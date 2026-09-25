@@ -1,0 +1,76 @@
+{
+  "driver": "OpenGL ES 3.2 Mesa 25.0.7-2",
+  "checks": {
+    "unlit_invariant_to_light_position": {
+      "measured": 0.0,
+      "maximum": 0,
+      "pass": true
+    },
+    "unlit_matches_source_rgb": {
+      "measured": 0.0,
+      "maximum": 1,
+      "pass": true
+    },
+    "mirror_normal_orientation_error": {
+      "measured": 1.0,
+      "maximum": 2,
+      "pass": true
+    },
+    "rotation_normal_orientation_error": {
+      "measured": 1.0,
+      "maximum": 2,
+      "pass": true
+    },
+    "native_resolution_normal_error_mean": {
+      "measured": 0.261854127284184,
+      "maximum": 1.5,
+      "pass": true
+    },
+    "static_live_material_equivalence": {
+      "measured": 0.0,
+      "maximum": 2,
+      "pass": true
+    },
+    "static_foreground_split_seam": {
+      "measured": 0.0,
+      "maximum": 2,
+      "pass": true
+    },
+    "foliage_whole_sprite_fade_opacity_drift": {
+      "measured": 0.0,
+      "maximum": 2,
+      "pass": true
+    },
+    "root_lock_pixel_motion": {
+      "measured": 0.0,
+      "maximum": 0,
+      "pass": true
+    }
+  },
+  "compiled_programs": [
+    "quadProg",
+    "bgMaterialProg",
+    "spriteProg",
+    "hdProg",
+    "hdFlatProg",
+    "hdTintProg",
+    "brightProg",
+    "blurProg",
+    "lightProg",
+    "shadowProg",
+    "shadowCompositeProg",
+    "postProg",
+    "waterProg",
+    "fxProg",
+    "guideProg",
+    "objectiveProg",
+    "foliage",
+    "foliageContact",
+    "foliageDebug",
+    "surfaceWater",
+    "surfaceGrass"
+  ],
+  "program_count": 21,
+  "failures": []
+}
+SPRITE PIXEL REGRESSION 4.14 PASS

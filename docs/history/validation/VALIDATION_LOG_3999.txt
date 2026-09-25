@@ -1,0 +1,94 @@
+Relay Moth Forest — Pretty Graphics Edition 3.999 validation
+
+$ node --check game.js
+OK
+$ node --check surfacefx.js
+OK
+$ python movement_regression_397.py
+Relay Moth Forest 3.97 — direct movement regression
+PASS
+movement cases: 30296
+free diagonal cases: 15148
+free diagonals preserving both axes: 15148
+maximum single-step displacement: 1.2 logical px
+mouse world-control: disabled by design
+per-frame player recovery snap: removed from gameplay update
+$ node input_regression.js
+INPUT REGRESSION PASSED
+  generic idle axis baseline -> no movement
+  sub-threshold/noisy button 0 -> no pulse edge
+  stable physical button press -> one edge only
+  release/re-press -> exactly one new edge
+  generic axis delta calibrated from connection baseline
+$ node npc_regression_399.js
+NPC REGRESSION 3.99 PASS
+no-route follower survived 240 frames; failCount=3 position=53.0,76.6
+$ python jitter_regression.py
+Relay Moth Forest 3.96 — keyboard jitter regression
+PASS
+cases: 10820
+maximum single-frame displacement: 1.2 logical px
+maximum unintended lateral displacement: 0 logical px
+legacy 2.75 px corner side-step: removed
+$ python fault_regression.py
+Relay Moth Forest 3.995.2 — recovered update fault regression
+PASS
+  frame faults preserve held keys
+  5 critical + 8 optional update subsystems isolated
+  optional repeated faults back off instead of throwing every frame
+  diagnostics filename is version-flexible; player movement remains direct
+$ python fault_regression_398.py
+Relay Moth Forest 3.995.2 — recovered update fault regression
+PASS
+  frame faults preserve held keys
+  5 critical + 8 optional update subsystems isolated
+  optional repeated faults back off instead of throwing every frame
+  diagnostics filename is version-flexible; player movement remains direct
+$ python transition_memory_regression.py
+TRANSITION MEMORY REGRESSION 3.995.2 PASS
+$ node surfacefx_regression.js
+SURFACEFX REGRESSION 3.999 PASS
+  shoreline field + rebuild invalidation validated
+  ripple list bounded; legacy/off fallback contract present
+  sparse grass generation deterministic and hard-capped
+  shader failure isolates SurfaceFX instead of aborting game startup
+$ node ambient_ai_regression_39953.js
+AMBIENT AI REGRESSION 3.995.4 PASS
+  completion-edge group seeding + safe avoidance + circle/scatter encounter validated
+  cat interest cooldown + squirrel edge escape validated
+$ python bridge_regression_39954.py
+TIN STREAM BRIDGE REGRESSION 3.995.4 PASS
+  coherent completed wooden bridge + four-row crossing + staged water authority validated
+$ node graphics_migration_regression_3999.js
+GRAPHICS MIGRATION REGRESSION 3.999 PASS
+  v3.998.1 settings migrate to decor-integrated grass; legacy Floater-FX is hidden by default
+$ python grass_shadow_regression_3999.py
+GRASS / SHADOW REGRESSION 3.999 PASS
+  decor-integrated rooted grass + hidden Floater-FX validated
+  lower-center origins + stronger width-matched spots + MAX shadow composition validated
+$ python self_test.py
+SURFACEFX REGRESSION 3.999 PASS
+  shoreline field + rebuild invalidation validated
+  ripple list bounded; legacy/off fallback contract present
+  sparse grass generation deterministic and hard-capped
+  shader failure isolates SurfaceFX instead of aborting game startup
+NPC REGRESSION 3.99 PASS
+no-route follower survived 240 frames; failCount=3 position=53.0,76.6
+GRAPHICS MIGRATION REGRESSION 3.999 PASS
+  v3.998.1 settings migrate to decor-integrated grass; legacy Floater-FX is hidden by default
+GRASS / SHADOW REGRESSION 3.999 PASS
+  decor-integrated rooted grass + hidden Floater-FX validated
+  lower-center origins + stronger width-matched spots + MAX shadow composition validated
+Relay Moth Forest 3.995.2 — recovered update fault regression
+PASS
+  frame faults preserve held keys
+  5 critical + 8 optional update subsystems isolated
+  optional repeated faults back off instead of throwing every frame
+  diagnostics filename is version-flexible; player movement remains direct
+Relay Moth Forest — Pretty Graphics Edition 3.999
+SELF-TEST PASSED
+  27 staged objective/exit routes
+  67 mini robots; 127 woodland creatures incl mushroom pixies/cats
+  162 large trees; 108 use original painted tree sprites
+  370 atlas regions + softened coordinate-matched bump atlas
+  decor-integrated rooted grass + unified MAX-composed shadows + existing gameplay invariants validated

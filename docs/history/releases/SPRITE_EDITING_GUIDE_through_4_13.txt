@@ -1,0 +1,72 @@
+RELAY MOTH FOREST 3.99 — SPRITE EDITING GUIDE
+==============================================
+
+RUNTIME ATLASES
+---------------
+assets/sprite_runtime_atlas.png    colour/alpha
+assets/sprite_bumpmap.png          coordinate-matched height/bump data
+assets/sprite_specularmap.png      coordinate-matched material/specular response
+hd_remake_atlas.json               named runtime rectangle authority
+
+EXTERNAL EDIT SHEETS
+--------------------
+Every category provides:
+    sprites_<category>.png
+    sprites_<category>_bump.png
+    sprites_<category>_edit_grid.png
+
+Categories:
+    large
+    small
+    terrain
+    characters
+    mini robots
+    foliage
+    trees
+    creatures
+    FX
+    UI
+
+The *_edit_grid.png versions add a 16 px reference grid, sprite boundaries, labels and
+coordinates. Edit the clean sheet rather than the annotated grid.
+
+3.99 CURRENT ART
+------------
+Foliage:
+    foliage_v391_00 .. foliage_v391_23
+
+Large trees:
+    tree_v391_00 .. tree_v391_07
+    plus matching masked trunk and canopy regions
+
+Woodland creatures:
+    squirrel / rabbit / cat / pixie / gnome
+    each with idle / blink / walk_a / walk_b
+
+The old foliage_extra_* regions were discovered to contain partial robot imagery and
+are deliberately excluded from all decorative foliage roles.
+
+BUMP MAP AUTHORING
+------------------
+Black/dark   recessed / cavity
+Mid gray     neutral body
+White/light  raised highlights
+
+3.99 uses softened finite-difference normal reconstruction, so bump edits are visibly
+more responsive than 3.9. Avoid isolated pure-white single pixels unless a very sharp
+specular point is intended.
+
+REGENERATE 3.99 AUTHORING ASSETS
+---------------------------------
+    py -3 -m pip install -r requirements-authoring.txt
+    py -3 build_v399_assets.py
+
+REBUILD MASTER ATLAS AFTER MANUAL SHEET EDITS
+---------------------------------------------
+    py -3 rebuild_runtime_atlas.py
+
+Map placements are external in relay_moth_maps.json and do not require repacking the
+atlas unless sprite pixels/regions change.
+
+V4.13 MATERIAL MAPS
+Run tools/generate_material_maps_413.py after changing HD decoration art when you want to regenerate broad tree-style bump data and material-aware specular response. Foliage is intentionally low-specular; metal/lamps/orbs are stronger.

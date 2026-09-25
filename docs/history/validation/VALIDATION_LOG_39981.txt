@@ -1,0 +1,26 @@
+Relay Moth Forest — Pretty Graphics Edition 3.998.1 validation
+
+PASS: node --check game.js
+PASS: node --check surfacefx.js
+PASS: python self_test.py
+PASS: python movement_regression_397.py
+PASS: node input_regression.js
+PASS: node npc_regression_399.js
+PASS: python jitter_regression.py
+PASS: python fault_regression.py
+PASS: python fault_regression_398.py
+PASS: python transition_memory_regression.py
+PASS: node surfacefx_regression.js
+PASS: node ambient_ai_regression_39952.js
+PASS: python bridge_regression_39954.py
+PASS: node graphics_migration_regression_39981.js
+PASS: python visual_behavior_regression_39981.py
+PASS: python grass_material_order_regression_39981.py
+PASS: Python compile checks
+
+Validated current contracts:
+- rooted three-band opaque/chunky grass
+- pink/purple Floater-FX copied from prior floating grass motion
+- optimized spatial-grid overlap ordering
+- front grass above moving actors, foreground trees above front grass
+- prior movement/NPC/water/bridge/tree/fault/memory contracts remain passing

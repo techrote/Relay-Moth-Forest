@@ -1,0 +1,10 @@
+NATIVE WEBGL room 1
+NATIVE WEBGL room 2
+NATIVE WEBGL room 3
+NATIVE WEBGL room 4
+NATIVE WEBGL room 5
+NATIVE WEBGL room 6
+NATIVE WEBGL room 7
+NATIVE WEBGL room 8
+NATIVE WEBGL room 9
+NATIVE BROWSER WEBGL2 PASS: nine rooms, material/quality toggles, resize, same-count edits, ghost geometry and UI input; ANGLE (Mesa, llvmpipe (LLVM 19.1.7 256 bits), OpenGL ES 3.2)

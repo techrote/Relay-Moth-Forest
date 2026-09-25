@@ -1,0 +1,246 @@
+4.14 — SPRITE RENDERING AUDIT / PIXEL-VERIFIED CORRECTIONS
+- Repaired robot material alpha and exact split-tree colour/material inheritance; deterministic staged source-art derivation.
+- Shared source-normal lighting across static/live/clipped sprites; corrected off states, mirrored/rotated normals and source-space resolution behavior.
+- Preserved whole-plant transition opacity without fragment masks; unified normal/tinted world sorting; connected fallback grass geometry.
+- Fixed complete SurfaceFX shader compilation, instanced VAO failure isolation, bounded dynamic flag uploads, oversized spatial queries and footer root bounds.
+- Invalidated same-count water/foliage edits; removed editor colour filter; matched ghost scales/anchors and rotated decor bounds.
+- Isolated save integration tests from real maps/backups.
+- Added strict 544-region / ten-tree audits, evaluated 21-program GLES pixel suite, and native Chromium WebGL2 room/settings/editor tests.
+
+4.13 — CLOSER FOLLOWERS + DECORATION MATERIAL MAPS
+- Casual robot followers now trail closer and accelerate more decisively when outside their comfort zone, without returning to rigid formation behavior.
+- Added a coordinate-matched `sprite_specularmap.png` alongside the runtime bump atlas.
+- Regenerated decoration bump regions with the same broad alpha/luminance height technique used for large trees; foliage is deliberately low-specular while metal/lamps/stone/wood receive material-aware response.
+- Static room decorations now emit world-space bump/specular material buffers and receive dynamic per-pixel normal/specular lighting rather than being permanently flat-baked into the background.
+- Live HD sprites and tall foreground decoration clips now sample the dedicated specular atlas as well.
+
+4.12 — OBJECT-LAYER WYSIWYG EDITING
+- Added OBJECT select tool for objective waypoint visuals, relay moth pickups, wildlife groups, mini-robot groups, and procedural ambient/pattern objects.
+- Objectives can be dragged to new tiles; deleting their editor object hides only the waypoint visual while preserving gameplay/story logic.
+- Added palette categories for relay moths, wildlife, mini robots, and ambient moon/star artwork.
+- Wildlife/moth/mini additions and removals refresh immediately in editor preview.
+- Added pattern_exclusions so generated ambient set dressing can be selected and removed. In Quiet Nest, the transparent moon/stars is `nest:swirl`; OBJECT-select it and press Delete/right-click.
+
+4.11 — WYSIWYG EDITOR INPUT OWNERSHIP FIX
+- Fixed palette/toolbar becoming non-interactive after selecting an item.
+- Corrected stacking order so the DOM editor UI is above the canvas interaction overlay.
+- Hardened pointer capture/release and canvas-vs-UI event ownership.
+- Palette and toolbar buttons are explicitly non-submit controls.
+
+4.10 — ON-CANVAS WYSIWYG ROOM EDITOR
+- Replaced the old F2 miniature map editor with a direct WYSIWYG authoring layer on the normal game view.
+- Added atlas-backed palette categories for tiles, blockers, trees, static decor, GrassFX clumps, lamps and robots.
+- Left-click brush painting, right-click decoration removal, selection/area select, drag move, internal copy/paste, delete, undo/redo and grid overlay.
+- Added optional editor_decor and decor_exclusions map fields; no migration required for existing rooms.
+- Edits rebuild the current Room/background/SurfaceFX/FoliageFX descriptors immediately while gameplay simulation is suspended.
+- Added localhost SAVE TO PROJECT endpoint with map-schema validation, timestamped backup and atomic relay_moth_maps.json replacement; Download JSON remains available.
+- Tab hides editor chrome for unobstructed WYSIWYG inspection while keeping editing active.
+
+4.09 — WHOLE-SPRITE FOLIAGE DEPTH + CASUAL FOLLOWERS + CLEAN PACKAGE
+- Removed all partial/fragment foliage foreground clipping. Foreground depth now fades a whole plant as a unit only when its lower-edge relationship is clearly in front of every overlapping actor.
+- Added conservative dwell/deadband behavior to reduce layer flicker while keeping the full plant continuously present in the background pass.
+- Replaced tight follower formation chasing with a broad casual follow zone, persistent personal targets, weak long-range cohesion and independent stuck recovery.
+- Consolidated historical docs, tests and authoring tools into subfolders so the release root contains only current runtime/package entry points.
+
+4.08 — COMPACT FOLLOWERS + TIN STREAM GRASS ENRICHMENT
+- Followers now maintain about the same minimum trailing distance while clustering into a tighter grouped formation where possible.
+- Added explicit compact formation slots, reduced over-separation, and added mild cohesion so grouped screenshot opportunities are easier to capture.
+- Room entry and teleport recovery now respawn followers into the compact formation instead of a loose ring.
+- Added denser authored grass layering along the right bank of level 3 / tin_stream for richer foliage examples.
+
+4.07 — STABLE PLANT-PROFILE OCCLUSION
+- Fixed the glitchy sliding top-cut profile on foreground grass/foliage occlusion.
+- Background pass still renders the full plant; foreground pass now uses a stable plant-local lower profile with soft alpha falloff instead of a moving hard cut silhouette.
+- Grouped lower-edge directional actor logic is preserved for choosing where local foreground coverage appears.
+- Result: less flicker and far less noticeable cutoff motion when actors move through grass.
+
+4.06 — DIRECTIONAL LOWER-EDGE FOLIAGE ANCHORING
+- Reworked foliage actor occlusion to use the center point of each sprite's lower edge as the primary origin.
+- Added directional bias so local foliage overlay favours the actor's travel direction rather than a symmetric blob.
+- Added grouped lower-edge lobes for wide / multi-tile sprites so occlusion behaves intelligently across larger bodies.
+- Updated interaction sources for player, followers, mini robots and wildlife to provide bottom-origin lower-body extents.
+- Diagnostics version corrected to 4.06.
+
+4.05 — FACE-SAFE FOLIAGE OCCLUSION
+- Fixed a remaining v4.05 occlusion bug where floor plants could draw over robot faces.
+- Constrained actor-local foliage overlay to a lower-body band instead of the full actor silhouette.
+- Updated diagnostics/version strings to 4.05.
+
+4.04 — ACTOR-LOCAL FOLIAGE OCCLUSION / NO-POP DEPTH FIX
+- Fixed the remaining whole-plant clipping/reordering visible when followers cross dense grass.
+- All physical foliage now remains continuously present in the background pass.
+- Foreground foliage is a local occlusion overlay clipped to only the actor silhouette(s) that the plant is actually in front of.
+- Per-instance depth state is now an 8-bit per-source mask, so one follower cannot force a plant in front of unrelated nearby actors.
+- Per-source hysteresis remains stable during contact but cannot leave stale masks when a source disappears.
+
+4.03 — STABLE GRASS ORDERING / FOLLOWER OCCLUSION FIX
+- Fixed moving grass/foliage changing sort order and popping in/out around robot followers.
+- Foliage pass membership now uses stable classifier flags instead of transient shader-side overlap recalc.
+- Hysteresis/hold now persists briefly even after contact ends.
+- Dynamic foreground flags are synchronized to the GPU instance buffer without rebuilding the foliage layout.
+
+4.02 — RENDER ORDER / CLIPPING / TREE-SEAM / LIGHTING AUDIT
+- Increased moving foliage stature with category-aware scale: short grass +34% height, fern +26%, broad leaf +18%, bush +12%, moss +8%; flowers stay 1.0x.
+- Increased fine GrassField blades by 24% height / 10% width.
+- Stable-sorted ordinary HD world sprites and foreground HD scenery by visual bottom-Y.
+- Sorted FoliageFX instances deterministically by root-Y for correct alpha-edge overlap.
+- Removed duplicate foreground tree-trunk submission; trunks are now drawn once and depth-sort with actors, while canopies remain foreground.
+- Replaced double-drawn tall wall-blocker tops with complementary static-lower / flat-foreground-upper clipping and removed the 72-top cap.
+- Added alpha-aware bump-neighbor sampling to HD sprites and FoliageFX to suppress false edge/seam normals.
+- Added tiny overlap between fallback rooted-grass deformation bands to suppress raster cracks.
+- Added render-order/seam regression and exact production HD/flat/tint GLSL compile-link validation.
+
+4.01 — FOLIAGE LIBRARY EXPANSION / SOFTER CONTACT TUNING
+- Added four new foliage source sheets to `assets/foliage_v401_sources/` and incorporated their extracted sprites into the runtime HD atlas.
+- Organized the additions into `foliage_v401_meadow`, `foliage_v401_grove`, `foliage_v401_ground` and `foliage_v401_reed` roles plus `foliage_v401_all`.
+- Foliage interaction diameter around the player/robots is reduced to ~60% of the v4.09 footprint.
+- Maximum grass/foliage deformation and stretch is reduced to ~50% of the v4.09 strength.
+- Pure standalone flower sprites are removed from the physical deformation pool; flowering foliage families use attenuated flower-friendly metadata profiles.
+- Legacy hero-grass fallback pools were updated so the same new art can appear when FoliageFX is unavailable.
+
+4.0 — GPU ROOTED FOLIAGEFX
+===========================
+- Added reusable `foliagefx.js` with registry, static instance buffer, coherent wind, bounded actor interaction, rooted deformation, foliage material, depth classifier and debug view.
+- Replaced the live CPU hero-grass render path with static GPU-instanced physical foliage while retaining dormant compatibility helpers for inherited regression coverage.
+- Added six metadata-driven foliage categories: GROUND_MOSS, SHORT_GRASS, FERN, BROAD_LEAF, FLOWER_CLUSTER and BUSH.
+- Root displacement is exactly zero; middle/upper deformation uses category-aware progressive bend weighting and quality tiers 0–3.
+- Added world-space primary wind, secondary coherent gusts and subtle deterministic variation; no independent per-instance sine-wobble authority.
+- Added source-alpha, non-additive, zero-emissive foliage shading combining broad bend pseudo-normal and stable low-frequency atlas bump response.
+- Added stable foliage contact AO through the existing MAX unified shadow compositor with authoritative water-mask rejection.
+- Added capped radial + velocity-drag actor interaction and actor-grid/root-Y depth classification with vertical-entry promotion and hysteresis.
+- Added Foliage FX graphics controls, debug views, v4 settings migration, `relay-moth-runtime-diagnostics-400.json`, and clean fault isolation.
+- Added dedicated FoliageFX/root/depth/metadata/current-visual regressions and integrated them into `self_test.py`.
+- Preserved the 27 routes, Tin Stream progression, WaterField, player input/movement, NPC/wildlife behavior, tree split/occlusion, LUT/post controls, save compatibility and `0Play.cmd`.
+
+3.999 — GRASS ART INTEGRATION / UNIFIED SHADOW COMPOSITION
+
+- Replaced flat/vector hero-grass rendering with rooted slices of the existing HD foliage/decor atlas (`foliage_v391`, `grass_patch`, `leaf_plant`, and HD foliage variants).
+- Disabled the fine instanced blade layer by default so normal 3.999 grass presentation is entirely consistent with existing floor decoration art; the reusable GrassField implementation remains available internally.
+- Retained actor-aware front/back grass ordering using bounded spatial bins, now with HD grass batches above/below actors.
+- Floater-FX remains implemented but is hidden by default and explicitly disabled during migration from 3.998.1.
+- Moved caster shadow origins from the sprite bottom edge into the lower-center footprint.
+- Increased contact spot-shadow intensity and tied its inner width directly to the projected-shadow width.
+- Added tapered shadow necks so projected shadows blend into contact spots rather than starting with a hard dark line.
+- Added a half-resolution pseudo-Z shadow mask using MAX composition. Overlapping shadows now unify rather than accumulating darker alpha layers.
+- Preserved shadow rejection over water.
+- Renamed launcher from `-Play.cmd` to `0Play.cmd`.
+
+3.998.1 — ROOTED GRASS / FLOATER-FX
+- Copied the old floaty hero-grass treatment into pink/purple Floater-FX.
+- Reworked visible grass into opaque chunky rooted tufts/fronds/bushes.
+- Bottom third of grass remains fixed; only mid/upper bands sway.
+- Added optimized 40 px actor-grid overlap sorting: vertical overlap promotes grass in front; lateral overlap uses bottom-Y ordering.
+- Added separate front-grass and foreground-scenery render batches so grass can occlude moving sprites without drawing over tree foregrounds.
+- Added Floater-FX controls and graphics migration to relayMothGraphics39981.
+
+3.998 — GRASS VISIBILITY PASS
+
+- Kept the existing authored / instanced GrassField, but added a second bounded hero-grass layer so grass is visibly readable in ordinary gameplay instead of disappearing into the floor palette.
+- Added procedural `grassBlade` and `grassTuft` masks to the small runtime sprite atlas.
+- Added dedicated ground-sprite batches rendered after SurfaceFX grass and before projected shadows / live actors.
+- Hero grass consumes the same per-room `grass_clumps`, is deterministic, wind-animated, LUT-coloured, and explicitly capped by quality tier.
+- Default quality 3 now produces >=280 visible hero tufts in each of the first three screenshot rooms; all nine rooms retain authored clumps.
+- Added `Grass visibility` graphics control (`grassHeroStrength`) and migrated 3.995.5 default grass settings forward while preserving deliberate custom settings.
+- F10 diagnostics now expose hero-grass rendered count and authored-clump count.
+- Retained the stronger v3.995.5 WaterField controls and soft spot-shadow fix unchanged.
+- Renamed `run_relay_moth_pretty_graphics.cmd` to `-Play.cmd` so the launcher sorts to the top of the folder.
+- Added `grass_visibility_regression_3998.py`, updated SurfaceFX/current visual regressions, and reran the full inherited suite.
+
+3.995.5 — WATER CONTROL HEADROOM / VISIBLE GRASS / SOFT SPOT SHADOWS
+
+- Raised SurfaceFX water control ceilings in the graphics panel: quality now exposes 0–4, ripple budget 1–12, and all major water-strength sliders have substantially higher maximum values for tuning.
+- Extended WaterField quality handling to accept quality level 4 and added two extra high-frequency analytical spectral bands for users who push the new top-end water controls.
+- Increased the bounded ripple-source cap from 8 to 12 while keeping the source queue explicitly capped for performance safety.
+- Strengthened grass visibility end-to-end: higher default grass density/wind/push values, brighter grass material colors, taller/wider blades, denser deterministic authored clumps, and a higher but still explicit hard cap.
+- GrassField now supports quality level 4 / density up to 4.0, with stronger coherent sway and interaction response so the effect is visibly present in ordinary gameplay.
+- Added soft-edged spot-shadow fans beneath sprite feet so the contact area blends naturally into projected shadows and hides the dark seam / black-line artifact at the start of the shadow.
+- Preserved water shadow rejection: projected and spot shadows still discard on the water mask, so no shadowing is applied to water surfaces.
+- Added 3.995.5 graphics-settings migration, diagnostics filename update, regression updates, and fresh validation coverage for the new shadow/grass/water contracts.
+
+3.995.4 — WATER / AUTHORED GRASS / ECOLOGY / COMPLETE BRIDGE PASS
+- Replaced finite-difference multi-sine idle water with an optimized analytical three-band pseudo-spectrum using deep-water dispersion and analytic gradients; retained bounded event ripples.
+- Shadows are clipped against the authoritative water mask; player shoreline movement creates splashes/ripples.
+- Added explicit `grass_clumps` to all nine rooms and increased readable instanced-grass presentation.
+- Added deterministic halfway-row vegetation inserts for dense adjacent foliage rows.
+- Halved wildlife from the oversized 3.995.3 scale; slightly enlarged mini robots; calmed full follower idle motion.
+- Cats chase rabbits or squirrels and sometimes play at water edges; rabbits inherit edge-escape jumps.
+- Tree foreground occlusion now redraws trunk/lower body as well as canopy over obscured actors.
+- Legacy flowers return closer to original scale; added three HD flower and three HD foliage families.
+- Completed Tin Stream switches to one coherent high-resolution wooden bridge sprite while preserving the four-row staged crossing.
+- Added reproducible v3.995.4 supplemental asset stage and current visual/behavior regression.
+
+3.995.3 — TREE / SURFACEFX / AMBIENT LIFE / TIN STREAM FIXUP PASS
+- Fixed split-tree rendering to use dedicated trunk + canopy layers, removing detached top-half trees.
+- Adjusted contact-shadow placement so shadows begin under art bases and no longer read over trees.
+- Repainted Tin Stream bridge tiles as wooden bridge art while preserving widened crossing width.
+- Increased water readability, foam, ripples and splashes; increased grass density/visibility and defaults.
+- Strengthened mini-robot post-completion grouping and circle/scatter behaviour.
+- Increased wildlife scale; cats move faster and lose interest sooner; squirrels now escape from any edge tile; mushroom pixies cluster and swirl.
+- Closed exit portal/gate state is now grey instead of blue.
+- Brightness / contrast / gamma controls remain present in the graphics menu.
+
+3.995.2 — VISUAL COHERENCE / AMBIENT LIFE / SURFACE MATERIAL PASS
+===================================================================
+- Large trees now use one full original HD/bump sprite and one logical scale; foreground canopy occlusion is cropped from the same UV/height source for continuous lighting.
+- Added foreground tall-scenery occlusion for ambient actors without changing collision authority.
+- Shadow/contact AO origins now use sprite foot/contact positions; added independent robot, large-decor and small-decor shadow width controls.
+- Mini robots avoid authored blocked/water areas with cheap target rejection/local repulsion; completed rooms gain free wandering, max-three groups and temporary two-group circle encounters.
+- Wildlife gains blocker/water avoidance, squirrel corner escape, periodic cat chase-interest cooldowns, water splashes and a further +50% render scale.
+- WaterField upgraded with stronger multi-band normals/detail, static-scene refraction, visible edge/shore response, stronger foam/highlights and tunable normal/detail/highlight/edge/refraction controls.
+- GrassField sparse clumps are more visible, with larger/taller blades, stronger material contrast, 7–9 derived clumps and a 1200 hard instance cap.
+- Tin Stream bridge now has dedicated deck/island sprites + bump art and a four-row (2x-width) staged crossing while preserving the four-rivet authority model.
+- Added post-process brightness, contrast, gamma, temperature, green/magenta tint, shadow lift and highlight gain.
+- Added ambient_ai_regression_39952.js and bridge_regression_39952.py; updated SurfaceFX/current self-tests.
+- Preserved v3.995.1 transition-memory fixes and the established direct player/input/NPC fault-isolation invariants.
+
+3.995.1 — PORTAL TRANSITION MEMORY / RECOVERY HOTFIX
+=======================================================
+- Fixed avoidable native-resolution OffscreenCanvas retention across room transitions.
+- Runtime static room canvases are now released immediately after WebGL upload; F8 rebuilds a temporary 640×360 export canvas on demand.
+- HD tint-cache canvas eviction now explicitly releases backing storage and is capped at 96 entries.
+- Added a 3840×2160-class framebuffer pixel budget plus MAX_TEXTURE_SIZE guard for pathological DPR/browser-zoom combinations.
+- WebGL context loss permits one automatic recovery reload per 15 seconds; repeated loss suppresses reload loops and leaves diagnostics visible.
+- WaterField retains only the small current 640×360 mask needed for quality rebuilds and releases the previous room mask on replacement.
+- Local Python server now bounds concurrent transfers, uses a fixed 32 KiB read buffer, and allows large image assets to be cached during recovery reloads.
+- Added transition_memory_regression.py and parallel localhost transfer stress validation.
+- SurfaceFX rendering/gameplay semantics otherwise unchanged from 3.995.
+
+3.995 — SURFACEFX BRIDGE PASS
+
+- Added reusable raw-WebGL2 `surfacefx.js` with independent WaterField and GrassField ownership.
+- WaterField consumes authoritative exposed-water masks; Tin Stream bridge-open cells remain excluded.
+- Added state-change shoreline distance field with quality resolutions 96x54 / 160x90 / 256x144.
+- Added bounded analytical multi-band wave normals, LUT-driven base/foam/highlight material, shoreline foam, and max-8 transient ripple sources.
+- Space pulse and Tin Stream construction can inject visual water ripples without changing gameplay authority.
+- Kept the original 3.99 water shader as SurfaceFX OFF / quality-0 / shader-failure fallback.
+- Added deliberately sparse deterministic grass clumps, one instanced draw, coherent wind, <=4 visual push fields, and a hard 900-instance ceiling.
+- Added SurfaceFX controls to the compact graphics panel and graphics migration to `relayMothGraphics3995`.
+- F10 diagnostics now include SurfaceFX resource, quality, rebuild, ripple, grass-instance and error state.
+- Replaced obsolete fault-regression filename coupling with a version-agnostic semantic regression; old script name remains a compatibility wrapper.
+- Corrected README/editor/architecture drift: current bump default 1.15, no world mouse control, >690 px direct follower teleport threshold, current mini/wildlife no-BFS policy, eight LUT channels including EFFECTS/fx_pulse.
+- Preserved 3.99 movement, input, NPC, route, story, lighting/order and content invariants; full baseline suite remains passing.
+
+3.99 — NPC / LIGHTING / FLOCK CONTROL PASS
+
+- Guarded all follower path results; no-route recovery now steps aside and retries up to three times.
+- Mini robots and wildlife switched to low-tick, non-colliding waypoint simulation.
+- +50% mini-robot render scale; +100% wildlife render scale; much higher authored populations.
+- Added mushroom pixie animation family and gnome/pixie/cat/squirrel/rabbit interactions.
+- Reintroduced original painted trees as the majority and rebuilt new variants from original tree art.
+- Softer bump-map generation and lower-frequency pseudo-normal sampling.
+- Shadows/AO remain below live characters.
+- Space pulse: dedicated fx_pulse LUT + shader + particles + emissive flash.
+- Native-resolution objective marker connected to the runtime renderer.
+- Objective-marker sprites filtered from same-room decoration.
+- Numeric, left-anchored graphics menu; max FPS; initial/complete ambient light; B full-light override.
+- Relay-moth orbit speed, distance and chaos are runtime-tunable.
+
+3.98 — UPDATE FAULT ISOLATION
+
+- Fixed direct cause of held-axis failure: recovered frame/update faults no longer clear the keyboard Set.
+- Split gameplay update into isolated named subsystems.
+- Player input/movement executes independently from decorative actors and particle systems.
+- Repeating optional subsystem faults enter short exponential backoff instead of throwing every animation frame.
+- Runtime badge now reports the exact faulting subsystem and exception message.
+- F10 exports a structured runtime diagnostic JSON with recent stacks, room, position, keys, renderer state and subsystem counters.
+- Existing direct 8-way deterministic swept-slide movement remains unchanged.

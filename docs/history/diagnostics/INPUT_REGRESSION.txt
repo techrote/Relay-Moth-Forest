@@ -1,0 +1,6 @@
+INPUT REGRESSION PASSED
+  generic idle axis baseline -> no movement
+  sub-threshold/noisy button 0 -> no pulse edge
+  stable physical button press -> one edge only
+  release/re-press -> exactly one new edge
+  generic axis delta calibrated from connection baseline

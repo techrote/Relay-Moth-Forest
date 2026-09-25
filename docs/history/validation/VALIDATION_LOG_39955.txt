@@ -1,0 +1,20 @@
+Relay Moth Forest — Pretty Graphics Edition 3.995.5 validation
+
+Commands executed
+1. node --check game.js
+2. node --check surfacefx.js
+3. node surfacefx_regression.js
+4. python self_test.py
+5. python visual_behavior_regression_39955.py
+
+Observed result
+- All commands completed successfully.
+- SurfaceFX regression passed.
+- Full self-test passed.
+- Visual / behavior regression 3.995.5 passed.
+
+Primary contracts revalidated
+- expanded water-control ceilings and quality-4 support
+- visible authored grass effect with explicit caps
+- soft spot-shadow masking while still rejecting water-shadowing
+- prior bridge / tree / wildlife / follower / objective invariants remain intact

@@ -1,0 +1,10 @@
+{
+  "regions": 544,
+  "split_resources": 20,
+  "files": {
+    "image": "7c2301d95cc7100ee68fe0cf705266e899e9dba7f1bfe2db3eef4e778d89d37e",
+    "bump_image": "81446dddcba3c5f3da1d3577c637774842206158c85487b2517e5d57f705a093",
+    "normal_image": "9cb54bf77c2ff3a5b391dffe847d43c7b8466e0c752c8fa1332dba3bd4644fb8",
+    "specular_image": "3fbd19ae8958194bc53ca650b69472cf6bd2ee2027c259c465a0c6e3a106813f"
+  }
+}

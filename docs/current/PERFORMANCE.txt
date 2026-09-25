@@ -1,0 +1,89 @@
+RELAY MOTH FOREST 3.99 — PERFORMANCE / STABILITY NOTES
+
+NPC simulation is deliberately split by cost:
+- Followers: collision-aware BFS only when needed, guarded no-route fallback, and short recovery steps.
+- Mini robots + wildlife: collision-free low-tick waypoints; no BFS and no map-collision queries.
+- Max framerate is user-editable (15–240) in the graphics menu.
+- Bump height uses broader Gaussian structure and the shader samples a wider footprint, reducing high-frequency highlight shimmer.
+
+HISTORICAL 3.94 MINI-ROBOT PATH BUDGET (NOT CURRENT)
+---------------------------
+At most two mini-guide BFS replans are allowed in one frame; deferred units retry shortly afterward. Mini guides also no longer contribute dynamic projected-shadow casters. This removes mini-robot-related frame spikes from the player input frame.
+
+RELAY MOTH FOREST 3.91 — PERFORMANCE NOTES
+===========================================
+
+3.91 increases material/shader fidelity but keeps expensive work bounded.
+
+STATIC WORK
+-----------
+The denser 4 px floor texture, organic foliage blockers and most scenery are rendered
+into the room's native-resolution static texture only when room/LUT/state/size changes.
+They are not redrawn as individual WebGL objects every frame.
+
+LIVE CANOPY BUDGET
+------------------
+Large trees have live foreground canopies so characters can pass behind them. To avoid
+turning a dense two-layer border into hundreds of live canopy quads, map data is capped
+at 18 split trees per room; other edge cells use precomposited foliage blockers.
+
+LIVE BOUNDS
+-----------
+    full-size followers           story-bounded
+    mini robots                   2–3 groups after Pip
+    woodland creatures            3–4 groups per room
+    relay moths                   collection-bounded
+    fireflies / trails            hard bounded
+    special shader effects        bounded active list
+    emissive lights               capped before upload
+
+POST PROCESS
+------------
+Bloom remains separable/half-resolution. AO/shadows are low-vertex light-map geometry,
+not a full geometry-buffer deferred renderer. Sprite pseudo-normal lighting is computed
+inside the existing HD sprite pass from the coordinate-matched bump texture.
+
+FLOOR
+-----
+Visual microtile size is 4 px but navigation stays 16 px, so floor visual density does
+not quadruple pathfinding cost.
+
+EXPECTED BOTTLENECK ORDER
+-------------------------
+1. native-resolution browser framebuffer fill / postprocess
+2. HD sprite alpha overdraw in very dense canopy rooms
+3. bloom + water + lighting passes
+4. JavaScript flock/follower/creature simulation
+
+The 18-tree foreground budget specifically limits item 2.
+
+No FPS figure is asserted from this container because performance in the software or
+virtual Chromium backend is not representative of the user's GPU/WebGL environment.
+
+3.93 collision/shadow note
+--------------------------
+Historical mouse pathfinding note: when world mouse control existed, clearance-aware pathfinding was evaluated only when a destination was set or replanned; it is not a per-frame global search. Shadow geometry remains bounded to the existing caster cap, but uses narrower footprints and therefore slightly less overdraw than 3.91.
+
+
+3.93 MOVEMENT COST
+------------------
+The continuous collision solver checks only the small neighbourhood of tiles overlapping the player's 3.25 px collision circle. At normal 60 FPS motion this is typically one substep and a handful of AABB tests; the cost is negligible compared with the WebGL render passes.
+
+
+3.95 INPUT / FX PERFORMANCE NOTES
+---------------------------------
+Repeated pulse storms could saturate both the bounded particle list and fullscreen additive FX pass when a noisy generic controller oscillated button 0. 3.95 debounces button edges, calibrates generic axes at connection, caps pulse frequency, reduces pulse particles (38 -> 22), and lowers the runtime particle cap (380 -> 300). Bloom now extracts luminance above a higher threshold instead of max-channel brightness, reducing the amount of half-resolution blur work contributing visible haze.
+
+
+3.96 INPUT STABILITY
+--------------------
+Keyboard movement no longer sums live gamepad axes, removing a per-frame input-vector source of jitter. The movement solver no longer evaluates large lateral pre-offset probes, so there are no collision-assist position jumps. Persistent blocked recovery is delayed and local depenetration is attempted first, avoiding expensive/visible teleport FX from transient numerical overlap.
+
+
+3.995.2 BOUNDED AMBIENT / SURFACE COSTS
+---------------------------------------
+Grass remains one instanced draw with quality caps 320 / 760 / 1200 and an absolute 1200
+instance bound. Mini-robot grouping is bounded by authored population and max-three groups;
+encounter state uses pair checks over the small current mini population. Wildlife obstacle
+avoidance samples only a local tile neighborhood and does not invoke BFS. Foreground tall-sprite
+occlusion is capped at 72 non-tree crops in addition to the existing 18 split trees per room.

@@ -1,0 +1,62 @@
+RELAY MOTH FOREST 3.995.1 — GRAPHICS / LIGHTING / SURFACE CONTROLS
+================================================================
+
+The compact left-anchored numeric graphics editor remains the runtime control surface.
+No CSS backdrop blur is used over the game.
+
+DISPLAY / POST
+    max framerate (15–240)
+    bloom enabled / strength / threshold
+    saturation / colour grade / vignette / fixed grain / exposure
+
+LIGHT / MATERIAL
+    emissive lighting
+    ambient initial / complete
+    force-complete-light override
+    emissive strength / radius
+    projected shadows / strength / length / softness
+    ambient occlusion / strength
+    sprite bump lighting / bump strength / specular response
+
+SURFACEFX
+    master enable
+    water material enable
+    water quality 0–3 (0 = legacy 3.99 shader)
+    water strength
+    wave scale / speed
+    shoreline foam strength
+    ripple strength / budget (1–8)
+    sparse grass enable
+    grass quality 0–3
+    grass density
+    coherent wind strength / speed
+    interaction push strength
+
+FX
+    objective / magic FX
+    special FX intensity
+    portal FX
+
+RELAY MOTH FLOCK
+    orbit speed / distance / chaos
+
+DEFAULTS ADDED BY 3.995
+    surfaceFX             true
+    waterQuality          2
+    waterWaveScale        1.00
+    waterWaveSpeed        1.00
+    shoreFoamStrength     0.72
+    waterRippleStrength   0.86
+    waterRippleBudget     8
+    grassFX               true
+    grassQuality          1
+    grassDensity          0.68
+    grassWindStrength     0.82
+    grassWindSpeed        1.00
+    grassPushStrength     0.82
+
+Existing defaults remain authoritative in game.js, notably bumpStrength=1.15,
+specular=0.28, ambientInitial=0.68 and ambientComplete=0.94.
+
+Graphics persistence now writes relayMothGraphics3995 and migrates from
+relayMothGraphics399 plus the pre-existing older-key chain.

@@ -1,0 +1,39 @@
+RELAY MOTH FOREST 4.14 — SPRITE MATERIAL AUTHORING
+
+AUTHORITATIVE INPUTS
+The colour/source sheets and hd_remake_atlas.json region/role metadata describe sprites.
+Edit clean sheets, not *_edit_grid.png reference images. Imported v4.01 foliage without
+a standard category sheet is preserved by the atlas rebuild utility.
+
+RUNTIME / DERIVED FILES
+assets/sprite_runtime_atlas.png   colour / source alpha
+assets/sprite_bumpmap.png         derived broad height (authoring/inspection)
+assets/sprite_normalmap.png       derived source-space normals / exact source alpha
+assets/sprite_specularmap.png     derived unassociated reflectivity / exact source alpha
+
+NORMAL ENCODING
+RGB encodes xyz as round(normal*127+128); flat normal is (128,128,255).
+Y is up. Renderers transform these vectors for geometry flip/rotation. Do not premultiply
+material RGB by alpha; alpha is carried separately and applied by compositing.
+
+BUILD
+python -m pip install -r tools/requirements-authoring.txt
+python tools/rebuild_runtime_atlas.py
+python self_test.py
+
+The rebuild utility calls tools/generate_material_maps_413.py (historical filename,
+current v4.14 implementation). Runtime materials are deterministically derived from
+source colour/alpha; previous runtime outputs are not inputs. Direct edits to derived
+PNG files will be replaced by the next build. Category bump sheets are retained as
+historical/reference authoring assets; they are not an override for the deterministic
+normal recipe. Modify source art or the controlled generator recipe to change derived
+materials deliberately.
+
+TREE SPLITS
+Do not edit derived child material resources independently. Children inherit parent
+height/normal/specular rectangles and exact child alpha. The strict asset regression
+checks full parent reconstruction and parent-material inheritance without averaged seam
+tolerances.
+
+Generated PNGs are staged and verified before replacing live files. Keep your own
+source backups before authoring; the package's tests never delete editor_backups.

@@ -1,0 +1,26 @@
+'use strict';
+const ROOT=require('path').resolve(__dirname,'../..');
+const fs=require('fs');
+const src=fs.readFileSync(ROOT+'/game.js','utf8');
+const a=src.indexOf('class GamepadInput{'), b=src.indexOf('\n\nclass Game{',a);
+if(a<0||b<0)throw new Error('GamepadInput class not found');
+global.window={addEventListener(){}};
+let pad={index:0,id:'Mock Generic HID',mapping:'',axes:[-1,0,0,0,-1],buttons:Array.from({length:16},()=>({value:0,pressed:false}))};
+Object.defineProperty(globalThis,'navigator',{value:{getGamepads:()=>[pad]},configurable:true});
+global.clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+eval(src.slice(a,b)+'\nglobalThis.GamepadInput=GamepadInput;');
+const g=new GamepadInput();
+function poll(t){return g.poll(t)}
+let q=poll(0); if(Math.hypot(q.x,q.y)>.001)throw new Error('generic baseline produced movement');
+pad.buttons[0].value=.65; q=poll(100); q=poll(180); if(q.just.has(0))throw new Error('noisy 0.65 button fired A');
+pad.buttons[0].value=1; q=poll(220); if(q.just.has(0))throw new Error('press fired before stability window'); q=poll(280); if(!q.just.has(0))throw new Error('stable press failed to fire'); q=poll(320); if(q.just.has(0))throw new Error('held press refired');
+pad.buttons[0].value=0; q=poll(380); q=poll(450); if(q.just.has(0))throw new Error('release fired');
+pad.buttons[0].value=1; q=poll(500); q=poll(565); if(!q.just.has(0))throw new Error('second stable press failed');
+pad.buttons[0].value=0; q=poll(650); q=poll(720);
+pad.axes[0]=-.45; q=poll(800); if(!(q.x>.2&&q.x<.8))throw new Error('baseline calibrated axis failed: '+q.x);
+console.log('INPUT REGRESSION PASSED');
+console.log('  generic idle axis baseline -> no movement');
+console.log('  sub-threshold/noisy button 0 -> no pulse edge');
+console.log('  stable physical button press -> one edge only');
+console.log('  release/re-press -> exactly one new edge');
+console.log('  generic axis delta calibrated from connection baseline');

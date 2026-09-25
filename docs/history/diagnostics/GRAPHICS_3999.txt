@@ -1,0 +1,18 @@
+Relay Moth Forest — Pretty Graphics Edition 3.999
+
+Grass
+- Main visible Grass FX now uses existing HD foliage/decor sprites rather than flat SpriteAtlas grass silhouettes.
+- Root band fixed; mid and upper bands receive progressively greater sway.
+- Fine instanced GrassField disabled by default (`grassFineFX=false`) but retained as reusable code.
+- Floater-FX retained but default OFF.
+- Actor-aware front/back ordering uses existing 40 px spatial bins and HD grass batches.
+
+Shadows
+- Contact origin moved upward to lower-center footprint: tree/small decor use a footprint inset; full followers use center + 0.24 × sprite height.
+- Stronger soft contact spot; inner spot radius matches projected shadow half-width.
+- Projected shadow starts with a tapered low-alpha neck.
+- All caster shadow geometry is composed into one half-resolution MAX mask and applied once to the scene.
+- Water-mask rejection remains active.
+
+Launcher
+- `0Play.cmd`

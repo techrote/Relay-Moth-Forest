@@ -1,0 +1,22 @@
+Relay Moth Forest 3.95 — INPUT / STICKINESS DIAGNOSTIC
+
+ROOT CAUSE FOUND
+----------------
+The generic-HID compatibility path treated the last joystick axis as a POV hat whenever the main stick appeared idle. Some Windows/gamepad drivers report the neutral POV axis as -1.0. The old decoder also mapped -1.0 to UP, so a connected but untouched generic controller could continuously inject movement into keyboard input. Because keyboard and gamepad vectors are summed, this felt like the player was sticking to certain walls/corners even while using WASD.
+
+The same generic device path used a single .55 button threshold. Noisy/analogue button 0 values could repeatedly cross that threshold, producing apparent random Space/A sparkle bursts.
+
+3.95 FIXES
+----------
+1. Generic axes are baseline-calibrated on connection.
+2. A POV axis is ignored while it remains at its calibrated neutral baseline.
+3. Generic button actions require >0.88 press, <0.24 release and 55 ms stable state.
+4. An action cannot fire until a full release/re-arm cycle occurs.
+5. Manual sparkle pulses are centrally rate-limited (180 ms pointer/keyboard, 320 ms controller).
+6. Keyboard auto-repeat cannot fire repeated Space pulses.
+7. Internal foliage collision now merges contiguous blocker cells and only insets exposed edges.
+8. Collision response preserves tangent velocity instead of killing individual axes.
+
+NODE REGRESSION
+---------------
+See INPUT_REGRESSION.txt. It verifies neutral generic axes, noisy button 0, stable button edges and calibrated axis movement.

@@ -1,0 +1,2572 @@
+{
+  "schema": "relay-moth-sprite-sheets/v4.01",
+  "grid_px": 16,
+  "categories": {
+    "characters": {
+      "image": "assets/sprites_characters.png",
+      "edit_image": "assets/sprites_characters_edit_grid.png",
+      "bump_image": "assets/sprites_characters_bump.png",
+      "size": [
+        2048,
+        1024
+      ],
+      "regions": {
+        "robot_lilac_blink": [
+          8,
+          8,
+          159,
+          161
+        ],
+        "robot_lilac_idle": [
+          175,
+          8,
+          170,
+          161
+        ],
+        "robot_lilac_walk_a": [
+          353,
+          8,
+          172,
+          161
+        ],
+        "robot_lilac_walk_b": [
+          533,
+          8,
+          168,
+          161
+        ],
+        "robot_warm": [
+          709,
+          8,
+          107,
+          161
+        ],
+        "robot_orange_blink": [
+          824,
+          8,
+          151,
+          160
+        ],
+        "robot_orange_idle": [
+          983,
+          8,
+          147,
+          160
+        ],
+        "robot_orange_walk_a": [
+          1138,
+          8,
+          152,
+          160
+        ],
+        "robot_orange_walk_b": [
+          1298,
+          8,
+          142,
+          160
+        ],
+        "robot_black_blink": [
+          1448,
+          8,
+          172,
+          151
+        ],
+        "robot_black_idle": [
+          1628,
+          8,
+          173,
+          151
+        ],
+        "robot_black_walk_a": [
+          1809,
+          8,
+          188,
+          151
+        ],
+        "robot_black_walk_b": [
+          8,
+          177,
+          174,
+          151
+        ],
+        "robot_ivy_blink": [
+          190,
+          177,
+          175,
+          150
+        ],
+        "robot_ivy_idle": [
+          373,
+          177,
+          181,
+          150
+        ],
+        "robot_ivy_walk_a": [
+          562,
+          177,
+          186,
+          150
+        ],
+        "robot_ivy_walk_b": [
+          756,
+          177,
+          176,
+          150
+        ],
+        "chibi_orange_leaf_0": [
+          940,
+          177,
+          143,
+          148
+        ],
+        "chibi_orange_leaf_1": [
+          1091,
+          177,
+          147,
+          148
+        ],
+        "chibi_orange_leaf_2": [
+          1246,
+          177,
+          148,
+          148
+        ],
+        "chibi_orange_leaf_3": [
+          1402,
+          177,
+          138,
+          148
+        ],
+        "robot_green": [
+          1548,
+          177,
+          104,
+          145
+        ],
+        "chibi_dark_repair_0": [
+          1660,
+          177,
+          158,
+          138
+        ],
+        "chibi_dark_repair_1": [
+          1826,
+          177,
+          162,
+          138
+        ],
+        "chibi_dark_repair_2": [
+          8,
+          336,
+          162,
+          138
+        ],
+        "chibi_dark_repair_3": [
+          178,
+          336,
+          158,
+          138
+        ],
+        "chibi_garden_white_0": [
+          344,
+          336,
+          158,
+          138
+        ],
+        "chibi_garden_white_1": [
+          510,
+          336,
+          162,
+          138
+        ],
+        "chibi_garden_white_2": [
+          680,
+          336,
+          164,
+          138
+        ],
+        "chibi_garden_white_3": [
+          852,
+          336,
+          158,
+          138
+        ],
+        "chibi_lilac_spot_0": [
+          1018,
+          336,
+          158,
+          138
+        ],
+        "chibi_lilac_spot_1": [
+          1184,
+          336,
+          151,
+          138
+        ],
+        "chibi_lilac_spot_2": [
+          1343,
+          336,
+          161,
+          138
+        ],
+        "chibi_lilac_spot_3": [
+          1512,
+          336,
+          158,
+          138
+        ],
+        "robot_cream_blink": [
+          1678,
+          336,
+          153,
+          136
+        ],
+        "robot_cream_idle": [
+          1839,
+          336,
+          153,
+          136
+        ],
+        "robot_cream_walk_a": [
+          8,
+          482,
+          170,
+          136
+        ],
+        "robot_cream_walk_b": [
+          186,
+          482,
+          155,
+          136
+        ],
+        "robot_headset_blink": [
+          349,
+          482,
+          182,
+          125
+        ],
+        "robot_headset_idle": [
+          539,
+          482,
+          178,
+          125
+        ],
+        "robot_headset_walk_a": [
+          725,
+          482,
+          186,
+          125
+        ],
+        "robot_headset_walk_b": [
+          919,
+          482,
+          179,
+          125
+        ],
+        "robot_pink_blink": [
+          1106,
+          482,
+          160,
+          125
+        ],
+        "robot_pink_idle": [
+          1274,
+          482,
+          158,
+          125
+        ],
+        "robot_pink_walk_a": [
+          1440,
+          482,
+          170,
+          125
+        ],
+        "robot_pink_walk_b": [
+          1618,
+          482,
+          173,
+          125
+        ],
+        "robot_cyan_blink": [
+          1799,
+          482,
+          177,
+          123
+        ],
+        "robot_cyan_idle": [
+          8,
+          626,
+          178,
+          123
+        ],
+        "robot_cyan_walk_a": [
+          194,
+          626,
+          180,
+          123
+        ],
+        "robot_cyan_walk_b": [
+          382,
+          626,
+          168,
+          123
+        ],
+        "chibi_cream_0": [
+          558,
+          626,
+          149,
+          122
+        ],
+        "chibi_cream_1": [
+          715,
+          626,
+          149,
+          122
+        ],
+        "chibi_cream_2": [
+          872,
+          626,
+          150,
+          122
+        ],
+        "chibi_cream_3": [
+          1030,
+          626,
+          146,
+          122
+        ],
+        "moth_cyan": [
+          1184,
+          626,
+          86,
+          120
+        ],
+        "chibi_pinkpods_0": [
+          1278,
+          626,
+          152,
+          116
+        ],
+        "chibi_pinkpods_1": [
+          1438,
+          626,
+          150,
+          116
+        ],
+        "chibi_pinkpods_2": [
+          1596,
+          626,
+          161,
+          116
+        ],
+        "chibi_pinkpods_3": [
+          1765,
+          626,
+          158,
+          116
+        ],
+        "chibi_whitepods_0": [
+          8,
+          757,
+          152,
+          116
+        ],
+        "chibi_whitepods_1": [
+          168,
+          757,
+          162,
+          116
+        ],
+        "chibi_whitepods_2": [
+          338,
+          757,
+          163,
+          116
+        ],
+        "chibi_whitepods_3": [
+          509,
+          757,
+          158,
+          116
+        ],
+        "moth_purple": [
+          675,
+          757,
+          112,
+          115
+        ],
+        "moth_bluepink": [
+          795,
+          757,
+          87,
+          114
+        ],
+        "moth_pink": [
+          890,
+          757,
+          90,
+          112
+        ],
+        "chibi_teal_companion_0": [
+          988,
+          757,
+          158,
+          108
+        ],
+        "chibi_teal_companion_1": [
+          1154,
+          757,
+          162,
+          108
+        ],
+        "chibi_teal_companion_2": [
+          1324,
+          757,
+          164,
+          108
+        ],
+        "chibi_teal_companion_3": [
+          1496,
+          757,
+          158,
+          108
+        ],
+        "moth_blue": [
+          1662,
+          757,
+          109,
+          108
+        ],
+        "moth_mint": [
+          1779,
+          757,
+          103,
+          107
+        ],
+        "moth_lilac": [
+          1890,
+          757,
+          114,
+          106
+        ],
+        "moth_orange": [
+          8,
+          881,
+          93,
+          106
+        ]
+      }
+    },
+    "creatures": {
+      "image": "assets/sprites_creatures.png",
+      "edit_image": "assets/sprites_creatures_edit_grid.png",
+      "bump_image": "assets/sprites_creatures_bump.png",
+      "size": [
+        2048,
+        128
+      ],
+      "regions": {
+        "creature_cat_blink": [
+          8,
+          8,
+          72,
+          72
+        ],
+        "creature_cat_idle": [
+          88,
+          8,
+          72,
+          72
+        ],
+        "creature_cat_walk_a": [
+          168,
+          8,
+          72,
+          72
+        ],
+        "creature_cat_walk_b": [
+          248,
+          8,
+          72,
+          72
+        ],
+        "creature_gnome_blink": [
+          328,
+          8,
+          72,
+          72
+        ],
+        "creature_gnome_idle": [
+          408,
+          8,
+          72,
+          72
+        ],
+        "creature_gnome_walk_a": [
+          488,
+          8,
+          72,
+          72
+        ],
+        "creature_gnome_walk_b": [
+          568,
+          8,
+          72,
+          72
+        ],
+        "creature_mushroom_pixie_blink": [
+          648,
+          8,
+          72,
+          72
+        ],
+        "creature_mushroom_pixie_idle": [
+          728,
+          8,
+          72,
+          72
+        ],
+        "creature_mushroom_pixie_walk_a": [
+          808,
+          8,
+          72,
+          72
+        ],
+        "creature_mushroom_pixie_walk_b": [
+          888,
+          8,
+          72,
+          72
+        ],
+        "creature_pixie_blink": [
+          968,
+          8,
+          72,
+          72
+        ],
+        "creature_pixie_idle": [
+          1048,
+          8,
+          72,
+          72
+        ],
+        "creature_pixie_walk_a": [
+          1128,
+          8,
+          72,
+          72
+        ],
+        "creature_pixie_walk_b": [
+          1208,
+          8,
+          72,
+          72
+        ],
+        "creature_rabbit_blink": [
+          1288,
+          8,
+          72,
+          72
+        ],
+        "creature_rabbit_idle": [
+          1368,
+          8,
+          72,
+          72
+        ],
+        "creature_rabbit_walk_a": [
+          1448,
+          8,
+          72,
+          72
+        ],
+        "creature_rabbit_walk_b": [
+          1528,
+          8,
+          72,
+          72
+        ],
+        "creature_squirrel_blink": [
+          1608,
+          8,
+          72,
+          72
+        ],
+        "creature_squirrel_idle": [
+          1688,
+          8,
+          72,
+          72
+        ],
+        "creature_squirrel_walk_a": [
+          1768,
+          8,
+          72,
+          72
+        ],
+        "creature_squirrel_walk_b": [
+          1848,
+          8,
+          72,
+          72
+        ]
+      }
+    },
+    "foliage": {
+      "image": "assets/sprites_foliage.png",
+      "edit_image": "assets/sprites_foliage_edit_grid.png",
+      "bump_image": "assets/sprites_foliage_bump.png",
+      "size": [
+        2048,
+        256
+      ],
+      "regions": {
+        "foliage_v391_00": [
+          8,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_01": [
+          144,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_02": [
+          280,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_03": [
+          416,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_04": [
+          552,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_05": [
+          688,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_06": [
+          824,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_07": [
+          960,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_08": [
+          1096,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_09": [
+          1232,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_10": [
+          1368,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_11": [
+          1504,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_12": [
+          1640,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_13": [
+          1776,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_14": [
+          1912,
+          8,
+          128,
+          100
+        ],
+        "foliage_v391_15": [
+          8,
+          116,
+          128,
+          100
+        ],
+        "foliage_v391_16": [
+          144,
+          116,
+          128,
+          100
+        ],
+        "foliage_v391_17": [
+          280,
+          116,
+          128,
+          100
+        ],
+        "foliage_v391_18": [
+          416,
+          116,
+          128,
+          100
+        ],
+        "foliage_v391_19": [
+          552,
+          116,
+          128,
+          100
+        ],
+        "foliage_v391_20": [
+          688,
+          116,
+          128,
+          100
+        ],
+        "foliage_v391_21": [
+          824,
+          116,
+          128,
+          100
+        ],
+        "foliage_v391_22": [
+          960,
+          116,
+          128,
+          100
+        ],
+        "foliage_v391_23": [
+          1096,
+          116,
+          128,
+          100
+        ]
+      }
+    },
+    "fx": {
+      "image": "assets/sprites_fx.png",
+      "edit_image": "assets/sprites_fx_edit_grid.png",
+      "bump_image": "assets/sprites_fx_bump.png",
+      "size": [
+        2048,
+        512
+      ],
+      "regions": {
+        "swirl_large": [
+          8,
+          8,
+          367,
+          316
+        ],
+        "spiral_wave": [
+          383,
+          8,
+          691,
+          147
+        ],
+        "guide_moon": [
+          1082,
+          8,
+          120,
+          124
+        ],
+        "moon_star_wave": [
+          1210,
+          8,
+          426,
+          124
+        ],
+        "spark_stream": [
+          1644,
+          8,
+          305,
+          124
+        ],
+        "orb_cyan": [
+          1957,
+          8,
+          82,
+          84
+        ],
+        "orb_blue": [
+          8,
+          332,
+          81,
+          83
+        ],
+        "orb_green": [
+          97,
+          332,
+          80,
+          83
+        ],
+        "orb_magenta": [
+          185,
+          332,
+          81,
+          83
+        ],
+        "orb_purple": [
+          274,
+          332,
+          80,
+          82
+        ],
+        "orb_orange": [
+          362,
+          332,
+          79,
+          81
+        ],
+        "orb_pillar": [
+          449,
+          332,
+          41,
+          75
+        ]
+      }
+    },
+    "large": {
+      "image": "assets/sprites_large.png",
+      "edit_image": "assets/sprites_large_edit_grid.png",
+      "bump_image": "assets/sprites_large_bump.png",
+      "size": [
+        2048,
+        1024
+      ],
+      "regions": {
+        "tree_pair": [
+          8,
+          8,
+          480,
+          356
+        ],
+        "tree_purple": [
+          496,
+          8,
+          235,
+          349
+        ],
+        "tree_green": [
+          739,
+          8,
+          273,
+          346
+        ],
+        "gate": [
+          1020,
+          8,
+          315,
+          341
+        ],
+        "canopy_tree_pair": [
+          1343,
+          8,
+          480,
+          256
+        ],
+        "canopy_tree_purple": [
+          8,
+          372,
+          235,
+          251
+        ],
+        "canopy_tree_green": [
+          251,
+          372,
+          273,
+          249
+        ],
+        "tree_purple_canopy": [
+          532,
+          372,
+          235,
+          223
+        ],
+        "tree_green_canopy": [
+          775,
+          372,
+          273,
+          221
+        ],
+        "tree_purple_trunk": [
+          1056,
+          372,
+          235,
+          126
+        ],
+        "tree_green_trunk": [
+          1299,
+          372,
+          273,
+          125
+        ]
+      }
+    },
+    "minirobots": {
+      "image": "assets/sprites_minirobots.png",
+      "edit_image": "assets/sprites_minirobots_edit_grid.png",
+      "bump_image": "assets/sprites_minirobots_bump.png",
+      "size": [
+        2048,
+        256
+      ],
+      "regions": {
+        "mini_charcoal_0": [
+          8,
+          8,
+          72,
+          72
+        ],
+        "mini_charcoal_1": [
+          88,
+          8,
+          72,
+          72
+        ],
+        "mini_charcoal_2": [
+          168,
+          8,
+          72,
+          72
+        ],
+        "mini_charcoal_3": [
+          248,
+          8,
+          72,
+          72
+        ],
+        "mini_lilac_0": [
+          328,
+          8,
+          72,
+          72
+        ],
+        "mini_lilac_1": [
+          408,
+          8,
+          72,
+          72
+        ],
+        "mini_lilac_2": [
+          488,
+          8,
+          72,
+          72
+        ],
+        "mini_lilac_3": [
+          568,
+          8,
+          72,
+          72
+        ],
+        "mini_mint_0": [
+          648,
+          8,
+          72,
+          72
+        ],
+        "mini_mint_1": [
+          728,
+          8,
+          72,
+          72
+        ],
+        "mini_mint_2": [
+          808,
+          8,
+          72,
+          72
+        ],
+        "mini_mint_3": [
+          888,
+          8,
+          72,
+          72
+        ],
+        "mini_orange_0": [
+          968,
+          8,
+          72,
+          72
+        ],
+        "mini_orange_1": [
+          1048,
+          8,
+          72,
+          72
+        ],
+        "mini_orange_2": [
+          1128,
+          8,
+          72,
+          72
+        ],
+        "mini_orange_3": [
+          1208,
+          8,
+          72,
+          72
+        ],
+        "mini_pink_0": [
+          1288,
+          8,
+          72,
+          72
+        ],
+        "mini_pink_1": [
+          1368,
+          8,
+          72,
+          72
+        ],
+        "mini_pink_2": [
+          1448,
+          8,
+          72,
+          72
+        ],
+        "mini_pink_3": [
+          1528,
+          8,
+          72,
+          72
+        ],
+        "mini_silver_0": [
+          1608,
+          8,
+          72,
+          72
+        ],
+        "mini_silver_1": [
+          1688,
+          8,
+          72,
+          72
+        ],
+        "mini_silver_2": [
+          1768,
+          8,
+          72,
+          72
+        ],
+        "mini_silver_3": [
+          1848,
+          8,
+          72,
+          72
+        ],
+        "mini_sky_0": [
+          1928,
+          8,
+          72,
+          72
+        ],
+        "mini_sky_1": [
+          8,
+          88,
+          72,
+          72
+        ],
+        "mini_sky_2": [
+          88,
+          88,
+          72,
+          72
+        ],
+        "mini_sky_3": [
+          168,
+          88,
+          72,
+          72
+        ],
+        "mini_teal_0": [
+          248,
+          88,
+          72,
+          72
+        ],
+        "mini_teal_1": [
+          328,
+          88,
+          72,
+          72
+        ],
+        "mini_teal_2": [
+          408,
+          88,
+          72,
+          72
+        ],
+        "mini_teal_3": [
+          488,
+          88,
+          72,
+          72
+        ],
+        "mini_black_blink": [
+          568,
+          88,
+          48,
+          48
+        ],
+        "mini_black_idle": [
+          624,
+          88,
+          48,
+          48
+        ],
+        "mini_black_walk_a": [
+          680,
+          88,
+          48,
+          48
+        ],
+        "mini_black_walk_b": [
+          736,
+          88,
+          48,
+          48
+        ],
+        "mini_cream_blink": [
+          792,
+          88,
+          48,
+          48
+        ],
+        "mini_cream_idle": [
+          848,
+          88,
+          48,
+          48
+        ],
+        "mini_cream_walk_a": [
+          904,
+          88,
+          48,
+          48
+        ],
+        "mini_cream_walk_b": [
+          960,
+          88,
+          48,
+          48
+        ],
+        "mini_cyan_blink": [
+          1016,
+          88,
+          48,
+          48
+        ],
+        "mini_cyan_idle": [
+          1072,
+          88,
+          48,
+          48
+        ],
+        "mini_cyan_walk_a": [
+          1128,
+          88,
+          48,
+          48
+        ],
+        "mini_cyan_walk_b": [
+          1184,
+          88,
+          48,
+          48
+        ],
+        "mini_headset_blink": [
+          1240,
+          88,
+          48,
+          48
+        ],
+        "mini_headset_idle": [
+          1296,
+          88,
+          48,
+          48
+        ],
+        "mini_headset_walk_a": [
+          1352,
+          88,
+          48,
+          48
+        ],
+        "mini_headset_walk_b": [
+          1408,
+          88,
+          48,
+          48
+        ],
+        "mini_ivy_blink": [
+          1464,
+          88,
+          48,
+          48
+        ],
+        "mini_ivy_idle": [
+          1520,
+          88,
+          48,
+          48
+        ],
+        "mini_ivy_walk_a": [
+          1576,
+          88,
+          48,
+          48
+        ],
+        "mini_ivy_walk_b": [
+          1632,
+          88,
+          48,
+          48
+        ],
+        "mini_lilac_blink": [
+          1688,
+          88,
+          48,
+          48
+        ],
+        "mini_lilac_idle": [
+          1744,
+          88,
+          48,
+          48
+        ],
+        "mini_lilac_walk_a": [
+          1800,
+          88,
+          48,
+          48
+        ],
+        "mini_lilac_walk_b": [
+          1856,
+          88,
+          48,
+          48
+        ],
+        "mini_orange_blink": [
+          1912,
+          88,
+          48,
+          48
+        ],
+        "mini_orange_idle": [
+          1968,
+          88,
+          48,
+          48
+        ],
+        "mini_orange_walk_a": [
+          8,
+          168,
+          48,
+          48
+        ],
+        "mini_orange_walk_b": [
+          64,
+          168,
+          48,
+          48
+        ],
+        "mini_pink_blink": [
+          120,
+          168,
+          48,
+          48
+        ],
+        "mini_pink_idle": [
+          176,
+          168,
+          48,
+          48
+        ],
+        "mini_pink_walk_a": [
+          232,
+          168,
+          48,
+          48
+        ],
+        "mini_pink_walk_b": [
+          288,
+          168,
+          48,
+          48
+        ]
+      }
+    },
+    "small": {
+      "image": "assets/sprites_small.png",
+      "edit_image": "assets/sprites_small_edit_grid.png",
+      "bump_image": "assets/sprites_small_bump.png",
+      "size": [
+        2048,
+        1024
+      ],
+      "regions": {
+        "lamp_blue": [
+          8,
+          8,
+          82,
+          140
+        ],
+        "lamp_pink": [
+          98,
+          8,
+          85,
+          129
+        ],
+        "lamp_orange": [
+          191,
+          8,
+          75,
+          126
+        ],
+        "foliage_mix_00": [
+          274,
+          8,
+          160,
+          118
+        ],
+        "foliage_mix_01": [
+          442,
+          8,
+          160,
+          118
+        ],
+        "foliage_mix_02": [
+          610,
+          8,
+          160,
+          118
+        ],
+        "foliage_mix_03": [
+          778,
+          8,
+          160,
+          118
+        ],
+        "foliage_mix_04": [
+          946,
+          8,
+          160,
+          118
+        ],
+        "foliage_mix_05": [
+          1114,
+          8,
+          160,
+          118
+        ],
+        "foliage_mix_06": [
+          1282,
+          8,
+          160,
+          118
+        ],
+        "foliage_mix_07": [
+          1450,
+          8,
+          160,
+          118
+        ],
+        "foliage_mix_08": [
+          1618,
+          8,
+          160,
+          118
+        ],
+        "foliage_mix_09": [
+          1786,
+          8,
+          160,
+          118
+        ],
+        "foliage_mix_10": [
+          8,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_11": [
+          176,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_12": [
+          344,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_13": [
+          512,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_14": [
+          680,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_15": [
+          848,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_16": [
+          1016,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_17": [
+          1184,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_18": [
+          1352,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_19": [
+          1520,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_20": [
+          1688,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_21": [
+          1856,
+          156,
+          160,
+          118
+        ],
+        "foliage_mix_22": [
+          8,
+          282,
+          160,
+          118
+        ],
+        "foliage_mix_23": [
+          176,
+          282,
+          160,
+          118
+        ],
+        "foliage_mix_24": [
+          344,
+          282,
+          160,
+          118
+        ],
+        "foliage_mix_25": [
+          512,
+          282,
+          160,
+          118
+        ],
+        "foliage_mix_26": [
+          680,
+          282,
+          160,
+          118
+        ],
+        "foliage_mix_27": [
+          848,
+          282,
+          160,
+          118
+        ],
+        "foliage_mix_28": [
+          1016,
+          282,
+          160,
+          118
+        ],
+        "foliage_mix_29": [
+          1184,
+          282,
+          160,
+          118
+        ],
+        "foliage_mix_30": [
+          1352,
+          282,
+          160,
+          118
+        ],
+        "foliage_mix_31": [
+          1520,
+          282,
+          160,
+          118
+        ],
+        "candelabra_small": [
+          1688,
+          282,
+          65,
+          113
+        ],
+        "candelabra_wide": [
+          1761,
+          282,
+          157,
+          111
+        ],
+        "lantern_cluster": [
+          8,
+          408,
+          171,
+          111
+        ],
+        "lantern_cyan": [
+          187,
+          408,
+          53,
+          109
+        ],
+        "lantern_blue": [
+          248,
+          408,
+          48,
+          108
+        ],
+        "bush_yellow": [
+          304,
+          408,
+          120,
+          100
+        ],
+        "bush_pair": [
+          432,
+          408,
+          173,
+          99
+        ],
+        "bush_blue": [
+          613,
+          408,
+          107,
+          95
+        ],
+        "foliage_extra_0_0": [
+          728,
+          408,
+          119,
+          91
+        ],
+        "foliage_extra_0_1": [
+          855,
+          408,
+          119,
+          91
+        ],
+        "flower_pink": [
+          982,
+          408,
+          90,
+          89
+        ],
+        "foliage_extra_2_0": [
+          1080,
+          408,
+          90,
+          89
+        ],
+        "foliage_extra_2_1": [
+          1178,
+          408,
+          90,
+          89
+        ],
+        "foliage_extra_7_0": [
+          1276,
+          408,
+          75,
+          83
+        ],
+        "foliage_extra_7_1": [
+          1359,
+          408,
+          75,
+          83
+        ],
+        "mushroom": [
+          1442,
+          408,
+          75,
+          83
+        ],
+        "flower_meadow": [
+          1525,
+          408,
+          53,
+          70
+        ],
+        "foliage_extra_1_0": [
+          1586,
+          408,
+          53,
+          70
+        ],
+        "foliage_extra_1_1": [
+          1647,
+          408,
+          53,
+          70
+        ],
+        "flower_blue": [
+          1708,
+          408,
+          56,
+          69
+        ],
+        "foliage_extra_3_0": [
+          1772,
+          408,
+          56,
+          69
+        ],
+        "foliage_extra_3_1": [
+          1836,
+          408,
+          56,
+          69
+        ],
+        "foliage_extra_8_0": [
+          1900,
+          408,
+          66,
+          67
+        ],
+        "foliage_extra_8_1": [
+          1974,
+          408,
+          66,
+          67
+        ],
+        "flower_bush": [
+          8,
+          527,
+          73,
+          66
+        ],
+        "foliage_extra_6_0": [
+          89,
+          527,
+          73,
+          66
+        ],
+        "foliage_extra_6_1": [
+          170,
+          527,
+          73,
+          66
+        ],
+        "foliage_extra_5_0": [
+          251,
+          527,
+          61,
+          65
+        ],
+        "foliage_extra_5_1": [
+          320,
+          527,
+          61,
+          65
+        ],
+        "leaf_plant": [
+          389,
+          527,
+          61,
+          65
+        ],
+        "flower_white": [
+          458,
+          527,
+          45,
+          49
+        ],
+        "foliage_extra_4_0": [
+          511,
+          527,
+          45,
+          49
+        ],
+        "foliage_extra_4_1": [
+          564,
+          527,
+          45,
+          49
+        ]
+      }
+    },
+    "terrain": {
+      "image": "assets/sprites_terrain.png",
+      "edit_image": "assets/sprites_terrain_edit_grid.png",
+      "bump_image": "assets/sprites_terrain_bump.png",
+      "size": [
+        2048,
+        1024
+      ],
+      "regions": {
+        "stone_tall": [
+          8,
+          8,
+          107,
+          133
+        ],
+        "blocker_foliage_00": [
+          123,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_01": [
+          259,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_02": [
+          395,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_03": [
+          531,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_04": [
+          667,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_05": [
+          803,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_06": [
+          939,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_07": [
+          1075,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_08": [
+          1211,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_09": [
+          1347,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_10": [
+          1483,
+          8,
+          128,
+          128
+        ],
+        "blocker_foliage_11": [
+          1619,
+          8,
+          128,
+          128
+        ],
+        "blocker_mixed_24": [
+          1755,
+          8,
+          128,
+          128
+        ],
+        "blocker_mixed_25": [
+          1891,
+          8,
+          128,
+          128
+        ],
+        "blocker_mixed_26": [
+          8,
+          149,
+          128,
+          128
+        ],
+        "blocker_mixed_27": [
+          144,
+          149,
+          128,
+          128
+        ],
+        "blocker_mixed_28": [
+          280,
+          149,
+          128,
+          128
+        ],
+        "blocker_mixed_29": [
+          416,
+          149,
+          128,
+          128
+        ],
+        "blocker_mixed_30": [
+          552,
+          149,
+          128,
+          128
+        ],
+        "blocker_mixed_31": [
+          688,
+          149,
+          128,
+          128
+        ],
+        "blocker_mixed_32": [
+          824,
+          149,
+          128,
+          128
+        ],
+        "blocker_mixed_33": [
+          960,
+          149,
+          128,
+          128
+        ],
+        "blocker_mixed_34": [
+          1096,
+          149,
+          128,
+          128
+        ],
+        "blocker_mixed_35": [
+          1232,
+          149,
+          128,
+          128
+        ],
+        "blocker_rock_12": [
+          1368,
+          149,
+          128,
+          128
+        ],
+        "blocker_rock_13": [
+          1504,
+          149,
+          128,
+          128
+        ],
+        "blocker_rock_14": [
+          1640,
+          149,
+          128,
+          128
+        ],
+        "blocker_rock_15": [
+          1776,
+          149,
+          128,
+          128
+        ],
+        "blocker_rock_16": [
+          1912,
+          149,
+          128,
+          128
+        ],
+        "blocker_rock_17": [
+          8,
+          285,
+          128,
+          128
+        ],
+        "blocker_rock_18": [
+          144,
+          285,
+          128,
+          128
+        ],
+        "blocker_rock_19": [
+          280,
+          285,
+          128,
+          128
+        ],
+        "blocker_rock_20": [
+          416,
+          285,
+          128,
+          128
+        ],
+        "blocker_rock_21": [
+          552,
+          285,
+          128,
+          128
+        ],
+        "blocker_rock_22": [
+          688,
+          285,
+          128,
+          128
+        ],
+        "blocker_rock_23": [
+          824,
+          285,
+          128,
+          128
+        ],
+        "blocker_tree_36": [
+          960,
+          285,
+          128,
+          128
+        ],
+        "blocker_tree_37": [
+          1096,
+          285,
+          128,
+          128
+        ],
+        "blocker_tree_38": [
+          1232,
+          285,
+          128,
+          128
+        ],
+        "blocker_tree_39": [
+          1368,
+          285,
+          128,
+          128
+        ],
+        "blocker_tree_40": [
+          1504,
+          285,
+          128,
+          128
+        ],
+        "blocker_tree_41": [
+          1640,
+          285,
+          128,
+          128
+        ],
+        "blocker_tree_42": [
+          1776,
+          285,
+          128,
+          128
+        ],
+        "blocker_tree_43": [
+          1912,
+          285,
+          128,
+          128
+        ],
+        "blocker_tree_44": [
+          8,
+          421,
+          128,
+          128
+        ],
+        "blocker_tree_45": [
+          144,
+          421,
+          128,
+          128
+        ],
+        "blocker_tree_46": [
+          280,
+          421,
+          128,
+          128
+        ],
+        "blocker_tree_47": [
+          416,
+          421,
+          128,
+          128
+        ],
+        "stone_orbs": [
+          552,
+          421,
+          106,
+          123
+        ],
+        "bridge": [
+          666,
+          421,
+          157,
+          118
+        ],
+        "stone_block": [
+          831,
+          421,
+          40,
+          98
+        ],
+        "grass_patch": [
+          879,
+          421,
+          119,
+          91
+        ],
+        "stump": [
+          1006,
+          421,
+          66,
+          67
+        ]
+      }
+    },
+    "trees": {
+      "image": "assets/sprites_trees.png",
+      "edit_image": "assets/sprites_trees_edit_grid.png",
+      "bump_image": "assets/sprites_trees_bump.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "regions": {
+        "tree_v391_00": [
+          8,
+          8,
+          260,
+          282
+        ],
+        "tree_v391_01": [
+          276,
+          8,
+          260,
+          282
+        ],
+        "tree_v391_02": [
+          544,
+          8,
+          260,
+          282
+        ],
+        "tree_v391_03": [
+          812,
+          8,
+          260,
+          282
+        ],
+        "tree_v391_04": [
+          1080,
+          8,
+          260,
+          282
+        ],
+        "tree_v391_05": [
+          1348,
+          8,
+          260,
+          282
+        ],
+        "tree_v391_06": [
+          1616,
+          8,
+          260,
+          282
+        ],
+        "tree_v391_07": [
+          8,
+          298,
+          260,
+          282
+        ],
+        "tree_v391trunk_00": [
+          276,
+          298,
+          260,
+          282
+        ],
+        "tree_v391trunk_01": [
+          544,
+          298,
+          260,
+          282
+        ],
+        "tree_v391trunk_02": [
+          812,
+          298,
+          260,
+          282
+        ],
+        "tree_v391trunk_03": [
+          1080,
+          298,
+          260,
+          282
+        ],
+        "tree_v391trunk_04": [
+          1348,
+          298,
+          260,
+          282
+        ],
+        "tree_v391trunk_05": [
+          1616,
+          298,
+          260,
+          282
+        ],
+        "tree_v391trunk_06": [
+          8,
+          588,
+          260,
+          282
+        ],
+        "tree_v391trunk_07": [
+          276,
+          588,
+          260,
+          282
+        ],
+        "tree_v391canopy_00": [
+          544,
+          588,
+          260,
+          155
+        ],
+        "tree_v391canopy_01": [
+          812,
+          588,
+          260,
+          155
+        ],
+        "tree_v391canopy_02": [
+          1080,
+          588,
+          260,
+          155
+        ],
+        "tree_v391canopy_03": [
+          1348,
+          588,
+          260,
+          155
+        ],
+        "tree_v391canopy_04": [
+          1616,
+          588,
+          260,
+          155
+        ],
+        "tree_v391canopy_05": [
+          8,
+          878,
+          260,
+          155
+        ],
+        "tree_v391canopy_06": [
+          276,
+          878,
+          260,
+          155
+        ],
+        "tree_v391canopy_07": [
+          544,
+          878,
+          260,
+          155
+        ]
+      }
+    },
+    "ui": {
+      "image": "assets/sprites_ui.png",
+      "edit_image": "assets/sprites_ui_edit_grid.png",
+      "bump_image": "assets/sprites_ui_bump.png",
+      "size": [
+        2048,
+        128
+      ],
+      "regions": {
+        "theme_dream": [
+          8,
+          8,
+          123,
+          99
+        ],
+        "theme_forest": [
+          139,
+          8,
+          123,
+          99
+        ],
+        "theme_ocean": [
+          270,
+          8,
+          121,
+          99
+        ],
+        "theme_sunset": [
+          399,
+          8,
+          121,
+          99
+        ],
+        "theme_winter": [
+          528,
+          8,
+          123,
+          99
+        ],
+        "gear": [
+          659,
+          8,
+          85,
+          90
+        ]
+      }
+    },
+    "bridge": {
+      "image": "assets/sprites_bridge.png",
+      "edit_image": "assets/sprites_bridge_edit_grid.png",
+      "bump_image": "assets/sprites_bridge_bump.png",
+      "size": [
+        144,
+        72
+      ],
+      "regions": {
+        "bridge_deck_tile": [
+          4,
+          4,
+          64,
+          64
+        ],
+        "bridge_island_tile": [
+          76,
+          4,
+          64,
+          64
+        ]
+      },
+      "material": "wood"
+    },
+    "foliage_hd": {
+      "image": "assets/sprites_foliage_hd.png",
+      "size": [
+        816,
+        144
+      ],
+      "regions": {
+        "flower_hd_bell": [
+          8,
+          8,
+          128,
+          128
+        ],
+        "flower_hd_star": [
+          144,
+          8,
+          128,
+          128
+        ],
+        "flower_hd_circuit": [
+          280,
+          8,
+          128,
+          128
+        ],
+        "foliage_hd_fern": [
+          416,
+          8,
+          128,
+          128
+        ],
+        "foliage_hd_moss": [
+          552,
+          8,
+          128,
+          128
+        ],
+        "foliage_hd_spiral": [
+          688,
+          8,
+          128,
+          128
+        ]
+      },
+      "note": "v3.995.4 high-resolution flower/foliage art at modest world scale",
+      "edit_image": "assets/sprites_foliage_hd_edit_grid.png",
+      "bump_image": "assets/sprites_foliage_hd_bump.png"
+    },
+    "bridge_complete": {
+      "image": "assets/bridge_complete.png",
+      "size": [
+        512,
+        256
+      ],
+      "regions": {
+        "bridge_complete": [
+          0,
+          0,
+          512,
+          256
+        ]
+      },
+      "material": "wood",
+      "note": "coherent full-span completed Tin Stream bridge",
+      "edit_image": "assets/bridge_complete_edit_grid.png",
+      "bump_image": "assets/bridge_complete_bump.png"
+    },
+    "foliage_v401_sources": {
+      "image_dir": "assets/foliage_v401_sources",
+      "sheets": {
+        "sheet_a": "assets/foliage_v401_sources/foliage_sheet_a.png",
+        "sheet_b": "assets/foliage_v401_sources/foliage_sheet_b.png",
+        "sheet_c": "assets/foliage_v401_sources/foliage_sheet_c.png",
+        "sheet_d": "assets/foliage_v401_sources/foliage_sheet_d.png"
+      },
+      "roles": {
+        "foliage_v401_meadow": [
+          "foliage_v401_meadow_r0c0",
+          "foliage_v401_meadow_r0c1",
+          "foliage_v401_meadow_r0c2",
+          "foliage_v401_meadow_r0c3",
+          "foliage_v401_meadow_r0c4",
+          "foliage_v401_meadow_r0c5",
+          "foliage_v401_meadow_r0c6",
+          "foliage_v401_meadow_r0c7",
+          "foliage_v401_meadow_r0c8",
+          "foliage_v401_meadow_r0c9",
+          "foliage_v401_meadow_r1c0",
+          "foliage_v401_meadow_r1c1",
+          "foliage_v401_meadow_r1c2",
+          "foliage_v401_meadow_r1c3",
+          "foliage_v401_meadow_r1c4",
+          "foliage_v401_meadow_r1c5",
+          "foliage_v401_meadow_r1c6",
+          "foliage_v401_meadow_r1c7",
+          "foliage_v401_meadow_r1c8",
+          "foliage_v401_meadow_r1c9",
+          "foliage_v401_meadow_r2c0",
+          "foliage_v401_meadow_r2c1",
+          "foliage_v401_meadow_r2c2",
+          "foliage_v401_meadow_r2c3",
+          "foliage_v401_meadow_r2c4",
+          "foliage_v401_meadow_r2c5",
+          "foliage_v401_meadow_r2c6",
+          "foliage_v401_meadow_r2c7",
+          "foliage_v401_meadow_r2c8",
+          "foliage_v401_meadow_r2c9",
+          "foliage_v401_meadow_r3c0",
+          "foliage_v401_meadow_r3c1",
+          "foliage_v401_meadow_r3c2",
+          "foliage_v401_meadow_r3c3",
+          "foliage_v401_meadow_r3c4",
+          "foliage_v401_meadow_r3c5",
+          "foliage_v401_meadow_r3c6",
+          "foliage_v401_meadow_r3c7",
+          "foliage_v401_meadow_r3c8",
+          "foliage_v401_meadow_r3c9",
+          "foliage_v401_meadow_r4c0",
+          "foliage_v401_meadow_r4c1",
+          "foliage_v401_meadow_r4c2",
+          "foliage_v401_meadow_r4c3",
+          "foliage_v401_meadow_r4c4",
+          "foliage_v401_meadow_r4c5",
+          "foliage_v401_meadow_r4c6",
+          "foliage_v401_meadow_r4c7",
+          "foliage_v401_meadow_r4c8",
+          "foliage_v401_meadow_r4c9"
+        ],
+        "foliage_v401_grove": [
+          "foliage_v401_grove_r0c0",
+          "foliage_v401_grove_r0c1",
+          "foliage_v401_grove_r0c2",
+          "foliage_v401_grove_r0c3",
+          "foliage_v401_grove_r0c4",
+          "foliage_v401_grove_r0c5",
+          "foliage_v401_grove_r0c6",
+          "foliage_v401_grove_r0c7",
+          "foliage_v401_grove_r0c8",
+          "foliage_v401_grove_r0c9",
+          "foliage_v401_grove_r0c10",
+          "foliage_v401_grove_r1c0",
+          "foliage_v401_grove_r1c1",
+          "foliage_v401_grove_r1c2",
+          "foliage_v401_grove_r1c3",
+          "foliage_v401_grove_r1c4",
+          "foliage_v401_grove_r1c5",
+          "foliage_v401_grove_r1c6",
+          "foliage_v401_grove_r1c7",
+          "foliage_v401_grove_r1c8",
+          "foliage_v401_grove_r1c9",
+          "foliage_v401_grove_r2c0",
+          "foliage_v401_grove_r2c1",
+          "foliage_v401_grove_r2c2",
+          "foliage_v401_grove_r2c3",
+          "foliage_v401_grove_r2c4",
+          "foliage_v401_grove_r2c5",
+          "foliage_v401_grove_r2c6",
+          "foliage_v401_grove_r3c0",
+          "foliage_v401_grove_r3c1",
+          "foliage_v401_grove_r3c2",
+          "foliage_v401_grove_r3c3",
+          "foliage_v401_grove_r3c4",
+          "foliage_v401_grove_r3c5",
+          "foliage_v401_grove_r3c6",
+          "foliage_v401_grove_r4c0",
+          "foliage_v401_grove_r4c1",
+          "foliage_v401_grove_r4c2",
+          "foliage_v401_grove_r4c3",
+          "foliage_v401_grove_r4c4",
+          "foliage_v401_grove_r4c5",
+          "foliage_v401_grove_r4c6"
+        ],
+        "foliage_v401_ground": [
+          "foliage_v401_ground_r0c0",
+          "foliage_v401_ground_r0c1",
+          "foliage_v401_ground_r0c2",
+          "foliage_v401_ground_r0c3",
+          "foliage_v401_ground_r0c4",
+          "foliage_v401_ground_r0c5",
+          "foliage_v401_ground_r0c6",
+          "foliage_v401_ground_r0c7",
+          "foliage_v401_ground_r0c8",
+          "foliage_v401_ground_r0c9",
+          "foliage_v401_ground_r1c0",
+          "foliage_v401_ground_r1c1",
+          "foliage_v401_ground_r1c2",
+          "foliage_v401_ground_r1c3",
+          "foliage_v401_ground_r1c4",
+          "foliage_v401_ground_r1c5",
+          "foliage_v401_ground_r1c6",
+          "foliage_v401_ground_r1c7",
+          "foliage_v401_ground_r1c8",
+          "foliage_v401_ground_r1c9",
+          "foliage_v401_ground_r2c0",
+          "foliage_v401_ground_r2c1",
+          "foliage_v401_ground_r2c2",
+          "foliage_v401_ground_r2c3",
+          "foliage_v401_ground_r2c4",
+          "foliage_v401_ground_r2c5",
+          "foliage_v401_ground_r2c6",
+          "foliage_v401_ground_r2c7",
+          "foliage_v401_ground_r3c0",
+          "foliage_v401_ground_r3c1",
+          "foliage_v401_ground_r3c2",
+          "foliage_v401_ground_r3c3",
+          "foliage_v401_ground_r3c4",
+          "foliage_v401_ground_r3c5",
+          "foliage_v401_ground_r3c6",
+          "foliage_v401_ground_r3c7",
+          "foliage_v401_ground_r4c0",
+          "foliage_v401_ground_r4c1",
+          "foliage_v401_ground_r4c2",
+          "foliage_v401_ground_r4c3",
+          "foliage_v401_ground_r4c4",
+          "foliage_v401_ground_r4c5",
+          "foliage_v401_ground_r4c6",
+          "foliage_v401_ground_r4c7"
+        ],
+        "foliage_v401_reed": [
+          "foliage_v401_reed_r0c0",
+          "foliage_v401_reed_r0c1",
+          "foliage_v401_reed_r0c2",
+          "foliage_v401_reed_r0c3",
+          "foliage_v401_reed_r0c4",
+          "foliage_v401_reed_r0c5",
+          "foliage_v401_reed_r0c6",
+          "foliage_v401_reed_r0c7",
+          "foliage_v401_reed_r0c8",
+          "foliage_v401_reed_r0c9",
+          "foliage_v401_reed_r0c10",
+          "foliage_v401_reed_r1c0",
+          "foliage_v401_reed_r1c1",
+          "foliage_v401_reed_r1c2",
+          "foliage_v401_reed_r1c3",
+          "foliage_v401_reed_r1c4",
+          "foliage_v401_reed_r1c5",
+          "foliage_v401_reed_r1c6",
+          "foliage_v401_reed_r1c7",
+          "foliage_v401_reed_r1c8",
+          "foliage_v401_reed_r2c0",
+          "foliage_v401_reed_r2c1",
+          "foliage_v401_reed_r2c2",
+          "foliage_v401_reed_r2c3",
+          "foliage_v401_reed_r2c4",
+          "foliage_v401_reed_r2c5",
+          "foliage_v401_reed_r2c6",
+          "foliage_v401_reed_r2c7",
+          "foliage_v401_reed_r2c8",
+          "foliage_v401_reed_r3c0",
+          "foliage_v401_reed_r3c1",
+          "foliage_v401_reed_r3c2",
+          "foliage_v401_reed_r3c3",
+          "foliage_v401_reed_r3c4",
+          "foliage_v401_reed_r3c5",
+          "foliage_v401_reed_r3c6",
+          "foliage_v401_reed_r3c7",
+          "foliage_v401_reed_r3c8"
+        ]
+      },
+      "count": 174
+    }
+  },
+  "notes": [
+    "v3.99: category sheets retain stable coordinates; creature/tree/bump authoring updated for the NPC and lighting pass.",
+    "Runtime sheets transparent; edit grids contain 16px guides, region outlines, names and coordinates.",
+    "Foliage, trees and creatures have dedicated external-edit sheets in v3.91."
+  ]
+}

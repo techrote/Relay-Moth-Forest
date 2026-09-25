@@ -1,0 +1,40 @@
+Relay Moth Forest — Pretty Graphics Edition 4.02
+FINAL VALIDATION SUMMARY
+
+Release focus:
+- enlarged moving grass/foliage with flowers held at 1.0x scale;
+- stable sprite/root-Y ordering;
+- complementary tall-blocker clipping;
+- single-submit tree trunks + foreground canopies;
+- tree split/seam validation for both supported split representations;
+- alpha-aware HD/FoliageFX bump normal sampling;
+- compatibility grass-band crack suppression.
+
+Automated validation:
+- full self_test.py PASS;
+- 27 staged routes PASS;
+- FoliageFX regressions PASS;
+- render_order_seam_regression_402.py PASS;
+- exact production FoliageFX GLSL compile/link PASS under surfaceless GLES3;
+- exact production HD/flat/tint GLSL compile/link PASS under surfaceless GLES3;
+- movement/input/jitter/transition-memory regressions PASS;
+- Tin Stream bridge regression PASS;
+- ambient AI + NPC regressions PASS;
+- graphics migration, grass/shadow and fault-isolation regressions PASS;
+- internal SHA256 manifest PASS before execution.
+
+Tree audit:
+- 10 split tree families validated;
+- 2 cropped-trunk split families;
+- 8 full-canvas alpha-masked-trunk split families;
+- source reconstruction and compatible world-scale contracts PASS.
+
+Clipping audit:
+- maximum current eligible authored tall wall blockers in one room: 103;
+- old 72-top foreground cap removed;
+- static lower / flat foreground upper source clips reconstruct exactly.
+
+Environment limitation:
+- Chromium headless visual smoke could not initialize EGL/ANGLE in this container.
+- This is not a shader syntax gap: exact production WebGL2/GLES3 shader programs compile and link successfully through the available surfaceless OpenGL ES 3.2 Mesa context.
+- A subjective Windows hardware-browser visual pass remains recommended for final grass-size taste tuning.

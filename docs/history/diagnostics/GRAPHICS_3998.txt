@@ -1,0 +1,29 @@
+Relay Moth Forest — Pretty Graphics Edition 3.998
+
+FOCUS: visible grass SurfaceFX.
+
+The fine instanced GrassField remains active and uses authored grass_clumps, deterministic
+instances, coherent wind and bounded push fields. v3.998 adds a separate hero-grass visibility
+layer because the fine GPU blades were not visually separating from the dark, busy forest floor
+in actual 1080p screenshots.
+
+Default grass settings:
+- grassFX: on
+- grassQuality: 3
+- grassDensity: 2.65
+- grassHeroStrength: 1.10
+- grassWindStrength: 1.18
+- grassWindSpeed: 1.08
+- grassPushStrength: 1.25
+
+Hero-grass design:
+- same authored clumps as GPU GrassField
+- deterministic tuft / blade placement
+- bounded count: q1 110, q2 220, q3 380, q4 520 maximum
+- high-contrast WORLD/far_forest LUT colours with occasional tree_lights accents
+- batched into one ground sprite batch rather than one draw call per tuft
+- rendered above static floor / GPU grass but below shadows and normal actors
+- visual-only; never modifies Room navigation or collision
+
+At q3 defaults the first three rooms each produce >=280 hero tufts, validated by
+`grass_visibility_regression_3998.py`.

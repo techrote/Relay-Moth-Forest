@@ -1,0 +1,31 @@
+Relay Moth Forest — Pretty Graphics Edition 3.97
+MOVEMENT CONTROLLER REWRITE
+
+Observed from the supplied Firefox recording:
+- player motion showed correction/state behaviour inconsistent with raw keyboard input;
+- several previous hotfix layers were all modifying the same frame of movement;
+- visual guide satellite motion could amplify the perception of positional jitter.
+
+Removed from normal gameplay:
+- mouse destination/path movement
+- mouse pulse/gather/wheel gameplay bindings
+- player acceleration/velocity response filter
+- candidate-scored collision movement
+- tangent corner probes
+- per-frame recoverPlayerIfBlocked()
+- moving guide satellites
+
+New movement pipeline:
+1. Read keyboard or gamepad. Keyboard has priority.
+2. Normalize keyboard diagonals to unit length.
+3. Convert directly to PLAYER_SPEED.
+4. Sweep the displacement in <=0.42 px substeps.
+5. Try the real diagonal substep first.
+6. If blocked, slide along X/Y in a deterministic, stable order.
+7. Never push/depenetrate/snap the player during ordinary movement.
+
+Regression:
+30,072 total movement cases
+15,036 unobstructed diagonal cases
+15,036/15,036 retained movement on both axes
+max requested/resulting free step: 1.2 logical px

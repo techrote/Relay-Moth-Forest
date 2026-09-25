@@ -1,0 +1,45 @@
+RELAY MOTH FOREST 3.99 — GRAPHICS / LIGHTING CONTROLS
+=====================================================
+
+GRAPHICS MENU
+-------------
+The Graphics + Lighting panel is a compact left-anchored floating editor. It does not
+apply CSS backdrop blur to the game. All scalar values are manually editable number
+fields rather than sliders.
+
+DISPLAY / POST
+    max framerate
+    bloom enabled, strength, threshold
+    saturation, colour grade, vignette, fixed grain, exposure
+
+LIGHT / MATERIAL
+    emissive lighting
+    ambient initial
+    ambient complete
+    force-complete-light override
+    emissive strength and radius
+    projected shadows, strength, length, softness
+    ambient occlusion and strength
+    sprite bump lighting, bump strength, specular response
+
+FX
+    water shader / strength
+    objective + magic shader FX / intensity
+    portal FX
+
+RELAY MOTH FLOCK
+    orbit speed
+    orbit distance
+    orbit chaos
+
+AMBIENT LIGHT PROGRESSION
+-------------------------
+Entering a room resets its ambient target to AMBIENT INITIAL. Once all objectives in
+that room are complete, ambient lighting eases toward AMBIENT COMPLETE. Press B during
+normal play to toggle the global force-complete-light override.
+
+BUMP / SHADOW ORDER
+-------------------
+The bump atlas is coordinate-matched to the colour atlas and deliberately low-frequency
+to avoid shimmering highlights. Projected shadows and contact AO are rendered before
+live character sprites, so character artwork is never darkened by its own shadow layer.

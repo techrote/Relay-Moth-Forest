@@ -1,0 +1,138 @@
+RELAY MOTH FOREST 4.02 — RUNTIME / FOLIAGEFX ARCHITECTURE
+=======================================================
+
+CURRENT RENDERER OWNERSHIP
+--------------------------
+GLRenderer
+  core scene / light / unified shadow / post passes
+  SurfaceFX
+    WaterField — exposed-water material, ripples, shore response
+    GrassField — fine low-level grass density/material motion
+  FoliageFX
+    FoliageRegistry — atlas metadata/category authority + safe defaults
+    FoliageInstanceBuffer — deterministic static per-room GPU instances
+    WindField — coherent world-space primary/secondary wind reference
+    InteractionField — hard-bounded actor sources and vertical-entry bias
+    RootedDeformation — exactly locked root with progressive bend weighting
+    FoliageMaterial — source-alpha, non-emissive diffuse/bump/bend shading
+    DepthClassifier — actor-grid/root-Y classification + hysteresis
+    DebugView — roots and bounded interaction-source visualization
+
+AUTHORITY BOUNDARY
+------------------
+FoliageFX is presentation-only. It may consume atlas regions/metadata, authored clumps, logical positions, time, bounded actor descriptors, lighting/LUT material data and graphics quality. It never owns or mutates collision, navigation, room completion, story objectives, bridge authority or save progression. Optional update/render failures disable the foliage subsystem without altering player input or movement.
+
+GPU / CPU BOUNDS
+----------------
+Visible foliage uses one static packed room instance buffer (112 bytes/instance) with a hard 208-instance quality-3 ceiling. Wind and interaction are uniforms, not per-plant CPU state. Actor sources are capped at eight; the CPU depth classifier queries a 40 px spatial grid only around those sources. Runtime drawing uses two instanced foliage passes plus one instanced contact-AO pass when AO is active. Instance data rebuilds only on room/descriptor or foliage-quality changes.
+
+RENDER ORDER
+------------
+floor -> static low decor -> SurfaceFX fine GrassField -> background FoliageFX -> unified shadow/contact mask -> actors -> foreground FoliageFX -> foreground tree/tall-scenery occluders -> top/objective/guide FX. The existing shadow compositor remains MAX-based and water-rejecting.
+
+FAULT ISOLATION
+---------------
+Floater-FX is a separate authored magical layer: OFF by default, independent of SurfaceFX, and fed only by explicit `floater_clumps` (none in the shipping v4 maps).
+
+FoliageFX initialization/shader/render exceptions are caught locally. The Foliage animation toggle and quality 0 both preserve static physical foliage while removing deformation/interaction; a true FoliageFX shader/runtime failure disables only that presentation subsystem. It never clears held keys, calls collision/pathfinding APIs, or changes progression.
+
+
+RELAY MOTH FOREST 3.995.2 — RUNTIME / SURFACE ARCHITECTURE
+========================================================
+
+AUTHORITY
+---------
+Gameplay truth remains external: maps own collision/water/placements, story owns
+progression, LUT JSON owns semantic palettes, effects JSON owns event presets, and the
+HD atlas owns sprite regions/material metadata. SurfaceFX consumes derived visual
+descriptors only and never mutates Room, StoryState, bridge progression or save state.
+
+LOGICAL MODEL
+-------------
+Viewport 640x360; gameplay 640x304 + 56 px HUD. Navigation/collision cells are 16 px;
+4 px floor microtiles are visual-only. Player movement remains deterministic <=0.42 px
+swept substeps with direct keyboard/gamepad input and no world mouse controller.
+
+NPC LOCOMOTION TIERS
+--------------------
+A. Full followers: collision-aware Room.findPath + Room.move, guarded no-route fallback,
+   loose spacing, rubber-band catch-up, very-large-distance recovery teleport.
+B. Mini robots / wildlife: collision-free low-tick waypoint ambience/hints, no BFS, no
+   Room.move, no projected shadows, unable to block or correct the player.
+
+FRAME / FAULT ISOLATION
+-----------------------
+Critical update steps: player, moth pickups, robot pickups, objectives, doors.
+Optional isolated steps: flock, followers, mini robots, wildlife, fireflies, particles,
+shader FX, SurfaceFX. A cosmetic fault cannot clear held keys or abort player movement.
+
+RENDER ORDER
+------------
+1 static native-resolution background
+2 water material (SurfaceFX WaterField; legacy 3.99 fallback retained)
+3 sparse instanced GrassField
+4 projected shadow/contact AO
+5 live sprites / HD materials / glows
+6 bloom
+7 bounded emissive light map
+8 post composite
+9 semantic fullscreen FX
+10 top particles/sprites
+11 objective marker
+12 guide shader
+
+SURFACEFX
+---------
+`surfacefx.js` is reusable raw WebGL2 and contains no Room/Story coupling.
+
+WaterField
+  input: exposed-water canvas mask + stable signature + semantic material colours
+  derived resource: 96x54 / 160x90 / 256x144 RGBA shoreline field for quality 1/2/3
+  rebuild: only when signature or quality changes
+  material: analytical multi-band waves, finite-difference normals, shore foam,
+            bounded ripples (max 8), semantic base/foam/highlight colours
+  fallback: quality 0, SurfaceFX OFF, or field/shader failure -> legacy 3.99 water
+
+GrassField
+  input: plain visual descriptor containing deterministic sparse clump centres/radii
+  generation: deterministic, quality-scaled, hard cap 1200 instances
+  render: one WebGL2 instanced blade batch; coherent low-frequency wind; max 4 push fields
+  authority: visual only; it receives no mutable collision structure
+
+DERIVED DATA ADAPTERS
+---------------------
+Game.buildWaterMask(): room.water minus bridgeOpen cells.
+Game.buildGrassSurfaceDescriptor(): derives only 4–5 sparse clumps near path edges from
+currently open ground, excluding walls/water/path/bridge/object cells. The result is a
+plain descriptor and cannot alter navigation.
+
+BOUNDS / DIAGNOSTICS
+--------------------
+Water ripples: max 8. Grass push fields: max 4. Grass hard cap: 1200 instances. Existing
+light/shadow/particle/FX caps remain unchanged. F10 diagnostics report SurfaceFX quality,
+field resolution/bytes/rebuilds, ripple occupancy, grass instances/cap/bytes/rebuilds,
+and recent SurfaceFX errors.
+
+HISTORICAL NOTE
+---------------
+Earlier 3.94 prose described mini-robot BFS and shared AI collision. That is historical;
+shipping 3.99/3.995 minis and wildlife use collision-free waypoint movement.
+
+
+3.995.2 RENDER / AMBIENT-LIFE ADDENDUM
+---------------------------------------
+Large-tree rendering now treats each split tree as one logical material object. The full
+original tree is rendered live through the coordinate-matched HD/bump shader, then the
+foreground canopy is redrawn as a UV crop of that same source after actors. This preserves
+one world scale and one height/light space while retaining foreground occlusion. Tall
+non-tree blockers receive a bounded foreground crop for the same actor-behind-scenery effect.
+
+Ambient mini robots and wildlife remain Tier-B non-blocking actors. They now consume Room
+collision/water only as read-only visual steering constraints: safe target selection plus a
+local obstacle-repulsion probe. They still do not own collision or invoke BFS. Completed-room
+mini robots add a bounded social FSM (free wander, grouped wander, full-group circle encounter,
+short encounter wander). Group size is capped at three.
+
+The Tin Stream bridge remains Room/Story-owned progression. Rendering consumes a four-row
+bridge-open set and dedicated bridge atlas roles; SurfaceFX consumes the remaining exposed
+water mask. Neither bridge art nor WaterField can change route authority.

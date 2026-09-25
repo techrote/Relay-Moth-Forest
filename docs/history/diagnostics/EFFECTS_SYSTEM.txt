@@ -1,0 +1,76 @@
+3.99 ADDITION
+-------------
+`pulse` now resolves through the dedicated `fx_pulse` 256-colour LUT in the EFFECTS channel. The manual Space pulse combines the reusable full-screen shader preset, bounded particles, and a short-lived emissive point light. All special-effect base colours remain external-data controlled.
+
+RELAY MOTH FOREST 3.995 — REUSABLE WEBGL EFFECTS SYSTEM
+=======================================================
+
+DATA AUTHORITY
+--------------
+relay_moth_effects.json
+
+A preset contains:
+    kind       shader branch ID
+    life       seconds
+    element    semantic colour LUT name
+    index      0..255 sample from that LUT
+    params     four generic floats
+
+COLOUR AUTHORITY
+----------------
+All named special effects now resolve base colour through the independent EFFECTS LUT
+channel. Current semantic effect LUTs:
+    fx_pulse
+    fx_magic
+    fx_water
+    fx_portal
+    fx_objective
+    fx_teleport
+    fx_creature
+
+This lets an effect's rendering algorithm remain unchanged while a theme completely
+recolours its base light/material response.
+
+CURRENT SHADER KIND VOCABULARY
+------------------------------
+0   sparkle pulse
+1   objective revelation
+2   robot teleport/materialisation
+3   relay-moth collection
+4   room-entry portal
+5   room-exit portal
+6   relay lamp ignition
+7   lantern branch/light growth
+8   bridge construction sweep
+9   Pip wake / eye response
+10  beacon radio pulse
+11  bell/song rings
+12  star constellation
+13  dawn rise
+14  mini-robot hint sparkle
+15  woodland-creature chime
+16  woodland-creature dash/wake trail
+17  AO/magic soft pulse
+
+OBJECTIVE ROUTING
+-----------------
+objective_map translates story objective kinds to named presets. Story/maps therefore
+contain no numeric shader IDs or GLSL.
+
+REUSE CONTRACT
+--------------
+gameplay event
+    -> semantic effect preset
+    -> preset kind + EFFECTS LUT role + lifetime + params
+    -> bounded fullscreen shader library
+
+An alternate game can retain EffectsLibrary / ShaderFX and replace the JSON. Additional
+shader kinds can be appended without invalidating old map or story formats.
+
+OTHER GPU PASSES
+----------------
+Water is a dedicated masked material pass and uses fx_water for its tunable base glow.
+Sprite pseudo-normal/bump lighting is integrated into the HD sprite material shader.
+Moth/firefly trails use bounded batched additive particles and feed bloom.
+Long-range emissive lighting, feathered projected shadows and contact AO are separate,
+tunable passes.

@@ -1,0 +1,86 @@
+{
+  "driver": "OpenGL ES 3.2 Mesa 25.0.7-2",
+  "checks": {
+    "unlit_invariant_to_light_position": {
+      "measured": 14.0,
+      "maximum": 0,
+      "pass": false
+    },
+    "unlit_matches_source_rgb": {
+      "measured": 20.0,
+      "maximum": 1,
+      "pass": false
+    },
+    "mirror_normal_orientation_error": {
+      "measured": 64.0,
+      "maximum": 2,
+      "pass": false
+    },
+    "rotation_normal_orientation_error": {
+      "measured": 51.0,
+      "maximum": 2,
+      "pass": false
+    },
+    "native_resolution_normal_error_mean": {
+      "measured": 0.6619801512287334,
+      "maximum": 1.5,
+      "pass": true
+    },
+    "static_live_material_equivalence": {
+      "measured": 57.0,
+      "maximum": 2,
+      "pass": false
+    },
+    "static_foreground_split_seam": {
+      "measured": 35.0,
+      "maximum": 2,
+      "pass": false
+    },
+    "foliage_whole_sprite_fade_opacity_drift": {
+      "measured": 36.0,
+      "maximum": 2,
+      "pass": false
+    },
+    "root_lock_pixel_motion": {
+      "measured": 0.0,
+      "maximum": 0,
+      "pass": true
+    }
+  },
+  "compiled_programs": [
+    "quadProg",
+    "bgMaterialProg",
+    "spriteProg",
+    "hdProg",
+    "hdFlatProg",
+    "hdTintProg",
+    "brightProg",
+    "blurProg",
+    "lightProg",
+    "shadowProg",
+    "shadowCompositeProg",
+    "postProg",
+    "waterProg",
+    "fxProg",
+    "guideProg",
+    "objectiveProg",
+    "foliage",
+    "foliageContact",
+    "foliageDebug",
+    "surfaceWater"
+  ],
+  "shader_compile_failures": {
+    "surfaceGrass": "surfaceGrass compile: 0:2(480): error: illegal use of reserved word `coherent'\n0:2(480): error: syntax error, unexpected ERROR_TOK, expecting ',' or ';'\n"
+  },
+  "program_count": 20,
+  "failures": [
+    "surfaceGrass compile",
+    "unlit_invariant_to_light_position",
+    "unlit_matches_source_rgb",
+    "mirror_normal_orientation_error",
+    "rotation_normal_orientation_error",
+    "static_live_material_equivalence",
+    "static_foreground_split_seam",
+    "foliage_whole_sprite_fade_opacity_drift"
+  ]
+}

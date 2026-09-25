@@ -1,0 +1,16 @@
+RELAY MOTH FOREST 3.995.1 — BUMP / MATERIAL LIGHTING
+==================================================
+
+Shipping defaults remain:
+    bumpStrength  1.15
+    specular      0.28
+    aoStrength    0.18
+
+The colour and bump atlases remain coordinate-identical. Height response is deliberately
+prefiltered/low-frequency; the HD sprite shader samples neighbouring height texels with a
+2.35-texel footprint and broad low-energy specular response to avoid the granular shimmer
+that earlier experiments produced on moving sprites.
+
+SurfaceFX does not change sprite bump authority. WaterField computes its own coherent
+analytical normals, while GrassField uses simple instanced geometry and LUT-driven colour.
+Projected shadows/contact AO remain below live character sprites.

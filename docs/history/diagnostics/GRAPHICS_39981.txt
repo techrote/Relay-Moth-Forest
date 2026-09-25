@@ -1,0 +1,19 @@
+Relay Moth Forest — Pretty Graphics Edition 3.998.1
+
+ROOTED GRASS
+- visible grass uses grassChunk / grassFrond / grassBush silhouettes
+- alpha 1.0, normal blending, no glow
+- bottom ~34% fixed at the authored root
+- mid band gets ~42% sway, upper band gets full sway
+- 40 px actor spatial bins avoid all-pairs depth tests
+- vertical actor overlap => grass front
+- lateral/slow overlap => bottom-Y ordering
+- front grass renders after moving actors but before foreground tree/scenery occluders
+
+FLOATER-FX
+- preserves the prior 3.998 whole-element drift/rotation treatment
+- recoloured through fx_magic / moth_wings pink-purple LUT ranges
+- toggle: floaterFX
+- strength: floaterStrength
+
+Underlying instanced GrassField remains active as fine ground structure.

@@ -1,0 +1,54 @@
+RELAY MOTH FOREST 3.995.2 — GRAPHICS / LIGHTING / SURFACE CONTROLS
+=================================================================
+
+DISPLAY / POST
+    max framerate
+    bloom enabled, strength, threshold
+    exposure
+    brightness
+    contrast
+    gamma
+    saturation
+    colour grade mix
+    temperature
+    green/magenta tint
+    shadow lift
+    highlight gain
+    vignette
+    fixed grain
+
+LIGHT / MATERIAL
+    emissive lighting
+    ambient initial / complete / force-complete override
+    emissive strength and radius
+    projected shadows: strength, length, softness
+    shadow width: robots
+    shadow width: large decor / trees
+    shadow width: small decor / bushes
+    ambient occlusion and strength
+    sprite bump lighting, bump strength, specular response
+
+SURFACE FX
+    SurfaceFX master
+    water enabled / quality / strength / wave scale / speed
+    shoreline foam
+    ripple strength / source budget
+    water normal strength
+    water detail strength
+    water highlight strength
+    water edge response
+    water refraction strength
+    grass enabled / quality / density
+    grass wind strength / speed
+    grass interaction push strength
+
+RELAY MOTH FLOCK
+    orbit speed
+    orbit distance
+    orbit chaos
+
+POST SEMANTICS
+Brightness is an additive linear-light offset after exposure/light/bloom composition. Contrast
+is centered around mid-grey. Gamma is a final transfer adjustment independent of exposure.
+Temperature and tint bias final channel balance; shadow lift and highlight gain provide simple
+tonality shaping without replacing semantic LUT colour selection.

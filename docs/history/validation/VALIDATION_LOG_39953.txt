@@ -1,0 +1,94 @@
+Relay Moth Forest — Pretty Graphics Edition 3.995.3
+FULL VALIDATION
+
+$ node --check game.js
+$ node --check surfacefx.js
+$ node --check ambient_ai_regression_39953.js
+$ node --check graphics_migration_regression_39953.js
+$ python -m py_compile ...
+
+$ python self_test.py
+SURFACEFX REGRESSION 3.995.3 PASS
+  shoreline field + rebuild invalidation validated
+  ripple list bounded; legacy/off fallback contract present
+  sparse grass generation deterministic and hard-capped
+  shader failure isolates SurfaceFX instead of aborting game startup
+NPC REGRESSION 3.99 PASS
+no-route follower survived 240 frames; failCount=3 position=38.6,42.0
+Relay Moth Forest 3.995.2 — recovered update fault regression
+PASS
+  frame faults preserve held keys
+  5 critical + 8 optional update subsystems isolated
+  optional repeated faults back off instead of throwing every frame
+  diagnostics filename is version-flexible; player movement remains direct
+Relay Moth Forest — Pretty Graphics Edition 3.995.3
+SELF-TEST PASSED
+  27 staged objective/exit routes
+  67 mini robots; 127 woodland creatures incl mushroom pixies/cats
+  162 large trees; 108 use original painted tree sprites
+  363 atlas regions + softened coordinate-matched bump atlas
+  continuous tree lighting + ambient social AI + wider bridge + stronger SurfaceFX validated
+$ python movement_regression_397.py
+Relay Moth Forest 3.97 — direct movement regression
+PASS
+movement cases: 30296
+free diagonal cases: 15148
+free diagonals preserving both axes: 15148
+maximum single-step displacement: 1.2 logical px
+mouse world-control: disabled by design
+per-frame player recovery snap: removed from gameplay update
+$ node input_regression.js
+INPUT REGRESSION PASSED
+  generic idle axis baseline -> no movement
+  sub-threshold/noisy button 0 -> no pulse edge
+  stable physical button press -> one edge only
+  release/re-press -> exactly one new edge
+  generic axis delta calibrated from connection baseline
+$ node npc_regression_399.js
+NPC REGRESSION 3.99 PASS
+no-route follower survived 240 frames; failCount=3 position=38.6,42.0
+$ python jitter_regression.py
+Relay Moth Forest 3.96 — keyboard jitter regression
+PASS
+cases: 10820
+maximum single-frame displacement: 1.2 logical px
+maximum unintended lateral displacement: 0 logical px
+legacy 2.75 px corner side-step: removed
+$ python fault_regression.py
+Relay Moth Forest 3.995.2 — recovered update fault regression
+PASS
+  frame faults preserve held keys
+  5 critical + 8 optional update subsystems isolated
+  optional repeated faults back off instead of throwing every frame
+  diagnostics filename is version-flexible; player movement remains direct
+$ python fault_regression_398.py
+Relay Moth Forest 3.995.2 — recovered update fault regression
+PASS
+  frame faults preserve held keys
+  5 critical + 8 optional update subsystems isolated
+  optional repeated faults back off instead of throwing every frame
+  diagnostics filename is version-flexible; player movement remains direct
+$ python transition_memory_regression.py
+TRANSITION MEMORY REGRESSION 3.995.2 PASS
+$ node surfacefx_regression.js
+SURFACEFX REGRESSION 3.995.3 PASS
+  shoreline field + rebuild invalidation validated
+  ripple list bounded; legacy/off fallback contract present
+  sparse grass generation deterministic and hard-capped
+  shader failure isolates SurfaceFX instead of aborting game startup
+$ node ambient_ai_regression_39953.js
+AMBIENT AI REGRESSION 3.995.3 PASS
+  completion-edge group seeding + safe avoidance + circle/scatter encounter validated
+  cat interest cooldown + squirrel edge escape validated
+$ node graphics_migration_regression_39953.js
+GRAPHICS MIGRATION REGRESSION 3.995.3 PASS
+  old default SurfaceFX values promoted; deliberate user values preserved
+$ python bridge_regression_39953.py
+TIN STREAM BRIDGE REGRESSION 3.995.3 PASS
+  wooden bridge sprites + four-row crossing + staged water authority validated
+$ python visual_behavior_regression_39953.py
+VISUAL / BEHAVIOR REGRESSION 3.995.3 PASS
+  split-tree continuity + shadow/occlusion ordering validated
+  stronger water/grass + visible splash contract validated
+  mini grouping/circle-scatter + wildlife behavior validated
+  grey disabled exit + post controls + wooden bridge validated

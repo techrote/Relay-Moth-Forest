@@ -1,0 +1,21 @@
+Relay Moth Forest — Pretty Graphics Edition 3.94
+MINI ROBOT / MOVEMENT DIAGNOSTIC
+=================================
+
+The v3.93 mini-guide robots were not explicit collision bodies: Room.blocked() is derived only from authored border, walls, water and staged bridge state. However, mini robots could still correlate with reported sticky movement in two ways:
+
+1. Every mini robot independently ran a BFS path replan on its own timer. Several replans could land on the same rendered frame and cause a visible input hitch.
+2. Mini robots were submitted to the projected-shadow caster list, making them look more physically solid than their gameplay semantics.
+
+v3.94 changes:
+- Mini robots are explicitly documented/implemented as non-blocking hint actors.
+- They are removed from projected-shadow casters.
+- At most two mini-robot path searches may start in one frame.
+- Replan cadence is reduced and surplus replans are deferred.
+- Mini robots repel away from the player's immediate 34 px vicinity instead of crowding the guide.
+- Internal foliage/rock/tree wall collision rectangles are inset 1.90 px from the visual tile edge.
+- Water and outer border collision remain full-tile solid.
+- Player collision radius is 2.85 px.
+- Player movement compares direct motion, both axis-slide orders, and conservative perpendicular corner-assist candidates, selecting the best forward-progress result.
+
+This means a mini robot cannot physically stop, push, or alter the player's collision result.

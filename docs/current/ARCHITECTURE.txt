@@ -1,0 +1,31 @@
+RELAY MOTH FOREST 4.14 — CURRENT RENDERING ARCHITECTURE
+
+Runtime scripts: surfacefx.js, sprite_material.js, foliagefx.js, editor.js, game.js.
+Logical scene: 640x360; playable area 640x304; gameplay tile 16 px.
+
+HDArtSheet owns source rectangles and metadata. Source art derives a matched height,
+normal and specular atlas. Runtime GPU materials upload colour/normal/specular.
+StaticPainter creates room colour + world-normal/specular buffers using shared
+sprite placement. GLRenderer runs shared sprite_material.js shading for static,
+live and clipped sprites. FoliageFX uses rooted instanced geometry with coherent
+wind, bounded actor sources, conservative directional lower-edge classification
+and alpha-conserving whole-plant background/foreground blending.
+
+CONTACT/DEPTH
+Ground/water/fine grass/low ground sprites -> unified shadow/contact mask -> physical
+background foliage -> merged bottom-Y HD world queue -> foreground foliage -> tall
+scenery/tree canopies -> guide/objective/top FX -> existing post/lighting stages.
+Trunks are not duplicated. Foreground/background plant passes do not cut sprites
+into actor-shaped fragments. Whole-plant fade changes do not multiply their opacity.
+
+EDITOR
+Editor overlays the normal view, without a colour-changing CSS filter. Geometry
+changes invalidate grass/water material caches even when object counts stay fixed.
+Ghost scales/anchors follow actual base sprite placement. Save tests are isolated
+from the user's project and backups. Gameplay is not driven by editor pointer code.
+
+VALIDATION
+See SPRITE_RENDER_AUDIT_414.md for measured findings and reproduction commands;
+MATERIAL_PIPELINE_414.md for the current material contract; docs/validation/v4.14/
+for baseline/fixed pixel JSON and native Chromium WebGL2 evidence. Historical
+architecture notes are retained under docs/history, not the current contract.

@@ -1,0 +1,26 @@
+Relay Moth Forest — Pretty Graphics Edition 3.93
+MOVEMENT REGRESSION
+===================
+
+Problem addressed
+-----------------
+Keyboard movement could feel sticky at blocker corners because v3.92 rejected
+whole X/Y movement components after a sampled collision test.
+
+3.93 changes
+------------
+- true circle-vs-AABB collision against authoritative blocker/water tiles
+- 3.25 px player collision radius
+- <=1.1 px continuous movement substeps
+- iterative overlap resolution, preserving tangent/sliding motion
+- conservative <=1.95 px corner assist only for strongly cardinal input
+- faster keyboard steering response after a direction change
+- recovery points must be clearance-valid
+
+Stress validation
+-----------------
+54,132 off-centre cardinal corridor/edge movement cases were simulated across
+all nine rooms (and all five Tin Stream bridge stages). Each case started up to
+4 px off corridor centre and was required to make meaningful forward progress.
+
+Failures: 0

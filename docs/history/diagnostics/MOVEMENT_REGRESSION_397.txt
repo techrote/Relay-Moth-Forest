@@ -1,0 +1,8 @@
+Relay Moth Forest 3.97 — direct movement regression
+PASS
+movement cases: 30072
+free diagonal cases: 15036
+free diagonals preserving both axes: 15036
+maximum single-step displacement: 1.2 logical px
+mouse world-control: disabled by design
+per-frame player recovery snap: removed from gameplay update

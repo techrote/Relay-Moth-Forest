@@ -1,0 +1,238 @@
+{
+  "schema": "relay-moth-effects/v3.99",
+  "max_active": 16,
+  "presets": {
+    "pulse": {
+      "kind": 0,
+      "life": 1.0,
+      "element": "fx_pulse",
+      "index": 244,
+      "params": [
+        1.15,
+        0,
+        0,
+        0
+      ]
+    },
+    "objective_generic": {
+      "kind": 1,
+      "life": 1.35,
+      "element": "fx_objective",
+      "index": 240,
+      "params": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "teleport": {
+      "kind": 2,
+      "life": 1.0,
+      "element": "fx_teleport",
+      "index": 230,
+      "params": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "moth_pickup": {
+      "kind": 3,
+      "life": 1.05,
+      "element": "fx_magic",
+      "index": 244,
+      "params": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "portal_start": {
+      "kind": 4,
+      "life": 1.45,
+      "element": "fx_portal",
+      "index": 238,
+      "params": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "portal_end": {
+      "kind": 5,
+      "life": 1.55,
+      "element": "fx_portal",
+      "index": 246,
+      "params": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "lamp_ignite": {
+      "kind": 6,
+      "life": 1.4,
+      "element": "fx_objective",
+      "index": 245,
+      "params": [
+        1.0,
+        10,
+        0,
+        0
+      ]
+    },
+    "lantern_branch": {
+      "kind": 7,
+      "life": 1.6,
+      "element": "fx_magic",
+      "index": 235,
+      "params": [
+        1.1,
+        7,
+        0,
+        0
+      ]
+    },
+    "bridge_build": {
+      "kind": 8,
+      "life": 1.6,
+      "element": "fx_objective",
+      "index": 235,
+      "params": [
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    "pip_wake": {
+      "kind": 9,
+      "life": 1.7,
+      "element": "fx_teleport",
+      "index": 240,
+      "params": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "beacon_ping": {
+      "kind": 10,
+      "life": 1.65,
+      "element": "fx_magic",
+      "index": 232,
+      "params": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "bell_song": {
+      "kind": 11,
+      "life": 1.75,
+      "element": "fx_magic",
+      "index": 220,
+      "params": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "star_constellation": {
+      "kind": 12,
+      "life": 1.6,
+      "element": "fx_magic",
+      "index": 248,
+      "params": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "dawn_rise": {
+      "kind": 13,
+      "life": 2.4,
+      "element": "fx_portal",
+      "index": 252,
+      "params": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "mini_hint": {
+      "kind": 14,
+      "life": 0.8,
+      "element": "fx_teleport",
+      "index": 220,
+      "params": [
+        0.8,
+        0,
+        0,
+        0
+      ]
+    },
+    "creature_chime": {
+      "kind": 15,
+      "life": 1.15,
+      "element": "fx_creature",
+      "index": 228,
+      "params": [
+        1.0,
+        5.0,
+        0.0,
+        0.0
+      ]
+    },
+    "creature_dash": {
+      "kind": 16,
+      "life": 0.7,
+      "element": "fx_creature",
+      "index": 204,
+      "params": [
+        0.8,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "ao_pulse": {
+      "kind": 17,
+      "life": 0.9,
+      "element": "fx_magic",
+      "index": 190,
+      "params": [
+        0.6,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "objective_map": {
+    "lamp": "lamp_ignite",
+    "lantern": "lantern_branch",
+    "rivet": "bridge_build",
+    "pip": "pip_wake",
+    "beacon": "beacon_ping",
+    "bell": "bell_song",
+    "star": "star_constellation",
+    "dawn": "dawn_rise"
+  },
+  "notes": [
+    "Effects are data-selected; the WebGL shader receives kind + four generic params. New games can reuse the same runtime and replace only this JSON.",
+    "Bridge-build effects use params to communicate segment progress and horizontal construction direction.",
+    "All v3.91 special effects resolve their base colour through dedicated EFFECTS-channel LUT elements.",
+    "v3.99: Space/pulse has an independent fx_pulse LUT base colour and a transient emissive light."
+  ]
+}

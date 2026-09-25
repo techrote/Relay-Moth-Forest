@@ -1,0 +1,10 @@
+'use strict';
+const ROOT=require('path').resolve(__dirname,'../..');
+const fs=require('fs'),assert=require('assert'),F=require(ROOT+'/foliagefx.js');
+assert.strictEqual(F.VERSION,'4.14');
+const game=fs.readFileSync(ROOT+'/game.js','utf8'),src=fs.readFileSync(ROOT+'/foliagefx.js','utf8');
+assert(game.includes('bottomY=y+h*.5'),'actor sources must use center of lower sprite edge as origin');
+assert(game.includes('groupSpan:tileSpan')&&game.includes('groupedHalfW'),'wide/multi-tile sprites must contribute grouped lower-edge footprint metadata');
+assert(src.includes('directional=clamp((Number(source.vy)||0)*.055,-3.0,3.0)'),'depth classifier must preserve directional bias');
+assert(src.includes('threshold=source.y+5.0-directional'),'depth threshold must be based on the lower-edge anchor');
+console.log('FOLIAGEFX ANCHOR/GROUPING REGRESSION 4.14 PASS');

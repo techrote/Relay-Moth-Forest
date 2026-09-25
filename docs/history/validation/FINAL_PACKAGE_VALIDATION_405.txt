@@ -1,0 +1,73 @@
+SURFACEFX REGRESSION 3.999 PASS
+  shoreline field + rebuild invalidation validated
+  ripple list bounded; legacy/off fallback contract present
+  sparse grass generation deterministic and hard-capped
+  shader failure isolates SurfaceFX instead of aborting game startup
+FOLIAGEFX REGRESSION 4.06 PASS
+  deterministic instances=17 hardCap=208 maxSources=8
+FOLIAGEFX DEPTH REGRESSION 4.06 PASS
+  bottom-Y, vertical promotion, hysteresis and tree-foreground ordering validated
+FOLIAGEFX OCCLUSION REGRESSION 4.06 PASS
+FOLIAGEFX METADATA REGRESSION 4.06 PASS
+  metadata_regions=211 categories=['BROAD_LEAF', 'BUSH', 'FERN', 'FLOWER_CLUSTER', 'GROUND_MOSS', 'SHORT_GRASS']
+EGL 1.5 · OpenGL ES 3.2 Mesa 25.0.7-2
+  main: compile + link PASS
+  contact: compile + link PASS
+  debug: compile + link PASS
+FOLIAGEFX GLSL ES 3.00 VALIDATION PASS
+VISUAL BEHAVIOR REGRESSION 4.06 PASS
+  reconstructed_tree_families=10; foliage/shadow/actor/tree ordering validated
+RENDER ORDER / CLIPPING / TREE SEAM / LIGHTING REGRESSION 4.06 PASS
+  tree split modes: cropped=2, full-canvas=8; tall authored blocker max/room=103
+  stable Y-sort, single-submit trunks, complementary blocker clips, edge-safe bump normals, enlarged moving grasses validated
+EGL 1.5 · OpenGL ES 3.2 Mesa 25.0.7-2
+  hd: compile + link PASS
+  flat: compile + link PASS
+  tint: compile + link PASS
+RENDER PIPELINE GLSL ES 3.00 VALIDATION PASS
+Relay Moth Forest 3.97 — direct movement regression
+PASS
+movement cases: 30296
+free diagonal cases: 15148
+free diagonals preserving both axes: 15148
+maximum single-step displacement: 1.2 logical px
+mouse world-control: disabled by design
+per-frame player recovery snap: removed from gameplay update
+INPUT REGRESSION PASSED
+  generic idle axis baseline -> no movement
+  sub-threshold/noisy button 0 -> no pulse edge
+  stable physical button press -> one edge only
+  release/re-press -> exactly one new edge
+  generic axis delta calibrated from connection baseline
+Relay Moth Forest 3.96 — keyboard jitter regression
+PASS
+cases: 10820
+maximum single-frame displacement: 1.2 logical px
+maximum unintended lateral displacement: 0 logical px
+legacy 2.75 px corner side-step: removed
+TRANSITION MEMORY REGRESSION 3.995.2 PASS
+TIN STREAM BRIDGE REGRESSION 3.995.4 PASS
+  coherent completed wooden bridge + four-row crossing + staged water authority validated
+AMBIENT AI REGRESSION 3.995.4 PASS
+  completion-edge group seeding + safe avoidance + circle/scatter encounter validated
+  cat interest cooldown + squirrel edge escape validated
+NPC REGRESSION 3.99 PASS
+no-route follower survived 240 frames; failCount=3 position=53.0,76.6
+GRAPHICS MIGRATION REGRESSION 3.999 PASS
+  v3.998.1 settings migrate to decor-integrated grass; legacy Floater-FX is hidden by default
+GRASS / SHADOW REGRESSION 3.999 PASS
+  decor-integrated rooted grass + hidden Floater-FX validated
+  lower-center origins + stronger width-matched spots + MAX shadow composition validated
+Relay Moth Forest 3.995.2 — recovered update fault regression
+PASS
+  frame faults preserve held keys
+  5 critical + 8 optional update subsystems isolated
+  optional repeated faults back off instead of throwing every frame
+  diagnostics filename is version-flexible; player movement remains direct
+Relay Moth Forest — Pretty Graphics Edition 4.05
+SELF-TEST PASSED
+  27 staged objective/exit routes
+  67 mini robots; 127 woodland creatures incl mushroom pixies/cats
+  162 large trees; 108 use original painted tree sprites
+  544 atlas regions + softened coordinate-matched bump atlas
+  GPU-instanced rooted FoliageFX + v4.05 lower-body foliage occlusion / face-safe ordering + unified MAX-composed shadows validated

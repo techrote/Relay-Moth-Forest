@@ -1,0 +1,3 @@
+# Runtime launcher needs only Python standard library. Tests/material tools require:
+Pillow>=10
+numpy>=1.26

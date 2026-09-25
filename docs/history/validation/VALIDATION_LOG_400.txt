@@ -1,0 +1,162 @@
+Relay Moth Forest — Pretty Graphics Edition 4.01
+VALIDATION LOG 400
+Date: 2026-09-05
+
+STATUS
+------
+PASS for the executable/static regression matrix available in this environment.
+The final package is not declared to have a measured GPU performance uplift; the design is bounded and CPU microprofiled, while actual end-user browser/GPU timing remains hardware/browser dependent.
+
+BASELINE
+--------
+The supplied v3.999 project was extracted separately and its current self-test/inherited movement, input, NPC, SurfaceFX, migration, grass/shadow, bridge, jitter, fault and transition-memory checks passed before v4 implementation work began.
+
+A historical `visual_behavior_regression_39981.py` assertion was confirmed stale because it also fails against the untouched supplied v3.999 baseline. It is not used as a v4 release gate. v4 uses `visual_behavior_regression_400.py`, which reconstructs the current ten split-tree families and validates the current render order/contracts.
+
+V4.0 FOLIAGE CONTRACT COVERAGE
+-------------------------------
+1. root band displacement exactly zero                         PASS
+2. upper deformation > middle deformation                     PASS
+3. deterministic instance generation                          PASS
+4. category metadata defaults                                 PASS
+5. hard instance cap                                           PASS
+6. bounded interaction source list (max 8)                    PASS
+7. physical foliage alpha/non-additive/emissive-zero          PASS
+8. coherent neighboring world-space wind                      PASS
+9. actor push local to nearby foliage                         PASS
+10. decaying recovery toward rest                             PASS
+11. lateral bottom-Y ordering                                 PASS
+12. vertical-entry foreground promotion                       PASS
+13. hysteresis prevents rapid depth flipping                  PASS
+14. foreground trees remain above foliage                     PASS
+15. animation-off / FoliageFX failure cannot mutate gameplay  PASS
+16. shader/upload/draw failure disables FoliageFX cleanly     PASS
+
+Additional v4 contracts:
+- quality 1: coarse bands + primary wind + simple shading      PASS
+- quality 2: secondary wind + bend pseudo-normal              PASS
+- quality 3: gust envelope + tip flutter + bump/bend normal   PASS
+- animation OFF keeps static physical foliage visible          PASS
+- two bounded recovery trail events per actor source           PASS
+- metadata authority covers all 6 required foliage categories  PASS
+- map data contains placement/clumps, not shader IDs            PASS
+- Floater-FX hidden by default                                 PASS
+- Floater-FX independent of SurfaceFX master                   PASS
+- Floater-FX uses explicit `floater_clumps` only                PASS
+- shipping v4 maps contain no automatic Floater placements     PASS
+- root contact AO uses unified MAX shadow mask                 PASS
+- root contact AO rejects authoritative water-mask pixels      PASS
+- normal FoliageFX draw budget is 3 bounded draws with AO      PASS
+- v3.999 CPU hero foliage is failure fallback only             PASS
+
+FINAL REGRESSION MATRIX
+-----------------------
+PASS  node --check surfacefx.js
+PASS  node --check foliagefx.js
+PASS  node --check game.js
+PASS  python movement_regression_397.py
+      30,296 movement cases; max single-step 1.2 logical px
+PASS  node input_regression.js
+PASS  node npc_regression_399.js
+PASS  python jitter_regression.py
+      10,820 cases; unintended lateral displacement 0
+PASS  python fault_regression.py
+PASS  python fault_regression_398.py
+PASS  python transition_memory_regression.py
+PASS  node surfacefx_regression.js
+PASS  node ambient_ai_regression_39953.js
+PASS  python bridge_regression_39954.py
+PASS  node graphics_migration_regression_3999.js
+PASS  python grass_shadow_regression_3999.py
+PASS  node foliagefx_regression_400.js
+PASS  node foliagefx_depth_regression_400.js
+PASS  python foliagefx_metadata_regression_400.py
+PASS  python foliagefx_glsl_regression_400.py
+PASS  python visual_behavior_regression_400.py
+PASS  python self_test.py
+      27 staged objective/exit routes
+      67 mini robots
+      127 woodland creatures
+      162 large trees; 108 original painted tree sprites
+      370 atlas regions
+
+GLSL VALIDATION
+---------------
+`foliagefx_glsl_regression_400.py` extracted the exact production shader strings from `foliagefx.js` and compiled/linked them in this environment using:
+
+  EGL 1.5
+  OpenGL ES 3.2 Mesa 25.0.7-2
+
+PASS main vertex + fragment compile/link
+PASS contact-AO vertex + fragment compile/link
+PASS debug vertex + fragment compile/link
+
+This caught and corrected an intermediate cross-stage integer precision mismatch before packaging.
+
+WEBGL API SMOKE
+---------------
+`foliagefx_regression_400.js` includes a Mock WebGL2 API smoke that executes the actual FoliageFX constructor, static buffer upload, background/foreground renders, contact AO, debug draw, animation-off static rendering, descriptor failure and forced runtime draw failure.
+
+Normal non-debug FoliageFX structural draw budget:
+  1 background instanced foliage draw
+  1 foreground instanced foliage draw
+  1 instanced contact-AO draw when AO is enabled
+
+No draw call per plant is present.
+
+LOCALHOST RESOURCE SMOKE
+------------------------
+PASS `relay_moth_server.py --no-browser` startup and HTTP fetch of:
+- index.html
+- foliagefx.js
+- hd_remake_atlas.json
+- assets/sprite_runtime_atlas.png
+- assets/sprite_bumpmap.png
+- relay_moth_maps.json
+
+Automated Chromium navigation itself is blocked by administrator policy in this execution sandbox, so no claim is made that an automated browser screenshot/playthrough was completed here. Shader compile/link, renderer API smoke, source/static contracts and localhost resource delivery were validated independently instead.
+
+CPU / BOUNDS PROFILE
+--------------------
+Environment-local Node microprofile (not a cross-hardware performance claim):
+
+Q3 generated physical foliage instances by room:
+  quiet_nest       77
+  lantern_lane     90
+  tin_stream       90
+  fern_hollow     101
+  home_loop        81
+  whisper_orchard  85
+  star_battery     90
+  dawn_tree       100
+  morning_garden   76
+
+Measured in this container:
+  deterministic Q3 generation mean: ~0.0348 ms / room build
+  8-source interaction + spatial depth update: ~0.0254 ms / simulated frame
+  dense tested room static instance bytes: 11,312 bytes
+
+Architectural bounds:
+  hard physical foliage cap: 208 instances
+  packed instance size: 112 bytes
+  hard actor source cap: 8
+  quality source budgets: 0 / 4 / 6 / 8
+  no per-frame CPU plant simulation
+  no actor x every-plant CPU scan
+  no per-plant draw call
+  no per-instance texture
+  instance buffers rebuild only on descriptor/room or quality changes
+
+LAUNCHER / VERSION
+------------------
+PASS VERSION.txt identifies Pretty Graphics Edition 4.01
+PASS relay_moth_server.py identifies Pretty Graphics Edition 4.01
+PASS index.html identifies Pretty Graphics Edition 4.01
+PASS runtime diagnostics filename is relay-moth-runtime-diagnostics-400.json
+PASS 0Play.cmd exists
+PASS -Play.cmd absent
+PASS run_relay_moth_pretty_graphics.cmd absent
+
+PACKAGE VALIDATION
+------------------
+The project is intended to be zipped, extracted to a clean directory, and the key current suite rerun there. Final archive extraction results and external archive SHA-256 are recorded after final packaging outside this in-archive log, because changing this log after hashing would change the archive checksum.

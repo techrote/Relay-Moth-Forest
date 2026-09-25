@@ -1,0 +1,56 @@
+RELAY MOTH FOREST 4.11 — WYSIWYG EDITOR GUIDE
+
+F2  WYSIWYG ROOM EDITOR
+
+The normal 640x360 game view is the editor. There is no separate miniature map canvas.
+Gameplay simulation is suspended while editor mode owns the pointer, but the normal renderer
+continues to show the current room and every edit is rebuilt into that view immediately.
+
+MOUSE
+  Left click           paint with Brush, select with Select, or drag with Move
+  Left drag            continuous paint / area select / move current selection
+  Right click/drag     remove authored decoration under pointer; if none exists, suppress
+                       procedural decoration on that tile
+
+TOOLS
+  B                    Brush
+  S                    Select / box select
+  V                    Move selection
+  E                    Erase (may erase tiles as well as decorations)
+  Tab                  hide/show editor chrome while keeping canvas editing active
+  Delete / Backspace   delete selection
+  Ctrl+C / Ctrl+V      copy/paste selection at current cursor position
+  Ctrl+Z / Ctrl+Y      undo/redo editor changes
+  Esc / F2             close editor
+
+PALETTE
+  Tiles       path, water, solid blocker, clear
+  Blockers    HD blocker sprite variants + collision
+  Trees       large split-tree families + matching collision authority
+  Decor       explicit static HD sprite decoration
+  Grass FX    moving GrassField/FoliageFX clump presets
+  Lamps       mounted authored lamp placements
+  Robots      decorative robot variants
+
+SAVE
+  SAVE TO PROJECT writes relay_moth_maps.json through the localhost Python launcher.
+  A timestamped backup is written to editor_backups/ first.
+  DOWNLOAD JSON is always available if the project-save endpoint is unavailable.
+
+AUTHORING FIELDS
+  editor_decor      optional explicit free-position static decoration array
+  decor_exclusions optional [tileX,tileY] entries suppressing generated decoration
+
+Existing maps do not require migration; both fields are optional.
+
+v4.12 OBJECT LAYER
+------------------
+Press O or click OBJECT to select gameplay/ambient objects without terrain getting in the way.
+Selectable object classes include objective waypoint visuals, relay moth pickups, wildlife spawn groups,
+mini-robot groups and removable procedural ambient/pattern art.
+
+Quiet Nest's large transparent crescent/star field is the procedural object `nest:swirl`.
+OBJECT-select the "Moon / star swirl" outline and press Delete (or right-click it) to store a
+`pattern_exclusions` entry. Use SAVE TO PROJECT to persist it.
+
+Palette tabs MOTHS, WILDLIFE, MINI ROBOTS and AMBIENT create new object-layer content.

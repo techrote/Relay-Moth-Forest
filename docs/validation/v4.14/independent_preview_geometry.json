@@ -1,0 +1,35 @@
+{
+  "method": "native Canvas2D ghost against independently specified runtime base scale/anchor",
+  "checks": [
+    {
+      "kind": "decor",
+      "scale": 0.62,
+      "anchor": "bottom",
+      "error": 0
+    },
+    {
+      "kind": "ambient",
+      "scale": 0.85,
+      "anchor": "bottom",
+      "error": 0
+    },
+    {
+      "kind": "moth",
+      "scale": 0.36,
+      "anchor": "center",
+      "error": 0
+    },
+    {
+      "kind": "wildlife",
+      "scale": 1.755,
+      "anchor": "center",
+      "error": 0
+    },
+    {
+      "kind": "mini",
+      "scale": 1.52,
+      "anchor": "center",
+      "error": 0
+    }
+  ]
+}

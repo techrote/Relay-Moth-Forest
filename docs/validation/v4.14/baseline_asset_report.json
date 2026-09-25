@@ -1,0 +1,311 @@
+{
+  "regions": 544,
+  "badbounds": [],
+  "mismatched_alpha_regions": 32,
+  "alpha_examples": [
+    {
+      "name": "robot_lilac_blink",
+      "pixels": [
+        11912,
+        11912
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_lilac_idle",
+      "pixels": [
+        12268,
+        12268
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_lilac_walk_a",
+      "pixels": [
+        12447,
+        12447
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_lilac_walk_b",
+      "pixels": [
+        12271,
+        12271
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_orange_blink",
+      "pixels": [
+        14123,
+        14123
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_orange_idle",
+      "pixels": [
+        14391,
+        14391
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_orange_walk_a",
+      "pixels": [
+        17574,
+        17574
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_orange_walk_b",
+      "pixels": [
+        17767,
+        17767
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_black_blink",
+      "pixels": [
+        16493,
+        16493
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_black_idle",
+      "pixels": [
+        16402,
+        16402
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_black_walk_a",
+      "pixels": [
+        16401,
+        16401
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    },
+    {
+      "name": "robot_black_walk_b",
+      "pixels": [
+        16396,
+        16396
+      ],
+      "max_alpha_delta": [
+        64,
+        64
+      ]
+    }
+  ],
+  "trees": [
+    {
+      "tree": "tree_purple",
+      "maps": {
+        "image": {
+          "opaque_rgb_mean_error": 0.0,
+          "alpha_max_error": 185.0
+        },
+        "bump_image": {
+          "opaque_rgb_mean_error": 0.04219447902174709,
+          "alpha_max_error": 185.0
+        },
+        "specular_image": {
+          "opaque_rgb_mean_error": 0.0034231529618510654,
+          "alpha_max_error": 185.0
+        }
+      }
+    },
+    {
+      "tree": "tree_green",
+      "maps": {
+        "image": {
+          "opaque_rgb_mean_error": 0.0,
+          "alpha_max_error": 0.0
+        },
+        "bump_image": {
+          "opaque_rgb_mean_error": 0.07697532261716097,
+          "alpha_max_error": 0.0
+        },
+        "specular_image": {
+          "opaque_rgb_mean_error": 0.006225945211682137,
+          "alpha_max_error": 0.0
+        }
+      }
+    },
+    {
+      "tree": "tree_v391_00",
+      "maps": {
+        "image": {
+          "opaque_rgb_mean_error": 0.0,
+          "alpha_max_error": 64.0
+        },
+        "bump_image": {
+          "opaque_rgb_mean_error": 0.22529921237772235,
+          "alpha_max_error": 64.0
+        },
+        "specular_image": {
+          "opaque_rgb_mean_error": 0.021190122487877345,
+          "alpha_max_error": 64.0
+        }
+      }
+    },
+    {
+      "tree": "tree_v391_01",
+      "maps": {
+        "image": {
+          "opaque_rgb_mean_error": 0.0,
+          "alpha_max_error": 64.0
+        },
+        "bump_image": {
+          "opaque_rgb_mean_error": 0.19234380642831347,
+          "alpha_max_error": 64.0
+        },
+        "specular_image": {
+          "opaque_rgb_mean_error": 0.017214397496087636,
+          "alpha_max_error": 64.0
+        }
+      }
+    },
+    {
+      "tree": "tree_v391_02",
+      "maps": {
+        "image": {
+          "opaque_rgb_mean_error": 0.0,
+          "alpha_max_error": 64.0
+        },
+        "bump_image": {
+          "opaque_rgb_mean_error": 0.22695355460928907,
+          "alpha_max_error": 64.0
+        },
+        "specular_image": {
+          "opaque_rgb_mean_error": 0.021911395617720878,
+          "alpha_max_error": 64.0
+        }
+      }
+    },
+    {
+      "tree": "tree_v391_03",
+      "maps": {
+        "image": {
+          "opaque_rgb_mean_error": 0.0,
+          "alpha_max_error": 64.0
+        },
+        "bump_image": {
+          "opaque_rgb_mean_error": 0.19030349303302158,
+          "alpha_max_error": 64.0
+        },
+        "specular_image": {
+          "opaque_rgb_mean_error": 0.01763218171406757,
+          "alpha_max_error": 64.0
+        }
+      }
+    },
+    {
+      "tree": "tree_v391_04",
+      "maps": {
+        "image": {
+          "opaque_rgb_mean_error": 0.0,
+          "alpha_max_error": 64.0
+        },
+        "bump_image": {
+          "opaque_rgb_mean_error": 0.21981289037994708,
+          "alpha_max_error": 64.0
+        },
+        "specular_image": {
+          "opaque_rgb_mean_error": 0.02045659111365682,
+          "alpha_max_error": 64.0
+        }
+      }
+    },
+    {
+      "tree": "tree_v391_05",
+      "maps": {
+        "image": {
+          "opaque_rgb_mean_error": 0.0,
+          "alpha_max_error": 64.0
+        },
+        "bump_image": {
+          "opaque_rgb_mean_error": 0.19462496946005375,
+          "alpha_max_error": 64.0
+        },
+        "specular_image": {
+          "opaque_rgb_mean_error": 0.017273393598827267,
+          "alpha_max_error": 64.0
+        }
+      }
+    },
+    {
+      "tree": "tree_v391_06",
+      "maps": {
+        "image": {
+          "opaque_rgb_mean_error": 0.0,
+          "alpha_max_error": 64.0
+        },
+        "bump_image": {
+          "opaque_rgb_mean_error": 0.22149086263400544,
+          "alpha_max_error": 64.0
+        },
+        "specular_image": {
+          "opaque_rgb_mean_error": 0.020552130200522135,
+          "alpha_max_error": 64.0
+        }
+      }
+    },
+    {
+      "tree": "tree_v391_07",
+      "maps": {
+        "image": {
+          "opaque_rgb_mean_error": 0.0,
+          "alpha_max_error": 64.0
+        },
+        "bump_image": {
+          "opaque_rgb_mean_error": 0.19275250578257516,
+          "alpha_max_error": 64.0
+        },
+        "specular_image": {
+          "opaque_rgb_mean_error": 0.016745373939861218,
+          "alpha_max_error": 64.0
+        }
+      }
+    }
+  ]
+}

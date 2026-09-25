@@ -1,0 +1,38 @@
+RELAY MOTH FOREST 3.99 — NPC PATHFINDING / FAULT FIX
+=====================================================
+
+FAULT ROOT CAUSE
+----------------
+The follower and mini-robot update faults reported as:
+    undefined is not iterable (cannot read property Symbol(Symbol.iterator))
+were caused by no-route pathfinding results. Older code could reduce the active
+waypoint index to -1 and then destructure path[-1].
+
+3.99 FOLLOWER POLICY
+--------------------
+Full-size recruited robots retain collision-aware room navigation. Every path result
+is guarded before use. If a route cannot be achieved, recovery is deliberately local:
+
+    attempt 1  short step in a clear cardinal direction
+    attempt 2  short randomized clear cardinal/diagonal step
+    attempt 3  another randomized clear step
+
+The robot then retries navigation. Long-range recovery teleport remains a last resort.
+The fallback does not throw and never destructures a missing waypoint.
+
+3.99 MINI-ROBOT / WILDLIFE POLICY
+---------------------------------
+Mini robots and woodland creatures are hint/ambience actors, not collision actors.
+They use low-tick direct waypoints and intentionally ignore the map collision graph.
+This removes unnecessary BFS work and prevents a decorative NPC from faulting the
+player simulation.
+
+ACTUAL CODE REGRESSION
+----------------------
+npc_regression_399.js extracts and evaluates the shipping Followers class and feeds
+it a room whose findPath() always returns []. The unit survives 240 frames and reaches
+the three-stage fallback without throwing.
+
+Latest expected output:
+    NPC REGRESSION 3.99 PASS
+    no-route follower survived 240 frames; failCount=3 position=38.6,42.0

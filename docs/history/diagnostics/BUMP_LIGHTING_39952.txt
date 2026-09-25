@@ -1,0 +1,15 @@
+RELAY MOTH FOREST 3.995.2 — BUMP / LARGE-SPRITE / SHADOW LIGHTING
+=================================================================
+
+Current shipping bump default: 1.15. Specular default: 0.28. Coordinate-matched colour and
+bump atlases remain the source of HD pseudo-normal response.
+
+Large trees now use a single logical scale and source UV basis: the complete original tree is
+rendered in the live HD material pass, and foreground canopy occlusion is cropped from the same
+full region after actors. This removes the previous independent trunk/canopy scaling path and
+keeps height/neighbour samples continuous across the whole tree image.
+
+Projected shadows and contact AO originate at explicit ground-contact positions. Shadow width
+is classified independently for robots, large decor/trees and small decor/bushes. Shadow/AO
+geometry still renders before live actors, so it cannot darken the character sprite placed over
+it.

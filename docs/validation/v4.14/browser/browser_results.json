@@ -1,0 +1,564 @@
+{
+  "rooms": [
+    {
+      "foliage": {
+        "enabled": true,
+        "quality": 3,
+        "instances": 77,
+        "backgroundCount": 77,
+        "foregroundCount": 0,
+        "interactionSourceCount": 2,
+        "categoryCounts": {
+          "GROUND_MOSS": 11,
+          "FLOWER_CLUSTER": 17,
+          "FERN": 5,
+          "BROAD_LEAF": 20,
+          "SHORT_GRASS": 8,
+          "BUSH": 16
+        },
+        "instanceBytes": 8624,
+        "dynamicUploads": 0,
+        "rebuilds": 1,
+        "drawCalls": 3,
+        "error": null
+      },
+      "surface": {
+        "version": "3.999",
+        "ready": true,
+        "errors": [],
+        "water": {
+          "ready": true,
+          "error": "",
+          "quality": 3,
+          "field": [
+            320,
+            180
+          ],
+          "fieldBytes": 230400,
+          "rebuilds": 1,
+          "gateRebuilds": 1,
+          "ripples": 0,
+          "rippleCap": 12
+        },
+        "grass": {
+          "ready": true,
+          "error": "",
+          "instances": 3000,
+          "instanceCap": 3000,
+          "candidates": 3000,
+          "culled": 0,
+          "instanceBytes": 96000,
+          "rebuilds": 1,
+          "signature": "[\"quiet_nest\",0,[{\"x\":501.42,\"y\":120.6,\"radius\":21,\"density\":1.38,\"seed\":1005768797},{\"x\":329.07,\"y\":133.34,\"radius\":20,\"density\":1.23,\"seed\":480930619},{\"x\":535.15,\"y\":117.05,\"radius\":28,\"density\":1.19,\"seed\":517442885},{\"x\":246.52,\"y\":136.39,\"radius\":26,\"density\":1.42,\"seed\":979613360},{\"x\":409.49,\"y\":120.91,\"radius\":27,\"density\":1.16,\"seed\":1082234520},{\"x\":219.62,\"y\":166.71,\"radius\":27,\"density\":1.33,\"seed\":1738593547},{\"x\":598.44,\"y\":169.13,\"radius\":26,\"density\":1.28,\"seed\":1015313918},{\"x\":522.47,\"y\":151.27,\"radius\":20,\"density\":1.46,\"seed\":696282081},{\"x\":564.29,\"y\":152.82,\"radius\":30,\"density\":1.29,\"seed\":181639804},{\"x\":106.49,\"y\":168.78,\"radius\":29,\"density\":1.46,\"seed\":1855455196}]]"
+        }
+      },
+      "room": "quiet_nest"
+    },
+    {
+      "foliage": {
+        "enabled": true,
+        "quality": 3,
+        "instances": 90,
+        "backgroundCount": 90,
+        "foregroundCount": 0,
+        "interactionSourceCount": 2,
+        "categoryCounts": {
+          "BROAD_LEAF": 34,
+          "FLOWER_CLUSTER": 15,
+          "SHORT_GRASS": 9,
+          "BUSH": 16,
+          "FERN": 7,
+          "GROUND_MOSS": 9
+        },
+        "instanceBytes": 10080,
+        "dynamicUploads": 0,
+        "rebuilds": 2,
+        "drawCalls": 3,
+        "error": null
+      },
+      "surface": {
+        "version": "3.999",
+        "ready": true,
+        "errors": [],
+        "water": {
+          "ready": true,
+          "error": "",
+          "quality": 3,
+          "field": [
+            320,
+            180
+          ],
+          "fieldBytes": 230400,
+          "rebuilds": 2,
+          "gateRebuilds": 2,
+          "ripples": 0,
+          "rippleCap": 12
+        },
+        "grass": {
+          "ready": true,
+          "error": "",
+          "instances": 3000,
+          "instanceCap": 3000,
+          "candidates": 3000,
+          "culled": 0,
+          "instanceBytes": 96000,
+          "rebuilds": 2,
+          "signature": "[\"lantern_lane\",0,[{\"x\":151.38,\"y\":154.45,\"radius\":28,\"density\":1.49,\"seed\":2000127308},{\"x\":484.5,\"y\":137.62,\"radius\":27,\"density\":1.39,\"seed\":759754034},{\"x\":565.16,\"y\":101.52,\"radius\":27,\"density\":1.49,\"seed\":1448746827},{\"x\":283.68,\"y\":122.39,\"radius\":26,\"density\":1.49,\"seed\":2062508922},{\"x\":521.31,\"y\":106.92,\"radius\":29,\"density\":1.48,\"seed\":1235250837},{\"x\":187.42,\"y\":117.24,\"radius\":29,\"density\":1.45,\"seed\":1401173680},{\"x\":454.67,\"y\":151.82,\"radius\":26,\"density\":1.22,\"seed\":1176016112},{\"x\":491.33,\"y\":185.44,\"radius\":25,\"density\":1.29,\"seed\":1784320059},{\"x\":340.04,\"y\":216.44,\"radius\":20,\"density\":1.33,\"seed\":1066131880},{\"x\":86.47,\"y\":154.15,\"radius\":24,\"density\":1.34,\"seed\":1747488729},{\"x\":233.75,\"y\":89.42,\"radius\":29,\"density\":1.18,\"seed\":384518361}]]"
+        }
+      },
+      "room": "lantern_lane"
+    },
+    {
+      "foliage": {
+        "enabled": true,
+        "quality": 3,
+        "instances": 154,
+        "backgroundCount": 154,
+        "foregroundCount": 0,
+        "interactionSourceCount": 2,
+        "categoryCounts": {
+          "FLOWER_CLUSTER": 48,
+          "BROAD_LEAF": 31,
+          "SHORT_GRASS": 18,
+          "BUSH": 34,
+          "GROUND_MOSS": 14,
+          "FERN": 9
+        },
+        "instanceBytes": 17248,
+        "dynamicUploads": 0,
+        "rebuilds": 3,
+        "drawCalls": 3,
+        "error": null
+      },
+      "surface": {
+        "version": "3.999",
+        "ready": true,
+        "errors": [],
+        "water": {
+          "ready": true,
+          "error": "",
+          "quality": 3,
+          "field": [
+            320,
+            180
+          ],
+          "fieldBytes": 230400,
+          "rebuilds": 3,
+          "gateRebuilds": 3,
+          "ripples": 0,
+          "rippleCap": 12
+        },
+        "grass": {
+          "ready": true,
+          "error": "",
+          "instances": 3000,
+          "instanceCap": 3000,
+          "candidates": 3000,
+          "culled": 0,
+          "instanceBytes": 96000,
+          "rebuilds": 3,
+          "signature": "[\"tin_stream\",0,[{\"x\":539.73,\"y\":167.85,\"radius\":23,\"density\":1.46,\"seed\":1560074746},{\"x\":501.83,\"y\":134.16,\"radius\":24,\"density\":1.19,\"seed\":754417758},{\"x\":155.73,\"y\":165.23,\"radius\":20,\"density\":1.48,\"seed\":1075377858},{\"x\":249.97,\"y\":168.52,\"radius\":27,\"density\":1.24,\"seed\":1535264029},{\"x\":437.99,\"y\":165.45,\"radius\":25,\"density\":1.37,\"seed\":1751018678},{\"x\":184.92,\"y\":102.97,\"radius\":21,\"density\":1.34,\"seed\":2127730003},{\"x\":244.65,\"y\":134.83,\"radius\":21,\"density\":1.16,\"seed\":800654932},{\"x\":218.87,\"y\":199.8,\"radius\":22,\"density\":1.37,\"seed\":1481374833},{\"x\":502.08,\"y\":165.29,\"radius\":29,\"density\":1.21,\"seed\":1903451469},{\"x\":411.89,\"y\":137.35,\"radius\":27,\"density\":1.15,\"seed\":2096410703},{\"x\":502.57,\"y\":198.57,\"radius\":22,\"density\":1.21,\"seed\":1696889881},{\"x\":58.31,\"y\":133.86,\"radius\":26,\"density\":1.28,\"seed\":531258390},{\"x\":468,\"y\":103,\"radius\":24,\"density\":1.72,\"seed\":4081001},{\"x\":482,\"y\":131,\"radius\":26,\"density\":1.86,\"seed\":4081002},{\"x\":474,\"y\":161,\"radius\":28,\"density\":2.05,\"seed\":4081003},{\"x\":491,\"y\":191,\"radius\":26,\"density\":1.92,\"seed\":4081004},{\"x\":509,\"y\":219,\"radius\":24,\"density\":1.68,\"seed\":4081005},{\"x\":521,\"y\":159,\"radius\":24,\"density\":1.58,\"seed\":4081006}]]"
+        }
+      },
+      "room": "tin_stream"
+    },
+    {
+      "foliage": {
+        "enabled": true,
+        "quality": 3,
+        "instances": 101,
+        "backgroundCount": 101,
+        "foregroundCount": 0,
+        "interactionSourceCount": 2,
+        "categoryCounts": {
+          "BUSH": 30,
+          "BROAD_LEAF": 22,
+          "FERN": 7,
+          "FLOWER_CLUSTER": 22,
+          "SHORT_GRASS": 14,
+          "GROUND_MOSS": 6
+        },
+        "instanceBytes": 11312,
+        "dynamicUploads": 0,
+        "rebuilds": 4,
+        "drawCalls": 3,
+        "error": null
+      },
+      "surface": {
+        "version": "3.999",
+        "ready": true,
+        "errors": [],
+        "water": {
+          "ready": true,
+          "error": "",
+          "quality": 3,
+          "field": [
+            320,
+            180
+          ],
+          "fieldBytes": 230400,
+          "rebuilds": 4,
+          "gateRebuilds": 4,
+          "ripples": 0,
+          "rippleCap": 12
+        },
+        "grass": {
+          "ready": true,
+          "error": "",
+          "instances": 3000,
+          "instanceCap": 3000,
+          "candidates": 3000,
+          "culled": 0,
+          "instanceBytes": 96000,
+          "rebuilds": 4,
+          "signature": "[\"fern_hollow\",0,[{\"x\":600.91,\"y\":165.72,\"radius\":21,\"density\":1.4,\"seed\":1622927439},{\"x\":345.87,\"y\":89.38,\"radius\":30,\"density\":1.34,\"seed\":2022981481},{\"x\":357.22,\"y\":134.78,\"radius\":30,\"density\":1.24,\"seed\":769654231},{\"x\":345.83,\"y\":168.3,\"radius\":27,\"density\":1.41,\"seed\":324552541},{\"x\":407.91,\"y\":170.52,\"radius\":26,\"density\":1.17,\"seed\":1973754422},{\"x\":551.95,\"y\":134.67,\"radius\":21,\"density\":1.25,\"seed\":673338892},{\"x\":421.08,\"y\":70.53,\"radius\":30,\"density\":1.41,\"seed\":117462588},{\"x\":410,\"y\":37.56,\"radius\":30,\"density\":1.3,\"seed\":722096206},{\"x\":454.66,\"y\":170.76,\"radius\":22,\"density\":1.45,\"seed\":533942648},{\"x\":519.39,\"y\":166.63,\"radius\":24,\"density\":1.2,\"seed\":57001769},{\"x\":314.65,\"y\":166.42,\"radius\":30,\"density\":1.17,\"seed\":1687264159},{\"x\":500.75,\"y\":136.09,\"radius\":22,\"density\":1.18,\"seed\":1847333318},{\"x\":565.63,\"y\":182.74,\"radius\":23,\"density\":1.25,\"seed\":1333672611}]]"
+        }
+      },
+      "room": "fern_hollow"
+    },
+    {
+      "foliage": {
+        "enabled": true,
+        "quality": 3,
+        "instances": 81,
+        "backgroundCount": 81,
+        "foregroundCount": 0,
+        "interactionSourceCount": 2,
+        "categoryCounts": {
+          "BROAD_LEAF": 19,
+          "BUSH": 20,
+          "FLOWER_CLUSTER": 23,
+          "GROUND_MOSS": 11,
+          "FERN": 2,
+          "SHORT_GRASS": 6
+        },
+        "instanceBytes": 9072,
+        "dynamicUploads": 0,
+        "rebuilds": 5,
+        "drawCalls": 3,
+        "error": null
+      },
+      "surface": {
+        "version": "3.999",
+        "ready": true,
+        "errors": [],
+        "water": {
+          "ready": true,
+          "error": "",
+          "quality": 3,
+          "field": [
+            320,
+            180
+          ],
+          "fieldBytes": 230400,
+          "rebuilds": 5,
+          "gateRebuilds": 5,
+          "ripples": 0,
+          "rippleCap": 12
+        },
+        "grass": {
+          "ready": true,
+          "error": "",
+          "instances": 3000,
+          "instanceCap": 3000,
+          "candidates": 3000,
+          "culled": 0,
+          "instanceBytes": 96000,
+          "rebuilds": 5,
+          "signature": "[\"home_loop\",0,[{\"x\":569.14,\"y\":184.92,\"radius\":23,\"density\":1.45,\"seed\":1838220861},{\"x\":409.87,\"y\":201.36,\"radius\":23,\"density\":1.38,\"seed\":985394704},{\"x\":212.26,\"y\":169.27,\"radius\":25,\"density\":1.43,\"seed\":991721274},{\"x\":139.04,\"y\":202.33,\"radius\":24,\"density\":1.46,\"seed\":308107197},{\"x\":598.84,\"y\":151.4,\"radius\":28,\"density\":1.42,\"seed\":2067637725},{\"x\":424.86,\"y\":168.41,\"radius\":21,\"density\":1.3,\"seed\":1496601335},{\"x\":105.29,\"y\":197.22,\"radius\":24,\"density\":1.5,\"seed\":1887616602},{\"x\":507.89,\"y\":186.86,\"radius\":20,\"density\":1.4,\"seed\":1563478702},{\"x\":452.03,\"y\":184.39,\"radius\":26,\"density\":1.42,\"seed\":995196263},{\"x\":441.22,\"y\":214.59,\"radius\":28,\"density\":1.49,\"seed\":621850795}]]"
+        }
+      },
+      "room": "home_loop"
+    },
+    {
+      "foliage": {
+        "enabled": true,
+        "quality": 3,
+        "instances": 85,
+        "backgroundCount": 85,
+        "foregroundCount": 0,
+        "interactionSourceCount": 2,
+        "categoryCounts": {
+          "BUSH": 29,
+          "BROAD_LEAF": 22,
+          "FERN": 2,
+          "SHORT_GRASS": 8,
+          "FLOWER_CLUSTER": 12,
+          "GROUND_MOSS": 12
+        },
+        "instanceBytes": 9520,
+        "dynamicUploads": 0,
+        "rebuilds": 6,
+        "drawCalls": 3,
+        "error": null
+      },
+      "surface": {
+        "version": "3.999",
+        "ready": true,
+        "errors": [],
+        "water": {
+          "ready": true,
+          "error": "",
+          "quality": 3,
+          "field": [
+            320,
+            180
+          ],
+          "fieldBytes": 230400,
+          "rebuilds": 6,
+          "gateRebuilds": 6,
+          "ripples": 0,
+          "rippleCap": 12
+        },
+        "grass": {
+          "ready": true,
+          "error": "",
+          "instances": 3000,
+          "instanceCap": 3000,
+          "candidates": 3000,
+          "culled": 0,
+          "instanceBytes": 96000,
+          "rebuilds": 6,
+          "signature": "[\"whisper_orchard\",0,[{\"x\":155.57,\"y\":103.55,\"radius\":21,\"density\":1.22,\"seed\":2096468589},{\"x\":152.74,\"y\":135.39,\"radius\":28,\"density\":1.49,\"seed\":1293043959},{\"x\":308.57,\"y\":122.42,\"radius\":29,\"density\":1.39,\"seed\":1721990122},{\"x\":169.81,\"y\":198.98,\"radius\":27,\"density\":1.42,\"seed\":945667047},{\"x\":247.6,\"y\":117.54,\"radius\":23,\"density\":1.33,\"seed\":1124662148},{\"x\":363.11,\"y\":169.41,\"radius\":28,\"density\":1.36,\"seed\":1478627206},{\"x\":357.38,\"y\":118.39,\"radius\":29,\"density\":1.15,\"seed\":1581453844},{\"x\":407.45,\"y\":169.54,\"radius\":21,\"density\":1.15,\"seed\":1683495140},{\"x\":330.76,\"y\":153.96,\"radius\":30,\"density\":1.32,\"seed\":1126906638},{\"x\":475.39,\"y\":87.96,\"radius\":28,\"density\":1.26,\"seed\":1400255849},{\"x\":456.04,\"y\":168.76,\"radius\":21,\"density\":1.27,\"seed\":1360400637}]]"
+        }
+      },
+      "room": "whisper_orchard"
+    },
+    {
+      "foliage": {
+        "enabled": true,
+        "quality": 3,
+        "instances": 90,
+        "backgroundCount": 90,
+        "foregroundCount": 0,
+        "interactionSourceCount": 2,
+        "categoryCounts": {
+          "FLOWER_CLUSTER": 23,
+          "BUSH": 23,
+          "GROUND_MOSS": 10,
+          "BROAD_LEAF": 23,
+          "SHORT_GRASS": 8,
+          "FERN": 3
+        },
+        "instanceBytes": 10080,
+        "dynamicUploads": 0,
+        "rebuilds": 7,
+        "drawCalls": 3,
+        "error": null
+      },
+      "surface": {
+        "version": "3.999",
+        "ready": true,
+        "errors": [],
+        "water": {
+          "ready": true,
+          "error": "",
+          "quality": 3,
+          "field": [
+            320,
+            180
+          ],
+          "fieldBytes": 230400,
+          "rebuilds": 7,
+          "gateRebuilds": 7,
+          "ripples": 0,
+          "rippleCap": 12
+        },
+        "grass": {
+          "ready": true,
+          "error": "",
+          "instances": 3000,
+          "instanceCap": 3000,
+          "candidates": 3000,
+          "culled": 0,
+          "instanceBytes": 96000,
+          "rebuilds": 7,
+          "signature": "[\"star_battery\",0,[{\"x\":343.35,\"y\":151.75,\"radius\":25,\"density\":1.26,\"seed\":1704180432},{\"x\":264.84,\"y\":185.4,\"radius\":26,\"density\":1.33,\"seed\":682336039},{\"x\":549.16,\"y\":101.25,\"radius\":30,\"density\":1.16,\"seed\":965476134},{\"x\":459.73,\"y\":230.54,\"radius\":21,\"density\":1.5,\"seed\":658061575},{\"x\":406.35,\"y\":118.67,\"radius\":21,\"density\":1.36,\"seed\":23480437},{\"x\":520.82,\"y\":70.42,\"radius\":25,\"density\":1.26,\"seed\":1687202338},{\"x\":185.59,\"y\":88.73,\"radius\":30,\"density\":1.17,\"seed\":1860749997},{\"x\":405.73,\"y\":152.83,\"radius\":24,\"density\":1.17,\"seed\":28443004},{\"x\":117.58,\"y\":70.17,\"radius\":21,\"density\":1.42,\"seed\":1922524982},{\"x\":521,\"y\":150.81,\"radius\":30,\"density\":1.45,\"seed\":1717022526},{\"x\":235.08,\"y\":151.98,\"radius\":28,\"density\":1.2,\"seed\":388882829},{\"x\":441.99,\"y\":169.96,\"radius\":30,\"density\":1.25,\"seed\":42329170}]]"
+        }
+      },
+      "room": "star_battery"
+    },
+    {
+      "foliage": {
+        "enabled": true,
+        "quality": 3,
+        "instances": 100,
+        "backgroundCount": 100,
+        "foregroundCount": 0,
+        "interactionSourceCount": 2,
+        "categoryCounts": {
+          "FLOWER_CLUSTER": 12,
+          "SHORT_GRASS": 9,
+          "BUSH": 29,
+          "BROAD_LEAF": 31,
+          "GROUND_MOSS": 13,
+          "FERN": 6
+        },
+        "instanceBytes": 11200,
+        "dynamicUploads": 0,
+        "rebuilds": 8,
+        "drawCalls": 3,
+        "error": null
+      },
+      "surface": {
+        "version": "3.999",
+        "ready": true,
+        "errors": [],
+        "water": {
+          "ready": true,
+          "error": "",
+          "quality": 3,
+          "field": [
+            320,
+            180
+          ],
+          "fieldBytes": 230400,
+          "rebuilds": 8,
+          "gateRebuilds": 8,
+          "ripples": 0,
+          "rippleCap": 12
+        },
+        "grass": {
+          "ready": true,
+          "error": "",
+          "instances": 3000,
+          "instanceCap": 3000,
+          "candidates": 3000,
+          "culled": 0,
+          "instanceBytes": 96000,
+          "rebuilds": 8,
+          "signature": "[\"dawn_tree\",0,[{\"x\":181.29,\"y\":218.17,\"radius\":23,\"density\":1.38,\"seed\":553005600},{\"x\":89.87,\"y\":181.93,\"radius\":29,\"density\":1.27,\"seed\":476307186},{\"x\":89.74,\"y\":217.54,\"radius\":30,\"density\":1.18,\"seed\":1112920528},{\"x\":218.76,\"y\":214.23,\"radius\":22,\"density\":1.23,\"seed\":1687860486},{\"x\":292.19,\"y\":214.96,\"radius\":28,\"density\":1.17,\"seed\":1669196809},{\"x\":411.67,\"y\":169.81,\"radius\":23,\"density\":1.21,\"seed\":878518331},{\"x\":535.72,\"y\":165.01,\"radius\":21,\"density\":1.31,\"seed\":1212464119},{\"x\":410.5,\"y\":137.67,\"radius\":28,\"density\":1.24,\"seed\":335612563},{\"x\":233.24,\"y\":182.89,\"radius\":24,\"density\":1.3,\"seed\":1140510713},{\"x\":343.91,\"y\":217.33,\"radius\":26,\"density\":1.28,\"seed\":767519583},{\"x\":313.13,\"y\":182.78,\"radius\":26,\"density\":1.34,\"seed\":557262593},{\"x\":485.27,\"y\":135.67,\"radius\":30,\"density\":1.38,\"seed\":323545925},{\"x\":169.57,\"y\":182.11,\"radius\":28,\"density\":1.25,\"seed\":1069575160}]]"
+        }
+      },
+      "room": "dawn_tree"
+    },
+    {
+      "foliage": {
+        "enabled": true,
+        "quality": 3,
+        "instances": 76,
+        "backgroundCount": 76,
+        "foregroundCount": 0,
+        "interactionSourceCount": 2,
+        "categoryCounts": {
+          "FLOWER_CLUSTER": 22,
+          "FERN": 6,
+          "BROAD_LEAF": 18,
+          "BUSH": 17,
+          "GROUND_MOSS": 7,
+          "SHORT_GRASS": 6
+        },
+        "instanceBytes": 8512,
+        "dynamicUploads": 0,
+        "rebuilds": 9,
+        "drawCalls": 3,
+        "error": null
+      },
+      "surface": {
+        "version": "3.999",
+        "ready": true,
+        "errors": [],
+        "water": {
+          "ready": true,
+          "error": "",
+          "quality": 3,
+          "field": [
+            320,
+            180
+          ],
+          "fieldBytes": 230400,
+          "rebuilds": 9,
+          "gateRebuilds": 9,
+          "ripples": 0,
+          "rippleCap": 12
+        },
+        "grass": {
+          "ready": true,
+          "error": "",
+          "instances": 3000,
+          "instanceCap": 3000,
+          "candidates": 3000,
+          "culled": 0,
+          "instanceBytes": 96000,
+          "rebuilds": 9,
+          "signature": "[\"morning_garden\",0,[{\"x\":340.32,\"y\":262.93,\"radius\":26,\"density\":1.23,\"seed\":314751195},{\"x\":409.33,\"y\":234.44,\"radius\":29,\"density\":1.23,\"seed\":401238057},{\"x\":420.57,\"y\":266.03,\"radius\":22,\"density\":1.26,\"seed\":804187176},{\"x\":374.71,\"y\":265.31,\"radius\":23,\"density\":1.34,\"seed\":1089179299},{\"x\":503.02,\"y\":264.51,\"radius\":30,\"density\":1.23,\"seed\":265474796},{\"x\":357.39,\"y\":233.66,\"radius\":26,\"density\":1.45,\"seed\":905044988},{\"x\":454.91,\"y\":230.39,\"radius\":26,\"density\":1.16,\"seed\":781998052},{\"x\":312.55,\"y\":245.86,\"radius\":21,\"density\":1.3,\"seed\":141681958},{\"x\":457.96,\"y\":265.36,\"radius\":22,\"density\":1.39,\"seed\":1890496173},{\"x\":532.65,\"y\":248.11,\"radius\":23,\"density\":1.24,\"seed\":226907103}]]"
+        }
+      },
+      "room": "morning_garden"
+    }
+  ],
+  "native_webgl": true,
+  "asset_transport": "offline injected, normal renderer",
+  "driver": {
+    "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "renderer": "ANGLE (Mesa, llvmpipe (LLVM 19.1.7 256 bits), OpenGL ES 3.2)"
+  },
+  "settings_matrix": [
+    {
+      "lighting": false
+    },
+    {
+      "bump": false
+    },
+    {
+      "foliageQuality": 0
+    },
+    {
+      "foliageQuality": 1
+    },
+    {
+      "foliageQuality": 2
+    },
+    {
+      "foliageQuality": 3,
+      "grassFineFX": true
+    },
+    {
+      "foliageWindStrength": 4,
+      "foliageBendAmount": 3,
+      "foliageInteractionStrength": 4
+    }
+  ],
+  "robot_overlap_frames": 36,
+  "same_count_edits": {
+    "grass": true,
+    "water": true
+  },
+  "ghost_geometry": [
+    {
+      "kind": "decor",
+      "scale": 0.62,
+      "anchor": "bottom",
+      "error": 0
+    },
+    {
+      "kind": "ambient",
+      "scale": 0.85,
+      "anchor": "bottom",
+      "error": 0
+    },
+    {
+      "kind": "moth",
+      "scale": 0.36,
+      "anchor": "center",
+      "error": 0
+    },
+    {
+      "kind": "wildlife",
+      "scale": 1.755,
+      "anchor": "center",
+      "error": 0
+    },
+    {
+      "kind": "mini",
+      "scale": 1.52,
+      "anchor": "center",
+      "error": 0
+    }
+  ],
+  "palette_after_selection": true,
+  "tab_restores_ui": true,
+  "editor_canvas_filter": "none",
+  "resize_to_1280": true,
+  "runtime_errors": []
+}

@@ -1,0 +1,358 @@
+{
+  "schema": "relay-moth-story/v3.91",
+  "rooms": [
+    {
+      "index": 0,
+      "key": "quiet_nest",
+      "title": "THE QUIET NEST",
+      "subtitle": "A round clearing under sleeping relay branches",
+      "intro": [
+        "The robot forest has forgotten its morning song.",
+        "One tiny relay lamp is still dreaming beneath the old copper branches. Its warm click may be enough to remind the nearby relays that morning is supposed to begin.",
+        "Guide the moths gently through the clearing and wake the lamp when you are ready. Nothing in the forest is in a hurry, and every little light has time to find its place."
+      ],
+      "prompt": "Wake the sleepy relay lamp.",
+      "complete_line": "Click! The first light remembers how to glow.",
+      "pattern": "nest",
+      "previous_room": null,
+      "previous_side": null,
+      "previous_fraction": 0.5,
+      "next_room": 1,
+      "next_side": "EAST",
+      "next_fraction": 0.54,
+      "objects": [
+        {
+          "object_id": "nest_lamp",
+          "kind": "lamp",
+          "x_fraction": 0.55,
+          "y_fraction": 0.44,
+          "label": "SLEEPY LAMP",
+          "required": 1.45
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "key": "lantern_lane",
+      "title": "LANTERN LANE",
+      "subtitle": "Three friendly lights beyond a copper hedge maze",
+      "intro": [
+        "Lantern Lane is awake enough to listen.",
+        "Three old lantern trees are waiting along the copper paths, each remembering a different part of the forest song. Their bulbs brighten when the relay moths bring them a little borrowed starlight.",
+        "Visit every lantern and let the lane answer one light at a time. When all three are shining, the hedges will know which path should open next."
+      ],
+      "prompt": "Wake all three lantern trees.",
+      "complete_line": "Lantern Lane shines from tree to tree.",
+      "pattern": "lane",
+      "previous_room": 0,
+      "previous_side": "WEST",
+      "previous_fraction": 0.54,
+      "next_room": 2,
+      "next_side": "EAST",
+      "next_fraction": 0.28,
+      "objects": [
+        {
+          "object_id": "lane_a",
+          "kind": "lantern",
+          "x_fraction": 0.23,
+          "y_fraction": 0.3,
+          "label": "LANTERN ONE",
+          "required": 1.25
+        },
+        {
+          "object_id": "lane_b",
+          "kind": "lantern",
+          "x_fraction": 0.52,
+          "y_fraction": 0.7,
+          "label": "LANTERN TWO",
+          "required": 1.25
+        },
+        {
+          "object_id": "lane_c",
+          "kind": "lantern",
+          "x_fraction": 0.78,
+          "y_fraction": 0.35,
+          "label": "LANTERN THREE",
+          "required": 1.25
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "key": "tin_stream",
+      "title": "THE TIN-STREAM BRIDGE",
+      "subtitle": "A broad Tin-Stream runs from north to south",
+      "intro": [
+        "The Tin-Stream now runs straight through the forest from north to south.",
+        "Two pieces of the old bridge are missing, with a small maintenance island waiting in the middle. The first two fastening stars rebuild the western half so the moths can reach the island.",
+        "The next two stars unfold the eastern half piece by piece. Follow each new section as it grows until the whole left-to-right crossing reaches the far bank."
+      ],
+      "prompt": "Wake the four bridge rivets and build a path across the Tin-Stream.",
+      "complete_line": "Both halves of the bridge are secure. Cross the river to the eastern bank.",
+      "pattern": "bridge",
+      "previous_room": 1,
+      "previous_side": "WEST",
+      "previous_fraction": 0.5,
+      "next_room": 3,
+      "next_side": "EAST",
+      "next_fraction": 0.5,
+      "objects": [
+        {
+          "object_id": "rivet_a",
+          "kind": "rivet",
+          "x_fraction": 0.2,
+          "y_fraction": 0.2,
+          "label": "BRIDGE ANCHOR 1",
+          "required": 0.95
+        },
+        {
+          "object_id": "rivet_b",
+          "kind": "rivet",
+          "x_fraction": 0.38,
+          "y_fraction": 0.32,
+          "label": "BRIDGE ANCHOR 2",
+          "required": 0.95
+        },
+        {
+          "object_id": "rivet_c",
+          "kind": "rivet",
+          "x_fraction": 0.59,
+          "y_fraction": 0.2,
+          "label": "BRIDGE ANCHOR 3",
+          "required": 0.95
+        },
+        {
+          "object_id": "rivet_d",
+          "kind": "rivet",
+          "x_fraction": 0.8,
+          "y_fraction": 0.32,
+          "label": "BRIDGE ANCHOR 4",
+          "required": 0.95
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "key": "fern_hollow",
+      "title": "PIP UNDER THE FERNS",
+      "subtitle": "A square spiral of mechanical leaves",
+      "intro": [
+        "A small seed-robot named Pip is blinking under the ferns.",
+        "Pip has been waiting very quietly beneath the mechanical leaves, listening for something friendly enough to follow. His little antenna still remembers the rhythm of the relay moths.",
+        "Reach him and wake him with a soft sparkle. Once he opens his eyes he will follow you immediately, even before you leave this room."
+      ],
+      "prompt": "Follow the curling trail to Pip.",
+      "complete_line": "Pip wakes with a polite little beep.",
+      "pattern": "ferns",
+      "previous_room": 2,
+      "previous_side": "NORTH",
+      "previous_fraction": 0.7,
+      "next_room": 4,
+      "next_side": "EAST",
+      "next_fraction": 0.64,
+      "objects": [
+        {
+          "object_id": "pip",
+          "kind": "pip",
+          "x_fraction": 0.52,
+          "y_fraction": 0.52,
+          "label": "PIP",
+          "required": 1.45
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "key": "home_loop",
+      "title": "PIP'S HOME LOOP",
+      "subtitle": "A broad loop around a warm round beacon",
+      "intro": [
+        "Pip follows with very small determined steps.",
+        "His home beacon is still warm somewhere around the broad garden loop, and its signal grows clearer whenever he gets closer. The other little maintenance robots seem curious about where you are going too.",
+        "Lead the small procession toward the round beacon and let Pip reach it beside you. The home light will stay awake after he arrives, so this room will always remember the reunion."
+      ],
+      "prompt": "Lead Pip to the warm home beacon.",
+      "complete_line": "Pip performs a very small dance.",
+      "pattern": "home",
+      "previous_room": 3,
+      "previous_side": "WEST",
+      "previous_fraction": 0.64,
+      "next_room": 5,
+      "next_side": "EAST",
+      "next_fraction": 0.38,
+      "objects": [
+        {
+          "object_id": "pip_home",
+          "kind": "beacon",
+          "x_fraction": 0.72,
+          "y_fraction": 0.68,
+          "label": "HOME BEACON",
+          "required": 1.45
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "key": "whisper_orchard",
+      "title": "THE WHISPER ORCHARD",
+      "subtitle": "Bell-fruit trees make a friendly musical maze",
+      "intro": [
+        "The orchard bells sing when someone visits them.",
+        "Copper, silver, and tin bell-fruit hang among the robot trees, each holding one note that the forest has misplaced. Pip knows the tune, but only the moths are light enough to wake the branches without startling them.",
+        "Visit all three bells and listen for the orchard to answer across the whole room. Each note will leave a visible echo among the leaves, building the middle verse of the morning song."
+      ],
+      "prompt": "Visit the copper, silver, and tin bells.",
+      "complete_line": "Ding... dong... ting. The forest remembers its middle verse.",
+      "pattern": "orchard",
+      "previous_room": 4,
+      "previous_side": "WEST",
+      "previous_fraction": 0.38,
+      "next_room": 6,
+      "next_side": "SOUTH",
+      "next_fraction": 0.25,
+      "objects": [
+        {
+          "object_id": "bell_a",
+          "kind": "bell",
+          "x_fraction": 0.24,
+          "y_fraction": 0.27,
+          "label": "COPPER BELL",
+          "required": 1.15
+        },
+        {
+          "object_id": "bell_b",
+          "kind": "bell",
+          "x_fraction": 0.55,
+          "y_fraction": 0.62,
+          "label": "SILVER BELL",
+          "required": 1.15
+        },
+        {
+          "object_id": "bell_c",
+          "kind": "bell",
+          "x_fraction": 0.8,
+          "y_fraction": 0.32,
+          "label": "TIN BELL",
+          "required": 1.15
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "key": "star_battery",
+      "title": "THE STAR BATTERY",
+      "subtitle": "Five patient ground-stars in a circuit garden",
+      "intro": [
+        "Five stars fell into the battery garden long ago.",
+        "They settled into the old circuit beds and have been patiently charging themselves under moss and metal. Together they can power the little Dawn Key carried by the forest relays.",
+        "Collect every ground-star and watch the garden circuitry wake behind you. The completed pattern will remain lit, turning the whole room into a quiet constellation map."
+      ],
+      "prompt": "Collect all five ground-stars.",
+      "complete_line": "The Dawn Key sounds like a pocketful of tiny bells.",
+      "pattern": "battery",
+      "previous_room": 5,
+      "previous_side": "NORTH",
+      "previous_fraction": 0.25,
+      "next_room": 7,
+      "next_side": "EAST",
+      "next_fraction": 0.67,
+      "objects": [
+        {
+          "object_id": "star_a",
+          "kind": "star",
+          "x_fraction": 0.18,
+          "y_fraction": 0.3,
+          "label": "GROUND STAR ONE",
+          "required": 0.78
+        },
+        {
+          "object_id": "star_b",
+          "kind": "star",
+          "x_fraction": 0.36,
+          "y_fraction": 0.72,
+          "label": "GROUND STAR TWO",
+          "required": 0.78
+        },
+        {
+          "object_id": "star_c",
+          "kind": "star",
+          "x_fraction": 0.52,
+          "y_fraction": 0.43,
+          "label": "GROUND STAR THREE",
+          "required": 0.78
+        },
+        {
+          "object_id": "star_d",
+          "kind": "star",
+          "x_fraction": 0.7,
+          "y_fraction": 0.74,
+          "label": "GROUND STAR FOUR",
+          "required": 0.78
+        },
+        {
+          "object_id": "star_e",
+          "kind": "star",
+          "x_fraction": 0.83,
+          "y_fraction": 0.27,
+          "label": "GROUND STAR FIVE",
+          "required": 0.78
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "key": "dawn_tree",
+      "title": "THE GREAT DAWN TREE",
+      "subtitle": "The last chamber holds a sleeping mechanical sunrise",
+      "intro": [
+        "The Great Dawn Tree waits beyond one final ring of roots.",
+        "Every lantern, rivet, bell, star, moth, and robot has carried a tiny piece of the missing morning here. The sleeping Dawn Heart only needs those pieces gathered close enough to remember what they once made together.",
+        "Bring the little procession to the bright heart and let the relay moths settle around it. When it wakes, the change should reach the entire room rather than appearing as only one small sparkle."
+      ],
+      "prompt": "Gather around the bright Dawn Heart.",
+      "complete_line": "Morning returns. Every little light helped.",
+      "pattern": "dawn",
+      "previous_room": 6,
+      "previous_side": "WEST",
+      "previous_fraction": 0.67,
+      "next_room": 8,
+      "next_side": "EAST",
+      "next_fraction": 0.5,
+      "objects": [
+        {
+          "object_id": "dawn_core",
+          "kind": "dawn",
+          "x_fraction": 0.62,
+          "y_fraction": 0.5,
+          "label": "DAWN HEART",
+          "required": 2.8
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "key": "morning_garden",
+      "title": "THE MORNING GARDEN",
+      "subtitle": "A peaceful free-play room where every light remembers you",
+      "intro": [
+        "The forest is singing again.",
+        "Every path now carries a little of the light you restored, and the robots have stopped pretending not to dance when nobody is looking. The Morning Garden is a place to revisit friends, change colours, and make shapes with the moths.",
+        "There is nowhere else you have to go and nothing left that can be failed. Stay for as long as you like, or wander back through the gates to see how the earlier rooms remember what you did."
+      ],
+      "prompt": "Swirl, sparkle, and visit the friendly trees.",
+      "complete_line": "Morning keeps glowing.",
+      "pattern": "garden",
+      "previous_room": 7,
+      "previous_side": "WEST",
+      "previous_fraction": 0.5,
+      "next_room": null,
+      "next_side": null,
+      "next_fraction": 0.5,
+      "objects": []
+    }
+  ],
+  "notes": {
+    "intro": "intro[0] is the lead line shown beneath the room description; intro[1:] is the two-sentence modal story body.",
+    "external": "Room story text and objective metadata may be edited without modifying Python source."
+  }
+}

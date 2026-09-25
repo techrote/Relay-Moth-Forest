@@ -1,0 +1,12 @@
+'use strict';
+const ROOT=require('path').resolve(__dirname,'../..');
+const fs=require('fs'),assert=require('assert'),F=require(ROOT+'/foliagefx.js');
+assert.strictEqual(F.VERSION,'4.14');
+const src=fs.readFileSync(ROOT+'/foliagefx.js','utf8');
+assert(src.includes('float alpha=passOpacity(t.a,clamp(vFrontBlend,0.0,1.0))'),'foreground coverage must be whole-sprite alpha');
+assert(!src.includes('vLocal'),'foreground compositor must not cut a plant using moving/local fragment geometry');
+assert(!src.includes('superEllipse'),'actor silhouette clipping must be absent');
+assert(!src.includes('bandTop'),'lower-body cut bands must be absent');
+assert(!src.includes('plantForegroundAlpha'),'plant-local cut profiles must be absent');
+assert(src.includes('backgroundCount:this.instances.length'),'full foliage must remain continuously present in the background pass');
+console.log('FOLIAGEFX OCCLUSION REGRESSION 4.14 PASS');

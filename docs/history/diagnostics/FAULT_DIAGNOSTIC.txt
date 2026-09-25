@@ -1,0 +1,21 @@
+Relay Moth Forest — Pretty Graphics Edition 3.98
+UPDATE-FAULT DIAGNOSTIC
+
+Observed symptom
+----------------
+The on-screen RECOVERED UPDATE FAULT count coincided with a held vertical key ceasing to move the player until that key was released and pressed again.
+
+Direct cause in 3.97
+--------------------
+Game.frameFault() called this.keys.clear() for every recovered update exception. Browsers do not guarantee another keydown event for a key that remains physically held after application state is cleared. A single unrelated simulation error could therefore erase W/S/ArrowUp/ArrowDown until the user's next physical key transition.
+
+3.98 correction
+---------------
+1. Recovered faults never mutate keyboard state.
+2. Player input and movement execute in a dedicated critical update step.
+3. Pickups/progression and each cosmetic simulation have named isolation boundaries.
+4. A repeatedly failing optional subsystem backs off for 180 ms, 500 ms, 1.4 s, then progressively longer intervals rather than throwing on every animation frame.
+5. The runtime status reports the exact subsystem name plus exception message.
+6. F10 exports relay-moth-runtime-diagnostics-398.json, including recent stack traces and subsystem counters.
+
+This is intentionally independent of the collision-controller changes: a firefly, mini-robot, follower, creature, particle or shader-effect error can no longer abort movement or clear a held axis.

@@ -1,0 +1,30 @@
+{
+  "release": "4.14",
+  "baseline_sha256": "f7a1cf3e239d479d985123cbc1d2e25dbfd55ae888ab1cf6275ad56212e01cac",
+  "atlas_regions": 544,
+  "atlas_sets": [
+    "colour",
+    "height",
+    "normal",
+    "specular"
+  ],
+  "exact_tree_families": 10,
+  "native_browser_driver": {
+    "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "renderer": "ANGLE (Mesa, llvmpipe (LLVM 19.1.7 256 bits), OpenGL ES 3.2)"
+  },
+  "native_rooms": 9,
+  "robot_overlap_frames": 36,
+  "same_count_editor_changes": {
+    "grass": true,
+    "water": true
+  },
+  "runtime_errors": [],
+  "production_programs": 21,
+  "worktree_self_test": "PASS",
+  "native_browser_test": "PASS",
+  "source_normal_pixel_tests": "PASS",
+  "strict_alpha_assets": "PASS",
+  "deterministic_full_material_rebuilds": "matching hashes on two consecutive builds",
+  "limits": "Linux Chromium ANGLE/Mesa software renderer; not Windows/Firefox hardware certification or an FPS benchmark"
+}

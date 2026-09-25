@@ -1,0 +1,80 @@
+RELAY MOTH FOREST 4.011 — GRAPHICS / FOLIAGEFX NOTES
+==================================================
+
+CURRENT VISUAL LAYERS
+---------------------
+1. Floor + low static decor
+2. SurfaceFX fine GrassField
+3. FoliageFX background physical foliage
+4. Unified MAX shadow/contact-AO mask
+5. Actors
+6. FoliageFX foreground physical foliage
+7. Foreground tree/tall-scenery occluders
+8. Top particles/objective/guide FX
+
+FOLIAGE FX CONTROLS
+-------------------
+Foliage animation             animation/interaction toggle; physical foliage remains static when off
+Foliage quality               0..3
+Foliage wind strength         coherent field amplitude
+Foliage wind speed            coherent field time scale
+Foliage interaction strength  actor radial/wake response
+Foliage shading strength      diffuse/bend-normal response
+Foliage bend amount           deformation amplitude
+
+Advanced/debug:
+Show foliage roots
+Show interaction radii
+Freeze foliage wind
+Foliage category visualization
+
+QUALITY LADDER
+--------------
+0  static/disabled deformation; gameplay unaffected
+1  coarse 3-band-style weighting, primary wind, small interaction budget
+2  four-band-style weighting, primary+secondary wind, bend pseudo-normal, interaction push
+3  smooth 4–5-band-equivalent response, gusts, upper flutter, combined bump+bend response, <=8 sources
+
+PHYSICAL MATERIAL CONTRACT
+--------------------------
+- source alpha
+- standard alpha compositing
+- non-additive
+- emissive = 0
+- high ambient/base retention
+- moderate diffuse
+- very-low specular
+- restrained rim
+- stable broad bump gradients
+- bright foliage colour is pigment/lighting, not glow
+
+ROOTING
+-------
+Every physical foliage sprite has a category/region root cutoff. Shader deformation is exactly
+zero at/below that cutoff. Typical cutoff is 30–45% from the bottom. Tip motion receives the
+full wind/interaction response; roots remain attached to the same logical ground coordinate.
+
+WIND
+----
+Primary world-space wavelength:   216 logical px
+Secondary world-space wavelength:  94 logical px
+Nearby foliage therefore samples related motion. Small deterministic variation is intentionally
+subordinate to the coherent field.
+
+CONTACT AO / SHADOWS
+--------------------
+Each instance supplies a stable root footprint. Contact AO is drawn into the same half-resolution
+MAX shadow mask used by ordinary casters, so overlapping shadow contributions do not repeatedly
+multiply darkness. Water-mask rejection is retained for foliage contact AO.
+
+FLOATER-FX
+----------
+Floater-FX remains the pink/purple magical/experimental effect family. It is OFF by default,
+independent of the SurfaceFX master toggle, and reads only explicit `floater_clumps` authoring.
+The shipping v4 maps contain no Floater clumps, so physical grass placement is never borrowed.
+
+DIAGNOSTICS
+-----------
+F10 current filename: relay-moth-runtime-diagnostics-400.json
+Foliage diagnostics report enable/quality state, instance and front/back counts, interaction
+source count, category counts, instance bytes, rebuild count, draw calls and errors.

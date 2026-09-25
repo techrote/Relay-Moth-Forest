@@ -1,0 +1,21 @@
+Relay Moth Forest — Pretty Graphics Edition 3.995.5
+
+Focus
+- increase maximum inputtable water-FX parameter values
+- make grass FX visibly present in normal play
+- hide the hard black seam at the start of projected sprite shadows
+
+Implementation summary
+- Graphics panel water ceilings raised (quality 0–4, ripple budget 1–12, stronger numeric maxima on the water material controls).
+- SurfaceFX water path extended to accept quality 4 with extra analytical micro-wave bands.
+- Grass defaults strengthened and migrated forward from 3.995.4 when users were still on the prior defaults.
+- Grass instancing increased in count/size while keeping explicit hard caps and deterministic authored placement.
+- Grass colors/interactions tuned upward in the main render path for easier visibility.
+- Soft elliptical spot-shadow fans added under casters before the projected shadow body, masking the start-line artifact while still respecting the water mask.
+
+Validation
+- node --check game.js
+- node --check surfacefx.js
+- node surfacefx_regression.js
+- python self_test.py
+- python visual_behavior_regression_39955.py

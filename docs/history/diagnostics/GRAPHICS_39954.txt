@@ -1,0 +1,47 @@
+RELAY MOTH FOREST 3.995.4 — GRAPHICS / LIGHTING / SURFACE CONTROLS
+=================================================================
+
+DISPLAY / POST
+    max framerate
+    bloom enabled, strength, threshold
+    exposure
+    brightness
+    contrast
+    gamma
+    saturation
+    colour grade mix
+    temperature
+    green/magenta tint
+    shadow lift
+    highlight gain
+    vignette
+    fixed grain
+
+LIGHT / MATERIAL
+    emissive lighting
+    ambient initial / complete / force-complete override
+    emissive strength and radius
+    projected shadows: strength, length, softness
+    shadow width: robots / large decor / small decor
+    ambient occlusion and strength
+    sprite bump lighting, bump strength, specular response
+
+SURFACE FX
+    SurfaceFX master
+    water enabled / quality / strength / wave scale / speed
+    shoreline foam
+    ripple strength / source budget
+    water normal / detail / highlight / edge / refraction response
+    grass enabled / quality / density
+    grass wind strength / speed
+    grass interaction push strength
+
+3.995.4 WATER NOTE
+Idle water is a bounded analytical pseudo-spectrum: qualitative long/medium/short directional
+wave bands use deep-water dispersion and analytic gradients. There is no per-frame FFT, no
+float ping-pong simulation and no SSR/physics-foam chain. Interaction splashes remain bounded
+transient ripple sources. Projected shadows are masked out over exposed water.
+
+3.995.4 GRASS NOTE
+All nine rooms contain explicit authored `grass_clumps`. Grass remains visual-only and instanced;
+it never changes Room collision/path authority.

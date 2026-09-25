@@ -1,0 +1,76 @@
+Relay Moth Forest — Pretty Graphics Edition 3.995.1
+Validation run: 2026-09-05
+
+== syntax ==
+syntax PASS
+
+== transition memory regression ==
+TRANSITION MEMORY REGRESSION 3.995.1 PASS
+
+== baseline + SurfaceFX suite ==
+SURFACEFX REGRESSION 3.995.1 PASS
+  shoreline field + rebuild invalidation validated
+  ripple list bounded; legacy/off fallback contract present
+  sparse grass generation deterministic and hard-capped
+  shader failure isolates SurfaceFX instead of aborting game startup
+NPC REGRESSION 3.99 PASS
+no-route follower survived 240 frames; failCount=3 position=38.6,42.0
+Relay Moth Forest 3.995.1 — recovered update fault regression
+PASS
+  frame faults preserve held keys
+  5 critical + 8 optional update subsystems isolated
+  optional repeated faults back off instead of throwing every frame
+  diagnostics filename is version-flexible; player movement remains direct
+Relay Moth Forest — Pretty Graphics Edition 3.995.1
+SELF-TEST PASSED
+  27 staged objective/exit routes
+  67 mini robots; 127 woodland creatures incl mushroom pixies/cats
+  162 large trees; 108 use original painted tree sprites
+  361 atlas regions + softened coordinate-matched bump atlas
+  NPC no-route fallback + SurfaceFX + portal-transition memory hotfix validated
+Relay Moth Forest 3.97 — direct movement regression
+PASS
+movement cases: 30072
+free diagonal cases: 15036
+free diagonals preserving both axes: 15036
+maximum single-step displacement: 1.2 logical px
+mouse world-control: disabled by design
+per-frame player recovery snap: removed from gameplay update
+INPUT REGRESSION PASSED
+  generic idle axis baseline -> no movement
+  sub-threshold/noisy button 0 -> no pulse edge
+  stable physical button press -> one edge only
+  release/re-press -> exactly one new edge
+  generic axis delta calibrated from connection baseline
+NPC REGRESSION 3.99 PASS
+no-route follower survived 240 frames; failCount=3 position=38.6,42.0
+Relay Moth Forest 3.96 — keyboard jitter regression
+PASS
+cases: 10740
+maximum single-frame displacement: 1.2 logical px
+maximum unintended lateral displacement: 0 logical px
+legacy 2.75 px corner side-step: removed
+Relay Moth Forest 3.995.1 — recovered update fault regression
+PASS
+  frame faults preserve held keys
+  5 critical + 8 optional update subsystems isolated
+  optional repeated faults back off instead of throwing every frame
+  diagnostics filename is version-flexible; player movement remains direct
+Relay Moth Forest 3.995.1 — recovered update fault regression
+PASS
+  frame faults preserve held keys
+  5 critical + 8 optional update subsystems isolated
+  optional repeated faults back off instead of throwing every frame
+  diagnostics filename is version-flexible; player movement remains direct
+SURFACEFX REGRESSION 3.995.1 PASS
+  shoreline field + rebuild invalidation validated
+  ripple list bounded; legacy/off fallback contract present
+  sparse grass generation deterministic and hard-capped
+  shader failure isolates SurfaceFX instead of aborting game startup
+
+== localhost concurrency stress ==
+24 concurrent atlas requests + 12 concurrent game.js requests: PASS
+server admitted at most 4 transfer workers by design
+
+== browser automation ==
+Attempted Chromium portal-loop test at 1920x1080 DPR2; environment blocked loopback navigation with ERR_BLOCKED_BY_ADMINISTRATOR, so no browser-runtime pass is claimed.

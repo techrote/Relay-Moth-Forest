@@ -1,0 +1,12 @@
+Relay Moth Forest 3.96 — KEYBOARD JITTER DIAGNOSTIC
+
+Observed 3.95 failure mechanisms:
+1. movePlayer() tested lateral pre-offsets of 0.55, 1.1, 1.65, 2.2 and 2.75 logical pixels before applying the requested move. Near a corner the best-scoring side could change between frames, producing visible left/right snapping.
+2. inputVector() added gamepad axes to WASD/arrows. Even a calibrated controller can have residual analogue noise; summing that noise into a digital keyboard vector changes heading every frame.
+3. recoverPlayerIfBlocked() immediately snapped any numerically-invalid frame to the centre of a nearby clear tile. A transient overlap therefore became a visible jump.
+
+3.96 corrections:
+- no large pre-offsets; maximum optional tangent probe is 0.16 logical px
+- keyboard axes are exclusive while any movement key is held
+- local depenetration before recovery teleport
+- 0.38 s persistent-invalid grace before tile-centre recovery

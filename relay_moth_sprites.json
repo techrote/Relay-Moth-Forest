@@ -1,0 +1,75 @@
+{
+  "schema": "relay-moth-sprites/v3.91",
+  "tokens": {
+    "M": [
+      "tree_metal",
+      175
+    ],
+    "m": [
+      "tree_metal",
+      105
+    ],
+    "S": [
+      "tree_shadow",
+      45
+    ],
+    "F": [
+      "robot_faces",
+      188
+    ],
+    "L": [
+      "tree_lights",
+      225
+    ],
+    "G": [
+      "far_forest",
+      205
+    ],
+    "P": [
+      "discoveries",
+      205
+    ]
+  },
+  "sprites": {
+    "pip": [
+      "...G...",
+      "..GG...",
+      "...M...",
+      ".MMMMM.",
+      ".MFFFM.",
+      ".MFLFM.",
+      "..S.S.."
+    ],
+    "moss_bot": [
+      "..L....",
+      "..M....",
+      ".MMMM..",
+      ".MFFM..",
+      "MMFFMM.",
+      "..MM...",
+      ".S..S.."
+    ],
+    "lantern_bot": [
+      "...L...",
+      "..MMM..",
+      ".MFFFM.",
+      ".MFPLM.",
+      ".MMMMM.",
+      "..M.M..",
+      "..S.S.."
+    ],
+    "garden_bot": [
+      "..GG...",
+      ".GMMG..",
+      ".MFFM..",
+      "MMFFMM.",
+      "..MM...",
+      ".M..M..",
+      ".S..S.."
+    ]
+  },
+  "notes": {
+    "format": "Each sprite is a pixel-character grid. '.' is transparent; token colours reference semantic LUTs.",
+    "external": "Add or replace sprites without editing Python source."
+  }
+}
