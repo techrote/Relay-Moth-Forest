@@ -1,0 +1,52 @@
+name: Publish modding guide to GitHub Wiki
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'wiki/**'
+      - '.github/workflows/publish-wiki.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: relay-moth-wiki
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Clone Wiki repository
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          wiki_url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          if ! git clone "$wiki_url" _wiki; then
+            echo "::error::The GitHub Wiki repository is not initialised. Open the repo Wiki tab, create/save the first Home page once, then rerun this workflow."
+            exit 1
+          fi
+
+      - name: Sync authored Wiki pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          find _wiki -mindepth 1 -maxdepth 1 -type f ! -name '.git*' -delete
+          cp wiki/*.md _wiki/
+          cd _wiki
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Wiki already current.'
+            exit 0
+          fi
+          git commit -m 'Update Relay Moth Forest modding guide'
+          git push origin HEAD

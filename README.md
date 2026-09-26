@@ -136,6 +136,12 @@ The v4.14 validation was performed under Linux software-rendered Chromium/GLES. 
 
 See [Testing and validation](docs/TESTING.md).
 
+## Modding guide
+
+For user-facing customisation—story/dialogue, maps, default settings, LUTs, effects, wildlife, moths and editor workflows—see the **[Relay Moth Forest Modding Guide](https://github.com/techrote/Relay-Moth-Forest/wiki)**.
+
+The Wiki is written from the modifier's perspective. The `docs/` directory remains the developer/implementation reference.
+
 ## Repository guide
 
 Start with [docs/README.md](docs/README.md).
