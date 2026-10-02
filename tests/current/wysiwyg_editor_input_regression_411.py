@@ -10,8 +10,10 @@ assert '#editorPalette' in css and 'pointer-events:auto;touch-action:auto;z-inde
 # Pointer capture is only acquired by actual canvas gestures and explicitly released.
 assert "if(p.y>=PLAY_H||![0,2].includes(e.button)){this.releasePointer(e.pointerId);return}" in ed
 assert 'this.overlay.setPointerCapture?.(e.pointerId)' in ed
-assert 'this.overlay.hasPointerCapture?.(pointerId)' in ed and 'this.overlay.releasePointerCapture(pointerId)' in ed
-assert "this.releasePointer(e.pointerId);this.pointerDown=false" in ed
+assert 'const id=pointerId??this.pointerId' in ed and 'this.overlay.hasPointerCapture?.(id)' in ed and 'this.overlay.releasePointerCapture(id)' in ed
+assert 'this.pointerId=e.pointerId' in ed and 'this.resetPointerState(e.pointerId)' in ed
+assert "this.overlay.addEventListener('pointercancel',e=>this.onCancel(e))" in ed
+assert 'onCancel(e)' in ed and 'this.cancelGesture(e.pointerId)' in ed
 # UI events are shielded from canvas/game handlers, and all buttons are explicit button controls.
 assert "for(const ui of [this.toolbar,this.palettePanel])" in ed
 assert "this.panel?.querySelectorAll('button').forEach(b=>b.type='button')" in ed
