@@ -267,6 +267,7 @@
     downloadMaps(){if(!this.preparePersistence('download'))return false;download('relay_moth_maps.json',JSON.stringify(this.game.maps,null,2)+'\n');this.markSavedBaseline('download');this.game.toast('Map JSON downloaded · exported baseline is clean',1.5);return true}
   }
 
+  root.RelayEditorInvalidation=EDITOR_INVALIDATION;
   root.WysiwygEditor=WysiwygEditor;
   root.setupWysiwygEditor=function(game){if(root.rmfEditor)return root.rmfEditor;root.rmfEditor=new WysiwygEditor(game);return root.rmfEditor};
   root.toggleWysiwygEditor=function(){root.rmfEditor?.toggle()};
