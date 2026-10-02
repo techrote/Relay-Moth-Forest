@@ -20,7 +20,7 @@ assert 'body.wysiwygEdit #game' in css
 # Required interaction model.
 for token in (
     'class WysiwygEditor', "this.tool='brush'", "data-editor-tool", 'onDown(e)', 'onMove(e)', 'onUp(e)',
-    'eraseAt(p,decorOnly=false)', 'selectBox', 'captureSelectionState()', 'copySelection()', 'pasteClipboard()',
+    "eraseAt(p,scope='erase')", 'selectBox', 'captureSelectionState()', 'copySelection()', 'pasteClipboard()',
     'Ctrl+C/V', 'SAVE TO PROJECT', 'DOWNLOAD JSON'
 ):
     # data-editor-tool and text tokens may live in HTML rather than editor source.
@@ -30,6 +30,10 @@ for tool in ('brush','select','move','erase'):
 for cat in ('tiles','blockers','trees','decor','grass','lamps','robots'):
     assert f'data-editor-category="{cat}"' in html
 assert "if(e.button===2){this.beginTransaction('remove decoration')" in editor and "if(this.tool==='erase'){this.beginTransaction('erase')" in editor
+assert "this.eraseAt(p,'right-click')" in editor and "this.eraseAt(p,'erase')" in editor
+assert "this.eraseAt(p,true)" not in editor and "this.eraseAt(p,false)" not in editor
+assert 'bb.y0=Math.min(bb.y0,y-18)' in editor and 'bb.x0=Math.min(bb.x0,x-14)' in editor
+assert 'bb.y0=Math.min(bb.y0,y-46)' not in editor and 'bb.x0=Math.min(bb.x0,x-28)' not in editor
 assert "(e.ctrlKey||e.metaKey)&&k==='c'" in editor and "(e.ctrlKey||e.metaKey)&&k==='v'" in editor
 assert "e.key==='Delete'||e.key==='Backspace'" in editor
 
