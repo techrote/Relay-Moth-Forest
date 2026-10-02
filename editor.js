@@ -50,11 +50,12 @@
       if(scope==='copy')return c.copy;
       return false;
     },
-    pick(items,p,scope){
+    candidates(items,p,scope){
       const candidates=(items||[]).map(it=>it.capabilities?it:this.describe(it)).filter(it=>this.allows(it,scope)&&p.x>=it.bbox.x0&&p.x<=it.bbox.x1&&p.y>=it.bbox.y0&&p.y<=it.bbox.y1);
-      candidates.sort((a,b)=>(a.hitPriority-b.hitPriority)||(a.bbox.y1-b.bbox.y1)||String(a.id).localeCompare(String(b.id)));
-      return candidates.length?candidates[candidates.length-1]:null;
-    }
+      candidates.sort((a,b)=>(b.hitPriority-a.hitPriority)||(b.bbox.y1-a.bbox.y1)||String(b.id).localeCompare(String(a.id)));
+      return candidates;
+    },
+    pick(items,p,scope){return this.candidates(items,p,scope)[0]||null}
   });
   root.RelayEditorPolicy=RelayEditorPolicy;
 
@@ -63,7 +64,7 @@
       this.game=game;this.active=false;this.tool='brush';this.category='tiles';this.choice={kind:'path',label:'Path'};
       this.overlay=document.querySelector('#editorOverlay');this.ctx=this.overlay.getContext('2d');
       this.panel=document.querySelector('#wysiwygEditor');this.toolbar=document.querySelector('#editorToolbar');this.palettePanel=document.querySelector('#editorPalette');this.palette=document.querySelector('#editorPaletteGrid');this.search=document.querySelector('#editorPaletteSearch');this.inspectorPanel=document.querySelector('#editorInspector');this.inspector=document.querySelector('#editorInspectorBody');
-      this.status=document.querySelector('#editorStatus');this.hover={x:320,y:152};this.pointerDown=false;this.pointerButton=0;this.pointerId=null;this.dragMode=null;this.dragStart=null;this.dragNow=null;this.selection=[];this.clipboard=null;this.history=new Map();this.transaction=null;this.inspectorEdit=null;this.activeRoomKey=this.roomKey();this.paintVisited=new Set();this.showGrid=true;this.showSuppressed=false;this.nextDecorId=1;this._renderQueued=false;
+      this.status=document.querySelector('#editorStatus');this.hover={x:320,y:152};this.pointerDown=false;this.pointerButton=0;this.pointerId=null;this.dragMode=null;this.dragStart=null;this.dragNow=null;this.selection=[];this.clipboard=null;this.history=new Map();this.transaction=null;this.inspectorEdit=null;this.overlapCycle=null;this.activeRoomKey=this.roomKey();this.paintVisited=new Set();this.showGrid=true;this.showSuppressed=false;this.nextDecorId=1;this._renderQueued=false;
       this.bind();this.buildCategories();this.buildPalette();this.renderOverlay();
     }
     roomKey(){return this.game.room?.key||this.game.storyData.rooms[this.game.state.room]?.key}
@@ -101,7 +102,7 @@
     releasePointer(pointerId=null){const id=pointerId??this.pointerId;try{if(id!=null&&this.overlay.hasPointerCapture?.(id))this.overlay.releasePointerCapture(id)}catch(_){} }
     resetPointerState(pointerId=null){this.releasePointer(pointerId);this.pointerId=null;this.pointerDown=false;this.pointerButton=0;this.dragMode=null;this.dragStart=null;this.dragNow=null;this.moveOriginal=null;this.paintVisited.clear()}
     historyFor(roomKey=this.roomKey()){let h=this.history.get(roomKey);if(!h){h={undo:[],redo:[]};this.history.set(roomKey,h)}return h}
-    syncRoomContext(){const current=this.roomKey();if(this.activeRoomKey===current)return false;if(this.transaction)this.cancelTransaction(false);this.inspectorEdit=null;this.selection=[];this.resetPointerState();this.activeRoomKey=current;this.renderOverlay();this.updateStatus();return true}
+    syncRoomContext(){const current=this.roomKey();if(this.activeRoomKey===current)return false;if(this.transaction)this.cancelTransaction(false);this.inspectorEdit=null;this.overlapCycle=null;this.selection=[];this.resetPointerState();this.activeRoomKey=current;this.renderOverlay();this.updateStatus();return true}
     beforeRoomChange(){if(this.transaction)this.cancelTransaction(false);this.inspectorEdit=null;this.selection=[];this.resetPointerState();this.activeRoomKey=null;this.renderOverlay();this.updateStatus()}
     onRoomChanged(){this.syncRoomContext()}
     cancelGesture(pointerId=null){if(this.transaction)this.cancelTransaction();else{this.selection=[];this.renderOverlay();this.updateStatus()}this.resetPointerState(pointerId)}
@@ -111,7 +112,7 @@
       const k=e.key.toLowerCase();if((e.ctrlKey||e.metaKey)&&k==='z'){e.preventDefault();e.shiftKey?this.redoOne():this.undoOne();return}if((e.ctrlKey||e.metaKey)&&k==='y'){e.preventDefault();this.redoOne();return}if((e.ctrlKey||e.metaKey)&&k==='c'){e.preventDefault();this.copySelection();return}if((e.ctrlKey||e.metaKey)&&k==='v'){e.preventDefault();this.pasteClipboard();return}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();this.deleteSelection();return}
       if(k==='b'){this.setTool('brush');e.preventDefault()}else if(k==='s'){this.setTool('select');e.preventDefault()}else if(k==='o'){this.setTool('object');e.preventDefault()}else if(k==='e'){this.setTool('erase');e.preventDefault()}else if(k==='v'){this.setTool('move');e.preventDefault()}
     }
-    setTool(tool){this.tool=tool;document.querySelectorAll('[data-editor-tool]').forEach(b=>b.classList.toggle('active',b.dataset.editorTool===tool));this.overlay.style.cursor=(tool==='select'||tool==='object')?'crosshair':tool==='move'?'move':tool==='erase'?'not-allowed':'crosshair';this.updateStatus();this.renderOverlay()}
+    setTool(tool){if(tool!==this.tool)this.overlapCycle=null;this.tool=tool;document.querySelectorAll('[data-editor-tool]').forEach(b=>b.classList.toggle('active',b.dataset.editorTool===tool));this.overlay.style.cursor=(tool==='select'||tool==='object')?'crosshair':tool==='move'?'move':tool==='erase'?'not-allowed':'crosshair';this.updateStatus();this.renderOverlay()}
     logical(ev){const r=this.overlay.getBoundingClientRect();return{x:clamp((ev.clientX-r.left)/r.width*W,0,W-.001),y:clamp((ev.clientY-r.top)/r.height*H,0,H-.001)}}
     tileAt(p){return[clamp(Math.floor(p.x/TILE),0,GRID_W-1),clamp(Math.floor(p.y/TILE),0,GRID_H-1)]}
     beginTransaction(label){this.syncRoomContext();if(this.transaction)return false;const roomKey=this.roomKey();this.transaction={roomKey,label,before:clone(this.game.maps.rooms[roomKey])};return true}
