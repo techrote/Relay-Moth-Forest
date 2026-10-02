@@ -220,6 +220,7 @@ def main():
     subprocess.run(['python',str(ROOT/'tests'/'current'/'wysiwyg_editor_regression_410.py')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_hit_policy_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'procedural_decor_regression_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_transaction_regression_415.js')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'wysiwyg_editor_input_regression_411.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'object_editor_regression_412.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'editor_server_save_regression_410.py')],check=True)
