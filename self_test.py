@@ -147,7 +147,7 @@ def main():
     assert "fetch('/__editor/save_maps'" in editor and "path != '/__editor/save_maps'" in server and "backups = ROOT / 'editor_backups'" in server
     assert 'relay-moth-runtime-diagnostics-414.json' in js
     # SurfaceFX v3.995.2 bridge architecture: separate reusable file, bounded water/grass resources, clean fallback.
-    assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('editor.js') < html.index('game.js')
+    assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('procedural_decor.js') < html.index('editor.js') < html.index('game.js')
     for token in ('class SurfaceFX','class WaterField','class GrassField','buildShoreField','drawArraysInstanced','GRASS_HARD_CAP=4600','MAX_RIPPLES=12',"const VERSION='3.999'",'uRefractionStrength','sampler2D uScene'): assert token in surface,token
     assert 'settings.waterQuality??2' in js and 'this.waterProg' in js
     assert 'buildGrassSurfaceDescriptor' in js and "this.updateStep('surface-fx'" in js
@@ -191,6 +191,7 @@ def main():
 
     subprocess.run(['node','--check',str(ROOT/'surfacefx.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'foliagefx.js')],check=True)
+    subprocess.run(['node','--check',str(ROOT/'procedural_decor.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'game.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'sprite_material.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'editor.js')],check=True)
@@ -218,6 +219,7 @@ def main():
     subprocess.run(['node',str(ROOT/'tests'/'current'/'followers_casual_regression_409.js')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'wysiwyg_editor_regression_410.py')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_hit_policy_regression_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'procedural_decor_regression_415.js')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'wysiwyg_editor_input_regression_411.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'object_editor_regression_412.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'editor_server_save_regression_410.py')],check=True)
