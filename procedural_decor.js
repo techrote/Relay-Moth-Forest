@@ -64,6 +64,15 @@
     return out;
   }
 
+  function suppress(rawRoom,item){
+    const tile=item?.tile;
+    if(!rawRoom||!Array.isArray(tile)||tile.length<2)return false;
+    const k=cellKey(tile);
+    rawRoom.decor_exclusions=rawRoom.decor_exclusions||[];
+    if(!rawRoom.decor_exclusions.some(q=>cellKey(q)===k))rawRoom.decor_exclusions.push([Number(tile[0]),Number(tile[1])]);
+    return true;
+  }
+
   function enumerate(room,roles={},options={}){
     if(!room)return[];
     const index=roomIndex(room),rkey=roomKey(room),spec=room.spec||options.spec||{};
@@ -107,11 +116,11 @@
           glow:{x:baseX,y:baseY-12,element:'tree_lights',index:162+(seed%86),radius:27,alpha:.20}});
       }else if(seed%3===0||nearPath){
         const sprite=plants[seed%Math.max(1,plants.length)];
-        if(sprite)out.push({...common,sprite,generatedKind:'plant',alpha:nearPath?.82:.92,element:'far_forest',flip:!!(seed&1),nearPath});
+        if(sprite)out.push({...common,sprite,generatedKind:'plant',alpha:nearPath ? .82 : .92,element:'far_forest',flip:!!(seed&1),nearPath});
       }
     }
     return out;
   }
 
-  return Object.freeze({enumerate,reservedKeys,doorTile,hash32,TILE,GRID_W,GRID_H});
+  return Object.freeze({enumerate,reservedKeys,suppress,doorTile,hash32,TILE,GRID_W,GRID_H});
 });
