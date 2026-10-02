@@ -93,7 +93,9 @@ def main():
         # Inspector edit via actual canvas selection + DOM field, then Ctrl+Z. Mark the
         # injected fixture as the baseline so the dirty indicator is directly testable.
         ins=page.evaluate('''()=>{const idx=game.storyData.rooms.findIndex(r=>r.key==='quiet_nest');game.enterRoom(idx,null);document.querySelector('#storyModal').classList.add('hidden');const raw=game.maps.rooms.quiet_nest,sprite=(game.art.roles.decor_plants||game.art.roles.foliage_v401_all||[])[0];if(!sprite)throw Error('decor sprite fixture missing');raw.editor_decor=raw.editor_decor||[];raw.editor_decor.push({editor_id:'browser_inspector_fixture',x:116,y:142,sprite,scale:1,alpha:1});rmfEditor.queueInvalidation(RelayEditorInvalidation.STATIC,{sync:true});rmfEditor.markSavedBaseline('browser-fixture');return{x:116,y:136}}''')
-        page.locator('[data-editor-tool="select"]').click();editor_click(ins['x'],ins['y'])
+        page.locator('[data-editor-tool="select"]').click()
+        page.locator('#editorChrome').click();editor_click(ins['x'],ins['y']);page.keyboard.press('Tab')
+        assert page.locator('#editorToolbar').is_visible()
         xfield=page.locator('#editorInspectorBody [data-editor-property="x"]')
         assert xfield.is_visible(),'inspector x control did not open from real canvas click'
         xfield.fill('143');xfield.press('Enter')
@@ -106,14 +108,17 @@ def main():
 
         # Alt+click cycles deterministic overlapping authoring refs using the real pointer path.
         cyc=page.evaluate('''()=>{const raw=game.maps.rooms.quiet_nest,candidates=[[80,252],[560,248],[82,82],[550,82]],p=candidates.find(([x,y])=>RelayEditorPolicy.candidates(rmfEditor.collectItems(),{x,y},'select').length===0)||[80,252],sprite=(game.art.roles.decor_plants||game.art.roles.foliage_v401_all||[])[0];raw.editor_decor.push({editor_id:'browser_cycle_a',x:p[0],y:p[1],sprite,scale:.7,alpha:1},{editor_id:'browser_cycle_b',x:p[0],y:p[1],sprite,scale:.7,alpha:1});rmfEditor.queueInvalidation(RelayEditorInvalidation.STATIC,{sync:true});return{x:p[0],y:p[1]-3}}''')
-        page.locator('[data-editor-tool="select"]').click();editor_click(cyc['x'],cyc['y'],alt=True)
+        page.locator('[data-editor-tool="select"]').click();page.locator('#editorChrome').click()
+        editor_click(cyc['x'],cyc['y'],alt=True)
         first=page.evaluate("rmfEditor.selection[0]?.id");editor_click(cyc['x'],cyc['y'],alt=True);second=page.evaluate("rmfEditor.selection[0]?.id")
+        page.keyboard.press('Tab');assert page.locator('#editorToolbar').is_visible()
         assert first in ('browser_cycle_a','browser_cycle_b') and second in ('browser_cycle_a','browser_cycle_b') and first!=second,(first,second)
         behavior['alt_cycle']=[first,second]
 
         # Hide/show an objective entirely through OBJECT canvas selection + toolbar action.
         obj=page.evaluate('''()=>{const item=rmfEditor.collectItems().find(i=>i.type==='objective');if(!item)throw Error('objective browser fixture missing');return{id:item.id,x:(item.bbox.x0+item.bbox.x1)/2,y:(item.bbox.y0+item.bbox.y1)/2,tile:item.tile}}''')
-        page.locator('[data-editor-tool="object"]').click();editor_click(obj['x'],obj['y'])
+        page.locator('[data-editor-tool="object"]').click();page.locator('#editorChrome').click()
+        editor_click(obj['x'],obj['y']);page.keyboard.press('Tab');assert page.locator('#editorToolbar').is_visible()
         assert not page.locator('#editorObjectiveVisual').is_disabled()
         page.locator('#editorObjectiveVisual').click()
         hidden=page.evaluate('(id)=>(rmfEditor.rawRoom().object_fx_hidden||[]).includes(id)',obj['id']);assert hidden
@@ -127,7 +132,7 @@ def main():
         page.evaluate('''()=>{const r=rmfEditor.rawRoom();r.pattern_exclusions=r.pattern_exclusions||[];if(!r.pattern_exclusions.includes('nest:swirl'))r.pattern_exclusions.push('nest:swirl');rmfEditor.queueInvalidation(RelayEditorInvalidation.STATIC|RelayEditorInvalidation.ROOM_DATA,{sync:true})}''')
         page.locator('#editorSuppressed').click();page.locator('[data-editor-tool="select"]').click()
         sup=page.evaluate('''()=>{const i=rmfEditor.collectItems().find(x=>x.type==='suppressed-pattern'&&x.id==='nest:swirl');if(!i)throw Error('suppressed nest:swirl handle missing');return{x:(i.bbox.x0+i.bbox.x1)/2,y:(i.bbox.y0+i.bbox.y1)/2}}''')
-        editor_click(sup['x'],sup['y'])
+        page.locator('#editorChrome').click();editor_click(sup['x'],sup['y']);page.keyboard.press('Tab');assert page.locator('#editorToolbar').is_visible()
         assert not page.locator('#editorRestoreSuppressed').is_disabled()
         page.locator('#editorRestoreSuppressed').click()
         restored=page.evaluate("!((rmfEditor.rawRoom().pattern_exclusions||[]).includes('nest:swirl'))");assert restored
