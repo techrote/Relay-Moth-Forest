@@ -229,6 +229,7 @@ def main():
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_move_copy_cycle_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_validation_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_dirty_save_regression_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_invalidation_regression_415.js')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'wysiwyg_editor_input_regression_411.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'object_editor_regression_412.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'editor_server_save_regression_410.py')],check=True)
