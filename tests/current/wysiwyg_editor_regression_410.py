@@ -4,6 +4,7 @@ import json,re
 R=Path(__file__).resolve().parents[2]
 editor=(R/'editor.js').read_text()
 game=(R/'game.js').read_text()
+procedural=(R/'procedural_decor.js').read_text()
 html=(R/'index.html').read_text()
 css=(R/'style.css').read_text()
 server=(R/'relay_moth_server.py').read_text()
@@ -13,7 +14,7 @@ maps=json.loads((R/'relay_moth_maps.json').read_text())
 assert '<canvas id="editorOverlay" width="640" height="360"' in html
 assert '<div id="wysiwygEditor" class="hidden">' in html
 assert 'id="mapEditor"' not in html and 'id="mapCanvas"' not in html
-assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('editor.js') < html.index('game.js')
+assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('procedural_decor.js') < html.index('editor.js') < html.index('game.js')
 assert '#editorOverlay{position:absolute;inset:0' in css
 assert 'body.wysiwygEdit #game' in css
 
@@ -48,7 +49,7 @@ assert '!!globalThis.rmfEditor?.active' in game
 
 # Right-click can suppress generated room decorations when no explicit item exists.
 assert 'decorExclusions=new Set' in game
-assert 'room.decorExclusions?.has(k)' in game
+assert "rawOrRuntime(room,'decorExclusions','decor_exclusions')" in procedural
 assert 'r.decor_exclusions=r.decor_exclusions||[]' in editor
 
 # Localhost project-save endpoint is constrained and validates the map shape.
