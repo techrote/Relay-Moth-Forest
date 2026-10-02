@@ -20,6 +20,9 @@
     path:{layer:'terrain',hitPriority:11,select:true,move:true,remove:true,copy:true,property:false,visibility:false},
     decor:{layer:'decor',hitPriority:34,select:true,move:true,remove:true,copy:true,property:true,visibility:false},
     'procedural-decor':{layer:'decor',hitPriority:35,select:true,move:false,remove:true,copy:false,property:false,visibility:true},
+    'suppressed-procedural':{layer:'decor',hitPriority:36,select:true,move:false,remove:false,copy:false,property:false,visibility:true},
+    'suppressed-pattern':{layer:'decor',hitPriority:37,select:true,move:false,remove:false,copy:false,property:false,visibility:true},
+    'suppressed-decor-tile':{layer:'decor',hitPriority:29,select:true,move:false,remove:false,copy:false,property:false,visibility:true},
     grass:{layer:'decor',hitPriority:31,select:true,move:true,remove:true,copy:true,property:true,visibility:false},
     lamp:{layer:'decor',hitPriority:32,select:true,move:true,remove:true,copy:true,property:true,visibility:false},
     robot:{layer:'decor',hitPriority:33,select:true,move:true,remove:true,copy:true,property:true,visibility:false},
@@ -60,7 +63,7 @@
       this.game=game;this.active=false;this.tool='brush';this.category='tiles';this.choice={kind:'path',label:'Path'};
       this.overlay=document.querySelector('#editorOverlay');this.ctx=this.overlay.getContext('2d');
       this.panel=document.querySelector('#wysiwygEditor');this.toolbar=document.querySelector('#editorToolbar');this.palettePanel=document.querySelector('#editorPalette');this.palette=document.querySelector('#editorPaletteGrid');this.search=document.querySelector('#editorPaletteSearch');
-      this.status=document.querySelector('#editorStatus');this.hover={x:320,y:152};this.pointerDown=false;this.pointerButton=0;this.pointerId=null;this.dragMode=null;this.dragStart=null;this.dragNow=null;this.selection=[];this.clipboard=null;this.history=new Map();this.transaction=null;this.activeRoomKey=this.roomKey();this.paintVisited=new Set();this.showGrid=true;this.nextDecorId=1;this._renderQueued=false;
+      this.status=document.querySelector('#editorStatus');this.hover={x:320,y:152};this.pointerDown=false;this.pointerButton=0;this.pointerId=null;this.dragMode=null;this.dragStart=null;this.dragNow=null;this.selection=[];this.clipboard=null;this.history=new Map();this.transaction=null;this.activeRoomKey=this.roomKey();this.paintVisited=new Set();this.showGrid=true;this.showSuppressed=false;this.nextDecorId=1;this._renderQueued=false;
       this.bind();this.buildCategories();this.buildPalette();this.renderOverlay();
     }
     roomKey(){return this.game.room?.key||this.game.storyData.rooms[this.game.state.room]?.key}
@@ -81,6 +84,10 @@
       document.querySelector('#editorCopy')?.addEventListener('click',()=>this.copySelection());
       document.querySelector('#editorPaste')?.addEventListener('click',()=>this.pasteClipboard());
       document.querySelector('#editorDelete')?.addEventListener('click',()=>this.deleteSelection());
+      document.querySelector('#editorObjectiveVisual')?.addEventListener('click',()=>this.toggleObjectiveVisual());
+      document.querySelector('#editorRestoreSuppressed')?.addEventListener('click',()=>this.restoreSelectedSuppressed());
+      document.querySelector('#editorConvertProcedural')?.addEventListener('click',()=>this.convertProceduralSelection());
+      document.querySelector('#editorSuppressed')?.addEventListener('click',e=>{this.showSuppressed=!this.showSuppressed;e.currentTarget.classList.toggle('active',this.showSuppressed);e.currentTarget.textContent=this.showSuppressed?'HIDE SUPPRESSED':'SHOW SUPPRESSED';this.selection=[];this.renderOverlay();this.updateStatus()});
       document.querySelector('#editorGrid')?.addEventListener('click',e=>{this.showGrid=!this.showGrid;e.currentTarget.classList.toggle('active',this.showGrid);this.renderOverlay()});
       document.querySelector('#editorChrome')?.addEventListener('click',()=>this.toggleChrome());
       document.querySelector('#editorSave')?.addEventListener('click',()=>this.saveProject());
