@@ -103,7 +103,7 @@
     resetPointerState(pointerId=null){this.releasePointer(pointerId);this.pointerId=null;this.pointerDown=false;this.pointerButton=0;this.dragMode=null;this.dragStart=null;this.dragNow=null;this.moveOriginal=null;this.paintVisited.clear()}
     historyFor(roomKey=this.roomKey()){let h=this.history.get(roomKey);if(!h){h={undo:[],redo:[]};this.history.set(roomKey,h)}return h}
     syncRoomContext(){const current=this.roomKey();if(this.activeRoomKey===current)return false;if(this.transaction)this.cancelTransaction(false);this.inspectorEdit=null;this.overlapCycle=null;this.selection=[];this.resetPointerState();this.activeRoomKey=current;this.renderOverlay();this.updateStatus();return true}
-    beforeRoomChange(){if(this.transaction)this.cancelTransaction(false);this.inspectorEdit=null;this.selection=[];this.resetPointerState();this.activeRoomKey=null;this.renderOverlay();this.updateStatus()}
+    beforeRoomChange(){if(this.transaction)this.cancelTransaction(false);this.inspectorEdit=null;this.overlapCycle=null;this.selection=[];this.resetPointerState();this.activeRoomKey=null;this.renderOverlay();this.updateStatus()}
     onRoomChanged(){this.syncRoomContext()}
     cancelGesture(pointerId=null){if(this.transaction)this.cancelTransaction();else{this.selection=[];this.renderOverlay();this.updateStatus()}this.resetPointerState(pointerId)}
     toggleChrome(){document.body.classList.toggle('wysiwygChromeHidden');const b=document.querySelector('#editorChrome');if(b)b.textContent=document.body.classList.contains('wysiwygChromeHidden')?'SHOW UI':'HIDE UI';this.renderOverlay()}
