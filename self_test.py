@@ -103,7 +103,7 @@ def main():
     for stage,obj in enumerate(story['rooms'][2]['objects']):target=tuple(tin['objects'][obj['object_id']]);assert path_for(tin,cur,target,stage),(stage,obj['object_id']);cur=target
     exit_tile=door(story['rooms'][2]['next_side'],story['rooms'][2]['next_fraction'],1);assert not path_for(tin,spawn(story['rooms'][2]['previous_side'],story['rooms'][2]['previous_fraction']),exit_tile,0);assert path_for(tin,cur,exit_tile,4)
 
-    js=(ROOT/'game.js').read_text();surface=(ROOT/'surfacefx.js').read_text();foliage=(ROOT/'foliagefx.js').read_text();editor=(ROOT/'editor.js').read_text();server=(ROOT/'relay_moth_server.py').read_text();html=(ROOT/'index.html').read_text();css=(ROOT/'style.css').read_text()
+    js=(ROOT/'game.js').read_text();surface=(ROOT/'surfacefx.js').read_text();foliage=(ROOT/'foliagefx.js').read_text();procedural=(ROOT/'procedural_decor.js').read_text();editor=(ROOT/'editor.js').read_text();server=(ROOT/'relay_moth_server.py').read_text();html=(ROOT/'index.html').read_text();css=(ROOT/'style.css').read_text()
     # No-path followers are guarded and use step-aside/retry; non-colliding minis/wildlife never use map BFS.
     follower=js[js.index('class Followers'):js.index('class MiniRobotGuides')];mini_js=js[js.index('class MiniRobotGuides'):js.index('class FireflyField')];wild_js=js[js.index('class WoodlandCreatures'):js.index('class GamepadInput')]
     assert '||[]' in follower and 'Array.isArray(raw)' in follower and 'fallbackStep' in follower and 'failCount=Math.min(3' in follower
@@ -122,7 +122,7 @@ def main():
     assert 'this.pulseLight=1' in js and "this.luts.rgb('fx_pulse',244)" in js
     assert 'renderObjectiveMarker(objectiveMarker)' in js and 'this.activeObjectiveMarker={x,y:' in js
     # Objective sprites excluded from automatic/pattern decoration.
-    assert 'objectiveSprites' in js and ".filter(n=>!objectiveSprites.has(n))" in js
+    assert 'objectiveSprites' in procedural and ".filter(n=>!objectiveSprites.has(n))" in procedural
     assert "if(p==='orchard'){for(let i=0;i<4;i++){if(skip(`orchard:lamp:${i}`))continue;const x=150+i*115,n='candelabra_small'" in js
     assert "const orbs=['orb_magenta','orb_green','orb_orange','orb_cyan','orb_purple']" in js
     # Pickup/follower scale equality.
@@ -147,7 +147,7 @@ def main():
     assert "fetch('/__editor/save_maps'" in editor and "path != '/__editor/save_maps'" in server and "backups = ROOT / 'editor_backups'" in server
     assert 'relay-moth-runtime-diagnostics-414.json' in js
     # SurfaceFX v3.995.2 bridge architecture: separate reusable file, bounded water/grass resources, clean fallback.
-    assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('editor.js') < html.index('game.js')
+    assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('procedural_decor.js') < html.index('editor.js') < html.index('game.js')
     for token in ('class SurfaceFX','class WaterField','class GrassField','buildShoreField','drawArraysInstanced','GRASS_HARD_CAP=4600','MAX_RIPPLES=12',"const VERSION='3.999'",'uRefractionStrength','sampler2D uScene'): assert token in surface,token
     assert 'settings.waterQuality??2' in js and 'this.waterProg' in js
     assert 'buildGrassSurfaceDescriptor' in js and "this.updateStep('surface-fx'" in js
@@ -191,6 +191,7 @@ def main():
 
     subprocess.run(['node','--check',str(ROOT/'surfacefx.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'foliagefx.js')],check=True)
+    subprocess.run(['node','--check',str(ROOT/'procedural_decor.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'game.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'sprite_material.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'editor.js')],check=True)
@@ -218,6 +219,7 @@ def main():
     subprocess.run(['node',str(ROOT/'tests'/'current'/'followers_casual_regression_409.js')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'wysiwyg_editor_regression_410.py')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_hit_policy_regression_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'procedural_decor_regression_415.js')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'wysiwyg_editor_input_regression_411.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'object_editor_regression_412.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'editor_server_save_regression_410.py')],check=True)
