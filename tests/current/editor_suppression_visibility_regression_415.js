@@ -130,7 +130,8 @@ function makeEditor(roomKey='quiet_nest'){
   raw.editor_decor=raw.editor_decor||[];
   const generated={
     id:'generated:quiet_nest:999',tile:[12,8],x:201,y:151,sprite:'foliage_v391_19',
-    scale:.82,alpha:.91,flip:true,element:'far_forest',tintIndex:180,tintStrength:.13,source:'procedural'
+    scale:.82,alpha:.91,flip:true,element:'far_forest',tintIndex:180,tintStrength:.13,source:'procedural',
+    glow:{x:201,y:129,element:'tree_lights',index:211,radius:27,alpha:.2}
   };
   e.selection=[{type:'procedural-decor',id:generated.id,obj:generated,tile:[...generated.tile],bbox:{x0:190,y0:125,x1:212,y1:152}}];
   e.collectItems=()=>[
@@ -144,6 +145,7 @@ function makeEditor(roomKey='quiet_nest'){
   for(const field of ['x','y','sprite','scale','alpha','flip','element'])assert.deepStrictEqual(authored[field],generated[field],field);
   assert.strictEqual(authored.tint_index,180);
   assert.strictEqual(authored.tint_strength,.13);
+  assert.deepStrictEqual(authored.glow,{dx:0,dy:-22,element:'tree_lights',index:211,radius:27,alpha:.2});
   assert.strictEqual(e.historyFor('quiet_nest').undo.length,1);
 
   e.undoOne();
