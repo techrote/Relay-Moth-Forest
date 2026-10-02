@@ -138,7 +138,7 @@ def main():
     # v4.14 direct WYSIWYG room editor: normal game canvas is the visual truth.
     assert '<canvas id="editorOverlay" width="640" height="360"' in html and '<div id="wysiwygEditor" class="hidden">' in html
     assert 'id="mapEditor"' not in html and 'mapCanvas' not in html and 'toggleMapEditor' not in js
-    for token in ('class WysiwygEditor','onDown(e)','onMove(e)','onUp(e)',"eraseAt(p,scope='erase')",'copySelection()','pasteClipboard()','rebuildRoom()','saveProject()'): assert token in editor,token
+    for token in ('class WysiwygEditor','onDown(e)','onMove(e)','onUp(e)',"eraseAt(p,scope='erase')",'copySelection()','pasteClipboard()','rebuildRoom(','queueInvalidation(','saveProject()'): assert token in editor,token
     for tool in ('brush','select','object','move','erase'): assert f'data-editor-tool="{tool}"' in html
     for cat in ('tiles','blockers','trees','decor','grass','lamps','robots','moths','wildlife','mini','ambient'): assert f'data-editor-category="{cat}"' in html
     assert "if(k==='f2'){e.preventDefault();toggleWysiwygEditor();return}" in js and '!!globalThis.rmfEditor?.active' in js
@@ -229,6 +229,7 @@ def main():
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_move_copy_cycle_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_validation_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_dirty_save_regression_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_invalidation_regression_415.js')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'wysiwyg_editor_input_regression_411.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'object_editor_regression_412.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'editor_server_save_regression_410.py')],check=True)

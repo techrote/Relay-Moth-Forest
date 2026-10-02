@@ -43,7 +43,9 @@ assert 'this.editorDecor=r.editor_decor||[]' in game
 assert 'drawEditorDecor(ctx,room)' in game
 assert 'this.drawEditorDecor(ctx,room)' in game
 assert 'new Room(idx,spec,this.game.maps)' in editor
-assert "this.game.bgKey=''" in editor and 'this.game.ensureBackground(true)' in editor
+assert 'EDITOR_INVALIDATION' in editor and 'queueInvalidation(' in editor and 'applyInvalidation(' in editor
+assert 'refreshEditorStatic()' in game and 'refreshEditorWater()' in game and 'refreshEditorFoliage()' in game
+assert 'rebuildRoom(skipInspector=false){return this.queueInvalidation(EDITOR_INVALIDATION.ALL' in editor
 assert "if(k==='f2'){e.preventDefault();toggleWysiwygEditor();return}" in game
 assert '!!globalThis.rmfEditor?.active' in game
 
