@@ -154,6 +154,17 @@ function fixture(){
   assert(toasts.some(t=>t.includes('objective skipped')));
 }
 
+// Even a legacy/manually constructed objective clipboard entry fails explicitly
+// rather than reaching pasteDataItem and silently doing nothing.
+{
+  const {e,toasts}=fixture();
+  e.clipboard={items:[{type:'objective',kind:'tile',data:{object_id:'objective_a'},tx:8,ty:8}],anchor:{x:136,y:136},persistentRobotCopies:0};
+  e.hover={x:200,y:200};
+  e.pasteClipboard();
+  assert.strictEqual(e.selection.length,0);
+  assert(toasts.some(t=>t.includes('Objective clipboard entries cannot be pasted')&&t.includes('story + map authority')));
+}
+
 // Alt-cycle stays inside the active scope, follows deterministic ordering, and
 // resets after cursor/tool/room changes.
 {
