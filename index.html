@@ -30,6 +30,8 @@
           <button id="editorGrid" class="active">GRID</button><button id="editorChrome" title="Hide editor UI but keep canvas editing active (Tab)">HIDE UI</button>
         </div>
         <div class="editorToolGroup editorSaveGroup">
+          <button id="editorValidate" title="Run semantic validation without leaving editor mode">VALIDATE</button>
+          <span id="editorValidationState">CLEAN · 0E 0W</span>
           <button id="editorSave" title="Write relay_moth_maps.json through the localhost launcher">SAVE TO PROJECT</button>
           <button id="editorDownload">DOWNLOAD JSON</button>
           <button id="editorClose">CLOSE</button>
@@ -58,6 +60,10 @@
       <aside id="editorInspector">
         <div class="editorInspectorTitle">PROPERTY INSPECTOR</div>
         <div id="editorInspectorBody"></div>
+      </aside>
+      <aside id="editorDiagnostics" class="hidden">
+        <div class="editorDiagnosticsTitle"><span>SEMANTIC DIAGNOSTICS</span><button id="editorDiagnosticsClose">×</button></div>
+        <div id="editorDiagnosticsBody"></div>
       </aside>
     </div>
     <div id="roomHeader">
@@ -263,6 +269,7 @@
 <script src="foliagefx.js"></script>
 <script src="procedural_decor.js"></script>
 <script src="editor_identity.js"></script>
+<script src="editor_validation.js"></script>
 <script src="editor.js"></script>
 <script src="game.js"></script>
 </body>
