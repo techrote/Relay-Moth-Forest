@@ -147,7 +147,7 @@ function makeEditor(roomKey='quiet_nest'){
   assert.strictEqual(e.historyFor('quiet_nest').undo.length,1);
 
   e.undoOne();
-  assert.strictEqual(JSON.stringify(raw),before,'conversion undo did not restore both sides atomically');
+  assert.strictEqual(JSON.stringify(e.game.maps.rooms.quiet_nest),before,'conversion undo did not restore both sides atomically');
   e.redoOne();
   assert.strictEqual(e.game.maps.rooms.quiet_nest.editor_decor.length,1);
   assert(e.game.maps.rooms.quiet_nest.decor_exclusions.some(p=>p[0]===12&&p[1]===8));
