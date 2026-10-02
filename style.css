@@ -85,5 +85,18 @@ body.wysiwygEdit #game{filter:none}
 #editorPaletteGrid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:4px;align-content:start;padding-right:2px;scrollbar-width:thin}
 .editorPaletteItem{min-width:0;height:68px;padding:2px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:hidden;background:#071724;border:1px solid #2f4c58;color:#a9cdca}.editorPaletteItem canvas{width:54px;height:48px;flex:none;image-rendering:auto}.editorPaletteItem span{display:block;width:100%;font-size:7px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;text-align:center}.editorPaletteItem.active{border-color:#ffdb72;color:#fff3b9;background:#262419}
 .editorPaletteHint{font-size:7.5px;line-height:1.35;color:#789b9e;border-top:1px solid #294854;padding-top:4px}
-@media(max-width:800px){#editorPalette{width:150px}.editorToolGroup button{font-size:8px;padding:3px 4px}#editorToolbar{gap:3px}.editorPaletteHint{display:none}}
-body.wysiwygChromeHidden #editorToolbar,body.wysiwygChromeHidden #editorPalette{display:none!important}
+#editorInspector{position:absolute;right:6px;top:60px;bottom:7px;width:194px;display:flex;flex-direction:column;gap:5px;padding:6px;background:#04111ded;border:1px solid #6b8d97;box-shadow:-7px 8px 28px #000a;pointer-events:auto;touch-action:auto;z-index:107;overflow:hidden}
+.editorInspectorTitle{font-size:11px;letter-spacing:.08em;color:#cffff5;border-bottom:1px solid #345763;padding:2px 2px 6px}
+#editorInspectorBody{flex:1;min-height:0;overflow:auto;padding-right:2px;scrollbar-width:thin}
+.editorInspectorSummary{font-size:8px;line-height:1.45;color:#91b7b5;padding:3px 2px 6px}
+.editorInspectorGroup{display:grid;grid-template-columns:68px minmax(0,1fr);gap:4px 5px;align-items:center;margin:4px 0 7px}
+.editorInspectorGroup label{font-size:7.5px;color:#9ec2bf;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.editorInspectorGroup input,.editorInspectorGroup select{min-width:0;width:100%;box-sizing:border-box;font:800 8px "Cascadia Mono",Consolas,monospace;padding:3px 4px;border:1px solid #486774;background:#081723;color:#eafffb;outline:none}
+.editorInspectorGroup input[readonly],.editorInspectorGroup input:disabled,.editorInspectorGroup select:disabled{color:#789895;background:#09131a;border-color:#304751}
+.editorInspectorCheck{display:flex;align-items:center;gap:5px;font-size:8px;color:#b9d9d7}
+.editorInspectorCheck input{width:auto}
+.editorInspectorActions{display:flex;flex-wrap:wrap;gap:4px;padding-top:5px;border-top:1px solid #294854}
+.editorInspectorActions button{font-size:8px;padding:4px 5px;border:1px solid #476c77;background:#0b1b29;color:#c7e4e1}
+.editorInspectorType{font-size:8px;color:#ffe6a1;margin-bottom:4px}
+@media(max-width:800px){#editorPalette{width:150px}#editorInspector{width:168px}.editorToolGroup button{font-size:8px;padding:3px 4px}#editorToolbar{gap:3px}.editorPaletteHint{display:none}}
+body.wysiwygChromeHidden #editorToolbar,body.wysiwygChromeHidden #editorPalette,body.wysiwygChromeHidden #editorInspector{display:none!important}
