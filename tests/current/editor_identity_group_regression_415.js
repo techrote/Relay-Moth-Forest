@@ -34,6 +34,7 @@ function bareEditor(maps,roomKey){
   e.rebuildRoom=()=>{};
   e.beginTransaction=()=>true;
   e.commitTransaction=()=>true;
+  e.collectItems=()=>{const r=e.rawRoom(),out=[];(r.editor_decor||[]).forEach((d,i)=>out.push({type:'decor',id:d.editor_id||`decor:${i}`,obj:d}));(r.grass_clumps||[]).forEach((d,i)=>out.push({type:'grass',id:`grass:${i}`,obj:d}));(r.decor_lamps||[]).forEach((d,i)=>out.push({type:'lamp',id:`lamp:${i}`,obj:d,tile:d.tile}));(r.decor_robots||[]).forEach((d,i)=>out.push({type:'robot',id:d.id||`robot:${i}`,obj:d,tile:d.tile}));(r.moth_pickups||[]).forEach((d,i)=>out.push({type:'moth',id:d.id||`moth:${i}`,obj:d,tile:d.tile}));(r.creature_groups||[]).forEach((d,i)=>out.push({type:'wildlife',id:d.id||`wildlife:${i}`,obj:d,tile:d.spawn}));(r.mini_robot_groups||[]).forEach((d,i)=>out.push({type:'mini',id:d.id||`mini:${i}`,obj:d,tile:d.spawn}));return out};
   return {e,toasts};
 }
 
