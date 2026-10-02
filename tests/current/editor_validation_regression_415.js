@@ -31,6 +31,14 @@ const baseline=validate(clone(maps0));
 assert.strictEqual(Validation.summary(baseline).errors,0,`baseline semantic errors: ${baseline.map(d=>d.code+':'+d.roomKey).join(', ')}`);
 assert.deepStrictEqual(baseline,validate(clone(maps0)),'baseline diagnostics are not deterministic');
 
+// Runtime-compatible string decor exclusions remain valid legacy input.
+{
+  const maps=clone(maps0),roomKey=story0.rooms[0].key;
+  (maps.rooms[roomKey].decor_exclusions??=[]).push('3,3');
+  const list=validate(maps);
+  assert(!list.some(d=>d.code==='TILE_OUT_OF_BOUNDS'&&d.ref?.type==='decor_exclusions'));
+}
+
 // Global persistent identity codes.
 {
   const moths=rows('moth_pickups');assert(moths.length>=2);
