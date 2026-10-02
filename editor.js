@@ -63,8 +63,8 @@
     constructor(game){
       this.game=game;this.active=false;this.tool='brush';this.category='tiles';this.choice={kind:'path',label:'Path'};
       this.overlay=document.querySelector('#editorOverlay');this.ctx=this.overlay.getContext('2d');
-      this.panel=document.querySelector('#wysiwygEditor');this.toolbar=document.querySelector('#editorToolbar');this.palettePanel=document.querySelector('#editorPalette');this.palette=document.querySelector('#editorPaletteGrid');this.search=document.querySelector('#editorPaletteSearch');this.inspectorPanel=document.querySelector('#editorInspector');this.inspector=document.querySelector('#editorInspectorBody');
-      this.status=document.querySelector('#editorStatus');this.hover={x:320,y:152};this.pointerDown=false;this.pointerButton=0;this.pointerId=null;this.dragMode=null;this.dragStart=null;this.dragNow=null;this.selection=[];this.clipboard=null;this.history=new Map();this.transaction=null;this.inspectorEdit=null;this.overlapCycle=null;this.activeRoomKey=this.roomKey();this.paintVisited=new Set();this.showGrid=true;this.showSuppressed=false;this.nextDecorId=1;this._renderQueued=false;
+      this.panel=document.querySelector('#wysiwygEditor');this.toolbar=document.querySelector('#editorToolbar');this.palettePanel=document.querySelector('#editorPalette');this.palette=document.querySelector('#editorPaletteGrid');this.search=document.querySelector('#editorPaletteSearch');this.inspectorPanel=document.querySelector('#editorInspector');this.inspector=document.querySelector('#editorInspectorBody');this.diagnosticsPanel=document.querySelector('#editorDiagnostics');this.diagnostics=document.querySelector('#editorDiagnosticsBody');this.validationState=document.querySelector('#editorValidationState');
+      this.status=document.querySelector('#editorStatus');this.hover={x:320,y:152};this.pointerDown=false;this.pointerButton=0;this.pointerId=null;this.dragMode=null;this.dragStart=null;this.dragNow=null;this.selection=[];this.clipboard=null;this.history=new Map();this.transaction=null;this.inspectorEdit=null;this.overlapCycle=null;this.activeRoomKey=this.roomKey();this.paintVisited=new Set();this.showGrid=true;this.showSuppressed=false;this.nextDecorId=1;this._renderQueued=false;this.validationReferenceMaps=clone(this.game.maps);this.savedBaseline=RelayEditorValidation.snapshot(this.game.maps);this.validationCache=null;this.pendingPersistenceOverride=null;this.lastSavedAt=null;
       this.bind();this.buildCategories();this.buildPalette();this.renderOverlay();
     }
     roomKey(){return this.game.room?.key||this.game.storyData.rooms[this.game.state.room]?.key}
@@ -91,13 +91,16 @@
       document.querySelector('#editorSuppressed')?.addEventListener('click',e=>{this.showSuppressed=!this.showSuppressed;e.currentTarget.classList.toggle('active',this.showSuppressed);e.currentTarget.textContent=this.showSuppressed?'HIDE SUPPRESSED':'SHOW SUPPRESSED';this.selection=[];this.renderOverlay();this.updateStatus()});
       document.querySelector('#editorGrid')?.addEventListener('click',e=>{this.showGrid=!this.showGrid;e.currentTarget.classList.toggle('active',this.showGrid);this.renderOverlay()});
       document.querySelector('#editorChrome')?.addEventListener('click',()=>this.toggleChrome());
+      document.querySelector('#editorValidate')?.addEventListener('click',()=>this.validateNow(true));
+      document.querySelector('#editorDiagnosticsClose')?.addEventListener('click',()=>this.showDiagnostics(false));
       document.querySelector('#editorSave')?.addEventListener('click',()=>this.saveProject());
       document.querySelector('#editorDownload')?.addEventListener('click',()=>this.downloadMaps());
       document.querySelector('#editorClose')?.addEventListener('click',()=>this.toggle(false));
       window.addEventListener('keydown',e=>this.onKey(e),true);
       window.addEventListener('resize',()=>this.renderOverlay());
+      window.addEventListener('beforeunload',e=>this.onBeforeUnload(e));
       const shield=e=>{if(!this.active)return;e.stopPropagation()};
-      for(const ui of [this.toolbar,this.palettePanel,this.inspectorPanel])if(ui){ui.addEventListener('pointerdown',shield);ui.addEventListener('pointerup',shield);ui.addEventListener('pointermove',shield);ui.addEventListener('contextmenu',shield)}
+      for(const ui of [this.toolbar,this.palettePanel,this.inspectorPanel,this.diagnosticsPanel])if(ui){ui.addEventListener('pointerdown',shield);ui.addEventListener('pointerup',shield);ui.addEventListener('pointermove',shield);ui.addEventListener('contextmenu',shield)}
     }
     releasePointer(pointerId=null){const id=pointerId??this.pointerId;try{if(id!=null&&this.overlay.hasPointerCapture?.(id))this.overlay.releasePointerCapture(id)}catch(_){} }
     resetPointerState(pointerId=null){this.releasePointer(pointerId);this.pointerId=null;this.pointerDown=false;this.pointerButton=0;this.dragMode=null;this.dragStart=null;this.dragNow=null;this.moveOriginal=null;this.paintVisited.clear()}
