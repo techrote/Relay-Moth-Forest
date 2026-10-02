@@ -73,6 +73,14 @@
     return true;
   }
 
+  function restore(rawRoom,itemOrTile){
+    const tile=Array.isArray(itemOrTile)?itemOrTile:itemOrTile?.tile;
+    if(!rawRoom||!Array.isArray(tile)||tile.length<2)return false;
+    const k=cellKey(tile),before=(rawRoom.decor_exclusions||[]).length;
+    rawRoom.decor_exclusions=(rawRoom.decor_exclusions||[]).filter(q=>cellKey(q)!==k);
+    return rawRoom.decor_exclusions.length!==before;
+  }
+
   function enumerate(room,roles={},options={}){
     if(!room)return[];
     const index=roomIndex(room),rkey=roomKey(room),spec=room.spec||options.spec||{};
@@ -96,7 +104,7 @@
     for(let i=0;i<count;i++){
       const seed=hash32(index+91,i,731);
       const tx=2+seed%(GRID_W-4),ty=2+(seed>>>8)%(GRID_H-4),k=key(tx,ty);
-      if(walls.has(k)||water.has(k)||border.has(k)||exclusions.has(k)||reserved.has(k))continue;
+      const suppressed=exclusions.has(k);if(walls.has(k)||water.has(k)||border.has(k)||reserved.has(k)||(suppressed&&!options.includeSuppressed))continue;
       const nearPath=paths.has(k),baseX=tx*TILE+4+(seed>>>16)%9,baseY=ty*TILE+7+(seed>>>21)%7;
       const common={
         id:`generated:${rkey}:${i}`,
@@ -108,7 +116,8 @@
         source:'procedural',
         order:i,
         scale:1,
-        reserved:false
+        reserved:false,
+        suppressed
       };
       if(seed%17===0&&standing.length){
         const sprite=standing[seed%standing.length];
@@ -122,5 +131,5 @@
     return out;
   }
 
-  return Object.freeze({enumerate,reservedKeys,suppress,doorTile,hash32,TILE,GRID_W,GRID_H});
+  return Object.freeze({enumerate,reservedKeys,suppress,restore,doorTile,hash32,TILE,GRID_W,GRID_H});
 });
