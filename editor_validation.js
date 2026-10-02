@@ -125,8 +125,9 @@
         checkTile(roomKey,tile,{type:'objective',id:objectId},'objective tile');
       }
 
-      const tileArrays=['walls','water','path_cells','bridge_cells','bridge_island','decor_exclusions'];
+      const tileArrays=['walls','water','path_cells','bridge_cells','bridge_island'];
       for(const field of tileArrays)for(let i=0;i<normalizeArray(room[field]).length;i++)checkTile(roomKey,room[field][i],{type:field,id:String(i)},field);
+      for(let i=0;i<normalizeArray(room.decor_exclusions).length;i++){const raw=room.decor_exclusions[i],tile=Array.isArray(raw)?raw:String(raw).split(',').map(Number);checkTile(roomKey,tile,{type:'decor_exclusions',id:String(i)},'decor_exclusions')}
       for(let gi=0;gi<normalizeArray(room.bridge_segments).length;gi++)for(let i=0;i<normalizeArray(room.bridge_segments[gi]).length;i++)checkTile(roomKey,room.bridge_segments[gi][i],{type:'bridge_segment',id:`${gi}:${i}`},'bridge segment');
       for(let i=0;i<normalizeArray(room.large_trees).length;i++){const t=room.large_trees[i];checkTile(roomKey,t?.tile,{type:'tree',id:String(i)},'tree tile');checkSprite(roomKey,t?.sprite,{type:'tree',id:String(i)},'tree sprite')}
       for(const [tileKey,style] of Object.entries(room.blocker_styles||{})){
