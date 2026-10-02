@@ -214,7 +214,7 @@ function fieldKeys(e,ref){
   const src=fs.readFileSync(path.join(ROOT,'editor.js'),'utf8');
   assert(html.includes('id="editorInspector"')&&html.includes('id="editorInspectorBody"'));
   assert(css.includes('#editorInspector{')&&css.includes('pointer-events:auto;touch-action:auto;z-index:107'));
-  assert(src.includes('for(const ui of [this.toolbar,this.palettePanel,this.inspectorPanel])'));
+  assert(src.includes('for(const ui of [this.toolbar,this.palettePanel,this.inspectorPanel,this.diagnosticsPanel])'));
   assert(src.includes("b.type='button'")||src.includes("b.type='button';"));
   assert(src.includes('dataset.editorProperty'));
 }
