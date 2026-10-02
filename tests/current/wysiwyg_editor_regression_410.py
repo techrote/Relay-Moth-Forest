@@ -14,7 +14,7 @@ maps=json.loads((R/'relay_moth_maps.json').read_text())
 assert '<canvas id="editorOverlay" width="640" height="360"' in html
 assert '<div id="wysiwygEditor" class="hidden">' in html
 assert 'id="mapEditor"' not in html and 'id="mapCanvas"' not in html
-assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('procedural_decor.js') < html.index('editor_identity.js') < html.index('editor.js') < html.index('game.js')
+assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('procedural_decor.js') < html.index('editor_identity.js') < html.index('editor_validation.js') < html.index('editor.js') < html.index('game.js')
 assert '#editorOverlay{position:absolute;inset:0' in css
 assert 'body.wysiwygEdit #game' in css
 
@@ -68,3 +68,6 @@ for room in maps['rooms'].values():
 
 print('WYSIWYG EDITOR REGRESSION 4.10 PASS')
 print('  on-canvas painting/right-erase/select-move/copy-paste/live-preview/project-save contracts validated')
+
+assert 'id="editorValidate"' in html and 'id="editorValidationState"' in html and 'id="editorDiagnostics"' in html
+assert 'preparePersistence(kind)' in editor and 'onBeforeUnload(e)' in editor
