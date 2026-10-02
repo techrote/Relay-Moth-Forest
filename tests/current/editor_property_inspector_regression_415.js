@@ -128,8 +128,10 @@ function fieldKeys(e,ref){
   assert(objective.fields.find(f=>f.key==='kind')?.readOnly);
   assert(objective.fields.find(f=>f.key==='story_label')?.readOnly);
   const beforeRobot=room.decor_robots[0].id;
+  e.selection=[r.robot];
   assert.strictEqual(e.applyInspectorProperty(e.inspectorRefKey(r.robot),'id','changed'),false);
   assert.strictEqual(room.decor_robots[0].id,beforeRobot);
+  e.selection=[r.objective];
   assert.strictEqual(e.applyInspectorProperty(e.inspectorRefKey(r.objective),'object_id','changed'),false);
   assert(room.objects.obj_test);
 }
