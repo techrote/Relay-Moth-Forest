@@ -34,7 +34,7 @@ def main():
             name=meta[key];page.locator('#auditAsset').set_input_files(str(ROOT/name))
             page.evaluate('(name)=>{window.__assets[name]=URL.createObjectURL(document.querySelector("#auditAsset").files[0])}',name)
         page.add_script_tag(content=SETUP)
-        for name in ('surfacefx.js','sprite_material.js','foliagefx.js','editor.js','game.js'):
+        for name in ('surfacefx.js','sprite_material.js','foliagefx.js','procedural_decor.js','editor_identity.js','editor_validation.js','editor.js','game.js'):
             source=(ROOT/name).read_text()
             if name=='game.js':source=source.replace('img.src=url','img.src=window.__assets[url]||url')
             page.add_script_tag(content=source)
@@ -63,8 +63,8 @@ def main():
         if args.out:
             f=page.evaluate('()=>auditFrame(4150,true)');(args.out/'robot_overlap.png').write_bytes(base64.b64decode(f['png'].split(',')[1]))
         page.evaluate('()=>{game.graphics={...__settings};rmfEditor.toggle(true)}')
-        changed=page.evaluate('''()=>{const r=rmfEditor.rawRoom(),fx=game.renderer.foliageFX,water=game.renderer.surfaceFX.water,oldGrass=fx.descriptorKey,oldWater=water.signature;r.grass_clumps[0].x+=11;r.water[0]=[r.water[0][0]+1,r.water[0][1]];rmfEditor.rebuildRoom();auditFrame(3000,false);return {grass:oldGrass!==fx.descriptorKey,water:oldWater!==water.signature}}''')
-        assert changed['grass'] and changed['water'],changed;result['same_count_edits']=changed
+        changed=page.evaluate('''()=>{const r=rmfEditor.rawRoom(),fx=game.renderer.foliageFX,water=game.renderer.surfaceFX.water,oldGrass=fx.descriptorKey,oldWater=water.signature;r.grass_clumps[0].x+=11;rmfEditor.queueInvalidation(RelayEditorInvalidation.FOLIAGE,{sync:true});auditFrame(2975,false);const grassChanged=oldGrass!==fx.descriptorKey,waterAfterGrass=water.signature;r.water[0]=[r.water[0][0]+1,r.water[0][1]];rmfEditor.queueInvalidation(RelayEditorInvalidation.TERRAIN,{sync:true});auditFrame(3000,false);return {grass:grassChanged,water:oldWater!==water.signature,grassDidNotRebuildWater:waterAfterGrass===oldWater,counters:rmfEditor.getInvalidationDiagnostics().counters}}''')
+        assert changed['grass'] and changed['water'] and changed['grassDidNotRebuildWater'],changed;result['same_count_edits']=changed
         # Ghost alpha, scale and origin must match the planted sprite dimensions.
         result['ghost_geometry']=page.evaluate('''()=>{const cases=[{kind:'decor',sprite:'flower_white'},{kind:'ambient',sprite:'guide_moon',scale:.85,alpha:.55},{kind:'moth',sprite:game.art.roles.moths[0]},{kind:'wildlife',wildlifeKind:'cat',sprite:game.art.roles.creatures.cat.idle},{kind:'mini',sprite:game.art.roles.mini_robots.teal.idle}];return cases.map(e=>{const a=new OffscreenCanvas(160,160),b=new OffscreenCanvas(160,160);rmfEditor.drawSpriteGhost(a.getContext('2d'),e,80,130);const geometry=rmfEditor.ghostGeometry(e),reference={decor:[.62,'bottom'],ambient:[.85,'bottom'],moth:[.36,'center'],wildlife:[1.755,'center'],mini:[1.52,'center']}[e.kind];if(geometry.scale!==reference[0]||geometry.anchor!==reference[1])throw Error('Preview scale/anchor differs from runtime base size '+e.kind);game.art.draw(b.getContext('2d'),e.sprite,80,130,null,null,{scale:reference[0],anchor:reference[1],alpha:.56*(e.alpha??1)});const aa=a.getContext('2d').getImageData(0,0,160,160).data,bb=b.getContext('2d').getImageData(0,0,160,160).data;let max=0;for(let i=0;i<aa.length;i++)max=Math.max(max,Math.abs(aa[i]-bb[i]));if(max)throw Error('ghost mismatch '+e.sprite+' '+max);return {kind:e.kind,scale:geometry.scale,anchor:geometry.anchor,error:max}})}''')
         page.locator('[data-editor-category="decor"]').click();page.locator('.editorPaletteItem').first.click();page.locator('[data-editor-category="trees"]').click()
