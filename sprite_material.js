@@ -7,6 +7,11 @@ precision highp float;
 in vec2 aPos;in vec2 aUV;in vec4 aColor;
 out vec2 vUV;out vec4 vColor;out vec2 vWorld;
 void main(){gl_Position=vec4(aPos.x/640.0*2.0-1.0,1.0-aPos.y/360.0*2.0,0,1);vUV=aUV;vColor=aColor;vWorld=aPos;}`;
+  const mutableVertex=`#version 300 es
+precision highp float;
+in vec2 aPos;in vec2 aUV;in vec4 aColor;in float aTintStrength;
+out vec2 vUV;out vec4 vColor;out vec2 vWorld;out float vTintStrength;
+void main(){gl_Position=vec4(aPos.x/640.0*2.0-1.0,1.0-aPos.y/360.0*2.0,0,1);vUV=aUV;vColor=aColor;vWorld=aPos;vTintStrength=aTintStrength;}`;
   const quadVertex=`#version 300 es
 precision highp float;
 in vec2 aPos;in vec2 aUV;out vec2 vUV;
@@ -36,12 +41,13 @@ vec3 shadeSprite(vec3 base,vec3 n,float specMask,vec2 world){
   return max(base*diffuse+vec3(spec),vec3(0));
 }`;
   function fragment(kind='hd'){
-    const base=kind==='tint'?'float lum=dot(t.rgb,vec3(.26,.62,.12));vec3 base=vColor.rgb*(.28+lum*.98)+pow(max(t.rgb,0.0),vec3(2.4))*.12;':kind==='flat'?'vec3 tint=floor(clamp(vColor.rgb,0.0,1.0)*15.0)/15.0;vec3 base=mix(t.rgb,tint,clamp(uTintStrength,0.0,1.0));':'vec3 base=mix(t.rgb,t.rgb*vColor.rgb,.07);';
+    const base=kind==='mutable'?'vec3 base=mix(t.rgb,vColor.rgb,clamp(vTintStrength,0.0,1.0));':kind==='tint'?'float lum=dot(t.rgb,vec3(.26,.62,.12));vec3 base=vColor.rgb*(.28+lum*.98)+pow(max(t.rgb,0.0),vec3(2.4))*.12;':kind==='flat'?'vec3 tint=floor(clamp(vColor.rgb,0.0,1.0)*15.0)/15.0;vec3 base=mix(t.rgb,tint,clamp(uTintStrength,0.0,1.0));':'vec3 base=mix(t.rgb,t.rgb*vColor.rgb,.07);';
+    const mutableInput=kind==='mutable'?'in float vTintStrength;':'';
     return `#version 300 es
 precision highp float;
 ${uniforms}
 uniform float uTintStrength;
-in vec2 vUV;in vec4 vColor;in vec2 vWorld;out vec4 o;
+in vec2 vUV;in vec4 vColor;in vec2 vWorld;${mutableInput}out vec4 o;
 ${normalGLSL}
 ${lightGLSL}
 void main(){vec4 t=texture(uTex,vUV);if(t.a<.002)discard;
@@ -62,5 +68,5 @@ vec2 world=vec2(vUV.x*uLogicalSize.x,(1.0-vUV.y)*uLogicalSize.y);
 vec3 shaded=shadeSprite(base.rgb,decodeSpriteNormal(normal.rgb),texture(uSpecularTex,vUV).r,world);
 o=vec4(mix(base.rgb,shaded,clamp(normal.a,0.0,1.0)),base.a);}`;
   function materialState(settings={}){const enabled=settings.lighting!==false&&settings.bump!==false;return {enabled,bump:enabled?Math.max(0,Number(settings.bumpStrength??1.35)):0,specular:enabled?Math.max(0,Number(settings.specular??.42)):0};}
-  return {vertex,quadVertex,fragment,background,normalGLSL,lightGLSL,materialState};
+  return {vertex,mutableVertex,quadVertex,fragment,background,normalGLSL,lightGLSL,materialState};
 });
