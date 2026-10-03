@@ -75,6 +75,32 @@ Each scenario is warmed before the probe is enabled. Results retain raw samples 
 - Do not treat moving the same synchronous work to a later timer as a fix.
 - Correctness gates from E415-09 remain authoritative: water/grass same-count edits, WYSIWYG immediacy, transaction flushes and scoped ambient-system refresh must not regress.
 
-## Evidence status
+## First reproducible CI evidence
 
-The first checked-in harness/instrumentation change establishes reproducible collection. Concrete CI run IDs and phase results should be added here after the branch is validated. Manual slow-hardware samples can be added separately with CPU, browser, viewport/DPR and graphics settings recorded.
+Actions run **37087472117**, job `111100636454`, passed the complete existing `python self_test.py`, the native nine-room Chromium/WebGL2 regression, and the PERF-001A harness on commit `64e785d1e688fb828606a1adc4ac4930667122e5`. Artifact **11261277156 / `perf-001a-evidence`** retains the raw JSON and browser evidence.
+
+Environment: Ubuntu 24.04 runner, Chromium 153, DPR 1, requested/native backing **1278×718**, ANGLE/Mesa llvmpipe (LLVM 20.1.2, OpenGL ES 3.2). Three samples were taken at Chromium CPU rates 1× and 4×.
+
+| Scenario | 1× sync median | 1× dominant measured phase | 4× sync median | 4× dominant measured phase |
+| --- | ---: | --- | ---: | --- |
+| ordinary objective | 689.3 ms | `static.build` 684.3 ms | 915.4 ms | `static.build` 893.2 ms |
+| Tin Stream rivet | 1096.3 ms | `surface.water.refresh` 865.8 ms | 1673.5 ms | `surface.water.refresh` 899.1 ms; `static.build` 770.8 ms |
+| final objective / gate state | 1034.3 ms | `static.build` 518.2 ms; colour upload 514.9 ms median | 864.7 ms | `static.build` 840.2 ms |
+| persistent robot recruitment | 588.3 ms | `static.build` 354.4 ms | 1180.8 ms | `static.build` 1156.7 ms |
+| editor decor | 1144.8 ms | `static.build` 682.1 ms | 860.2 ms | `static.build` 789.3 ms |
+| editor objective | 826.3 ms | `static.build` 556.1 ms | 996.6 ms | `static.build` 926.0 ms |
+| editor grass | 16.9 ms | editor/status work 15.1 ms | 56.9 ms | editor/status work 51.8 ms |
+| editor water/terrain | 1103.9 ms | `surface.water.refresh` 853.6 ms | 1732.6 ms | `surface.water.refresh` 918.7 ms; `static.build` 750.4 ms |
+| wildlife-only control | 12.1 ms | editor/status work 12.0 ms | 51.0 ms | editor/status work 50.3 ms |
+
+The absolute values are specific to software-rendered CI and have substantial variance in some colour-upload samples. The attribution is much more stable than the absolute latency:
+
+- ordinary objective, robot recruitment, editor decor and editor objective changes all converge on the full static-room build path;
+- Tin Stream / water-terrain changes add a second large cost in `SurfaceFX.WaterField` refresh;
+- progression serialization/localStorage is negligible in these samples (typically 0–0.4 ms);
+- grass-only and wildlife-only controls avoid the monolithic static/water work and remain one to two orders of magnitude cheaper synchronously;
+- the reported user symptom therefore has a shared measured mechanism rather than being dominated by save/UI work.
+
+Frame-gap evidence is retained in the artifact. At 1×, the wildlife control median frame gap was 17.3 ms while the static/water scenarios were roughly 0.7–1.16 s. At 4×, software rendering itself became expensive enough that even the controls could have 0.76–0.82 s frame gaps; use that rate for phase attribution and scaling, not as a physical-hardware FPS claim.
+
+Manual slow-hardware samples can be added separately with CPU, browser, viewport/DPR and graphics settings recorded.
