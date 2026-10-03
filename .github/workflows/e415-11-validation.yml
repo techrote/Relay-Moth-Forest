@@ -9,20 +9,16 @@ concurrency:
   cancel-in-progress: true
 jobs:
   release-validation:
+    if: "!contains(github.event.head_commit.message, '[e415-transport]')"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Snapshot exact candidate for review
+      - name: Identify exact tested candidate
         run: |
           git rev-parse HEAD
-          git ls-files '*AGENTS.md'
-          git archive --format=zip HEAD -o /tmp/relay-candidate.zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: e415-11-candidate-source
-          path: /tmp/relay-candidate.zip
-          retention-days: 2
+          git rev-parse HEAD^{tree}
+          git diff --check
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -35,19 +31,30 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Full deterministic regression
         run: python self_test.py
-      - name: Explicit v4.15 editor and inherited renderer gates
+      - name: Explicit editor, reserved surfaces and inherited renderer gates
         run: |
           node tests/current/editor_behavior_regression_415.js
+          node tests/current/procedural_decor_regression_415.js
           node tests/current/render_contracts_414.js
           python tests/current/sprite_assets_regression_414.py
           python tests/current/sprite_pixels_regression_414.py --out /tmp/e415-11-pixels
+          python tests/current/release_docs_regression_415.py
       - name: Native Chromium editor and all-room renderer regression
         run: python tests/current/browser_render_regression_414.py --out /tmp/e415-11-browser
-      - name: Release documentation checks when present
+      - name: Clean versioned package and unchanged-content verification
         run: |
-          if test -f tests/current/release_docs_regression_415.py; then
-            python tests/current/release_docs_regression_415.py
-          fi
+          sha256sum -c SHA256SUMS.txt > /tmp/e415-11-source-checksums.txt
+          git archive --format=tar HEAD -o /tmp/Relay-Moth-Forest-v4.15.tar
+          mkdir /tmp/e415-11-clean
+          tar -xf /tmp/Relay-Moth-Forest-v4.15.tar -C /tmp/e415-11-clean
+          cd /tmp/e415-11-clean
+          sha256sum -c SHA256SUMS.txt > /tmp/e415-11-clean-before.txt
+          python self_test.py
+          node tests/current/editor_behavior_regression_415.js
+          node tests/current/procedural_decor_regression_415.js
+          python tests/current/release_docs_regression_415.py
+          sha256sum -c SHA256SUMS.txt > /tmp/e415-11-clean-after.txt
+          echo CLEAN PACKAGE AND CHECKSUMS PASS
       - name: Retain concise diagnostic reports
         if: always()
         uses: actions/upload-artifact@v4

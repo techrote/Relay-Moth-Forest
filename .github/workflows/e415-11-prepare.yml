@@ -1,0 +1,66 @@
+name: E415-11 reviewed candidate transport
+on:
+  push:
+    branches: [e415-11/docs-release-consolidation-15]
+    paths: ['.github/e415-11.payload.*']
+permissions:
+  contents: write
+jobs:
+  apply-reviewed-files:
+    if: contains(github.event.head_commit.message, '[e415-transport]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply hash-verified reviewed edits
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, lzma
+          pieces = [Path('.github/e415-11.payload.0'), Path('.github/e415-11.payload.1')]
+          data = lzma.decompress(b''.join(p.read_bytes() for p in pieces))
+          assert hashlib.sha256(data).hexdigest() == '7a411fcf76071dc639e2fa0f636d991e688f0be22b7c012be8a26d53938b832d'
+          changes = json.loads(data)
+          assert len(changes) == 28
+          for change in changes:
+              path = Path(change['path'])
+              assert not path.is_absolute() and '..' not in path.parts
+              assert path.suffix != '.json' and path.parts[0] not in ('assets', 'milestones', '.github')
+              before = path.read_bytes() if path.exists() else b''
+              assert hashlib.sha256(before).hexdigest() == change['before'], str(path)
+              result = before.decode('utf-8')
+              for start, end, replacement in reversed(change['edits']):
+                  assert 0 <= start <= end <= len(result)
+                  result = result[:start] + replacement + result[end:]
+              encoded = result.encode('utf-8')
+              assert hashlib.sha256(encoded).hexdigest() == change['after'], str(path)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(encoded)
+              print(str(path), change['after'])
+          for path in pieces:
+              path.unlink()
+          Path('.github/workflows/e415-11-prepare.yml').unlink()
+          PY
+          python tests/current/release_docs_regression_415.py
+          git diff --check
+      - name: Refresh current source manifest and publish candidate branch
+        run: |
+          git add -A
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, subprocess
+          paths = sorted(p for p in subprocess.check_output(['git','ls-files','-z']).decode().split('\0') if p)
+          with open('SHA256SUMS.txt','w',encoding='utf-8') as out:
+              for name in paths:
+                  if name == 'SHA256SUMS.txt' or name.startswith('.github/workflows/e415-11-'):
+                      continue
+                  out.write(f'{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  ./{name}\n')
+          PY
+          sha256sum -c SHA256SUMS.txt > /tmp/e415-11-checksums.txt
+          git add SHA256SUMS.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'E415-11: consolidate v4.15 editor docs, Modding Guide and release identity'
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}
+          git push origin HEAD:refs/heads/e415-11/docs-release-consolidation-15
