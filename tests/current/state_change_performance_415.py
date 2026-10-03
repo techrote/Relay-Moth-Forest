@@ -86,7 +86,10 @@ async (name) => {
   }
   if(name==='objective-final'){
     await reset('lantern_lane',['lane_a','lane_b']);
-    game.bgKey='';game.ensureBackground(true);game.updateUI();
+    // PERF-002 static backing is progression-invariant; only refresh objective/UI state.
+    // Forcing a second full backing rebuild here would contaminate the first post-event
+    // frame with unrelated warm-up GPU work.
+    game.updateUI();
     await twoFrames();relayMothPerf.clear();
     const obj=game.room.spec.objects.find(o=>o.object_id==='lane_c'),tile=game.room.objects[obj.object_id];
     [game.x,game.y]=game.room.center(tile);game.checkObjectives();
