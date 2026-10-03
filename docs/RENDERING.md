@@ -10,17 +10,18 @@ The runtime may render at a larger native framebuffer, but world/material calcul
 
 The current ordering contract is:
 
-1. static room colour + material background;
+1. static room-invariant colour + material background;
 2. SurfaceFX water;
 3. fine GrassField;
 4. ground/low sprites;
-5. unified shadow/contact-AO mask;
-6. physical background foliage;
-7. globally bottom-Y-sorted ordinary/tinted HD world sprites;
-8. physical foreground foliage;
-9. tall foreground scenery and tree canopies;
-10. guide/objective/top particles and semantic FX;
-11. bloom, lighting, colour grading and post-processing.
+5. mutable background presentation (generated/authored decor, recruitable robots, completed objectives, gates and bridge-stage art);
+6. unified shadow/contact-AO mask;
+7. physical background foliage;
+8. globally bottom-Y-sorted ordinary/tinted HD world sprites;
+9. physical foreground foliage;
+10. tall foreground scenery and tree canopies;
+11. guide/objective/top particles and semantic FX;
+12. bloom, lighting, colour grading and post-processing.
 
 Exact batching may combine compatible materials, but the ordering relationship must remain.
 
@@ -53,13 +54,15 @@ This v4.14 correction is important: transformed sprites must move their highligh
 
 When sprite bump/material lighting is disabled, the shader returns the source/tinted colour. It does not continue to darken sprites based on light position with a flat normal.
 
-## Static material buffers
+## Static material buffers and mutable presentation
 
-Most room decoration is still efficiently baked into a static colour texture.
+Room-scale invariant scenery is efficiently baked into static colour/normal/specular textures. During static construction, the same placement calls write aligned material buffers, so the background shader uses source-derived material vectors rather than differentiating a resampled world-height image.
 
-During static construction, the same placement calls write aligned world normal/specular buffers. The static material shader therefore shades the composited room using source-derived material vectors instead of differentiating a resampled world-height texture.
+Stateful or frequently authored presentation is intentionally outside this cache. The mutable layer batches those HD sprites through a dedicated source-normal/specular shader with per-item tint strength, allowing the runtime to reproduce the Canvas2D source-atop tint contract without rebuilding the room textures.
 
-This keeps static/live/clipped versions of the same art visually consistent without turning every background object into a separate live draw.
+Current mutable classes include generated and authored editor decor, unrecruited persistent robots, completed-objective visuals, gate state and Tin Stream bridge-stage presentation. Structural terrain remains in the static backing; a terrain edit may therefore still require an expensive room bake.
+
+Rendered-pixel tests compare mutable tinted output against the equivalent static colour/normal/specular composition.
 
 ## Tree splits
 
