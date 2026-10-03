@@ -1,0 +1,48 @@
+name: PERF-002 validation
+
+on:
+  push:
+    branches:
+      - perf-002/mutable-presentation-32
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test/browser/GLES dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r tools/requirements-authoring.txt playwright
+          python -m playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libegl-mesa0 libgles2 libgl1-mesa-dri
+      - name: Full deterministic regression
+        run: python self_test.py
+      - name: Native browser regression
+        run: python tests/current/browser_render_regression_414.py --out /tmp/perf-002-browser
+      - name: Performance evidence
+        run: |
+          python tests/current/state_change_performance_415.py \
+            --out /tmp/perf-002.json \
+            --samples 3 \
+            --cpu-throttle 1
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-002-evidence
+          path: |
+            /tmp/perf-002.json
+            /tmp/perf-002-browser
+          if-no-files-found: warn
