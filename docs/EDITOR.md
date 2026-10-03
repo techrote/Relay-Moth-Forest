@@ -43,7 +43,7 @@ Tile-backed objects use the same snapped/clamped movement plan for the ghost and
 
 Copy reports unsupported/skipped types. Objectives, generated decor and room patterns are not copyable; convert generated decor first. Paste selects the newly created items. It never creates a second story objective as a side effect.
 
-Persistent robot IDs survive moves, as do their other authored fields. New/copy IDs for persistent robots, moths, wildlife and mini-robot groups are allocated against all rooms and persistent types. One wildlife/mini-robot group is one editor item, regardless of its actor count; copying it creates one logical group. Legacy entries without IDs are not rewritten merely by opening or selecting the editor.
+Persistent robot IDs survive moves, as do their other authored fields. Copying a persistent robot creates a **decorative robot without a persistent ID**, with an explicit paste message; it does not create another recruitable identity. An ID-less robot copies normally. New/copy IDs for moths, wildlife and mini-robot groups are allocated against IDs in all rooms and persistent types, including robots. One wildlife/mini-robot group is one editor item, regardless of its actor count; copying it creates one logical group. Legacy entries without IDs are not rewritten merely by opening or selecting the editor.
 
 ## Property inspector
 

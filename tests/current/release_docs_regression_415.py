@@ -95,6 +95,10 @@ def main():
                  'SAVE ANYWAY', 'DOWNLOAD ANYWAY', 'DIRTY PROJECT/ROOM',
                  'read-only', 'inspector', 'migration']:
         assert term in editor, term
+    for name in ['docs/EDITOR.md', 'docs/DATA_FORMATS.md',
+                 'wiki/Robots-Wildlife-and-Relay-Moths.md', 'wiki/Reference.md']:
+        source = text(name).lower()
+        assert 'decorative' in source and 'persistent id' in source, name
     for page in ['Getting-Started', 'Rooms-and-Maps', 'Sprites-and-Decoration',
                  'Testing-Your-Mod', 'Recipes', 'Reference']:
         source = text(f'wiki/{page}.md')

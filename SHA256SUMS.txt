@@ -1,6 +1,6 @@
 3c7994c81a2654319f67a893b9f5a75d2647b621181163c95f8c092de02c81e2  ./.github/workflows/publish-wiki.yml
 b4fec017fb0dc9b6415526f44193ca24e5e11bfad663a497ec4e297203dcd376  ./0Play.cmd
-8062cab2b12fc3a9b1b5b5cef124e09e33163d770013c19478b852b87612ce82  ./CHANGELOG.txt
+a6745f18f2c8d07175d90295b64c23f85ca61158be241f82d72ff910a16afc5e  ./CHANGELOG.txt
 238cbe4fde3bec452fff9be1c0e95fd60c724bebd36a5bb45211b389234ff55b  ./README.md
 0e82d36d666f78fc9f10b8c93e5fe6d4aa5908d15bb1e847f1252a67f4b62935  ./VERSION.txt
 ddc4507b24f98011dca1e58086fc28d37ec769d2026860a29e57f4d6cdcc19d8  ./assets/HD_remake_pixel_art_sample.png
@@ -175,10 +175,10 @@ b0b91903019a450c6c8610448c415696948aff0f3086cc4c847f4fe9fae7ebc5  ./docs/4.14 mi
 5f6b10d419da5759fca7a13f84c5de04eb29212497abb243f7830ab1467165eb  ./docs/4.14 milestone archive/validation/v4.14/worktree_self_test.txt
 27c0b482eba8f335d9bbfa8dbef6ae7bc083f812648a8dd618c6fdf103afc984  ./docs/ARCHITECTURE.md
 66e6dd6ef9e74e9f232855e16a2e5bd25324107948ed50bc5d3c52922377de94  ./docs/ASSET_PIPELINE.md
-6702eb1aad4c56c476c08c4b38b470af6a46be8cce8ec3a8af41b48b0e0911cf  ./docs/DATA_FORMATS.md
+f4ff6d1e0281a0c59a47beb5ecdbcc2a89288a1aec58c41ec82bc49047a18e6b  ./docs/DATA_FORMATS.md
 a327071632000579de281ac897e1cdf3627109469cd063690241c461cb15fdaa  ./docs/DESIGN_HISTORY.md
 e867698b85fca384436be36baa2050c99ef86fcfe8960fa030b7225523d77a14  ./docs/DEVELOPMENT.md
-45bea2e6eb4d5a78ea6df66af7978b76d24f469006fe926c516f2f097983edc1  ./docs/EDITOR.md
+7447b62bb3237831b94383bd7845a781e4fba510a37b3a1ed65f84e24a5b5a26  ./docs/EDITOR.md
 eca66cb209d4aed6ee0217e1f8287d75e5e7919e6a052e65ed37517964181f3e  ./docs/GAMEPLAY_AND_SIMULATION.md
 8b354799f7966aa2f16bb744760243bc851b14c854a83ec95f6c066b42841238  ./docs/README.md
 52fd2ccec2af964064e2fe89fcd05cdb6e41b92cc4602ab78b86ea94baeb2689  ./docs/RENDERING.md
@@ -196,7 +196,7 @@ c2f4c46c6428a39d6e9cb0058e06f92a2585ab1661726de69c16f5c9243a93e3  ./docs/rag/edi
 c7ad86ad939573ce6318f9edd2a8b4fce18795e0569b4c63b1731299418ebfc2  ./docs/rag/editor-v415/09-test-matrix-release-gates.md
 b1fe36a53af73352ee8643513b7ea9e34002a9503d38f98864409a9a13fc4a06  ./docs/rag/editor-v415/10-design-invariants-out-of-scope.md
 5be56f435484186cd08324db01251d55f7302f26e258360e2c8f5af232c24c37  ./docs/rag/editor-v415/README.md
-88fc4d912025ff86aeba2bf76d1d8a2545667da7f605339a145565c80e342da0  ./docs/validation/v4.15/README.md
+f561e601b704ebe11a758a74b6e2222c93d9b101b089fe74b8dd39cecc6011f9  ./docs/validation/v4.15/README.md
 df4dcacc7d1a3422b3df3fd5a13c7be659a2a2cf658f0cc7e76bf6c7afd455cf  ./editor.js
 2a684581e474a381d00dbe52842681b38a2a7b57708f93979f8eb9ccbcb958a0  ./editor_identity.js
 f408f919620ddcb638016443decfeb1ffdbc9e7ec1b543ac1390ee5b99e2fc3a  ./editor_validation.js
@@ -252,7 +252,7 @@ f1e0e3bcd205c0a579019083ec02d973e6a51dc1949f1be35c5a857ed7b25937  ./tests/curren
 68cdaa0c98998f3b62235451d31f242c8e04b79792cba61692832b3d20a48974  ./tests/current/npc_regression_399.js
 9e78b38b9300a8b39b4517a2aa875c542f835a219c7c65e5944bbc36512062ae  ./tests/current/object_editor_regression_412.py
 d8e5a90a833fe86bf756da67f8423ec29eb3e8e6f17d766cf36970eb022fab52  ./tests/current/procedural_decor_regression_415.js
-eec7c3765218fd36e3187d0a69b1400b85d0a365046d3da9070986126105dd9d  ./tests/current/release_docs_regression_415.py
+656590967d1b506071ec9c5e81a9ee42a70dda93046b4af4468e91f71236dbae  ./tests/current/release_docs_regression_415.py
 514dc082a53f200b3b26c1ebccfa83b553666a14a658c7fc268ddbfaa5643fcf  ./tests/current/render_contracts_414.js
 91a5f9161a9e766eb83c71b2a93176a71e1cb83ddf8b680843b6d11e0c9727a6  ./tests/current/render_order_seam_regression_402.py
 bd222c5b04b9678d07153f95b88c923388c1a374cbd2abdc93c7b3dc8c2d2065  ./tests/current/render_pipeline_glsl_regression_402.py
@@ -296,8 +296,8 @@ c8b2471ad5bfb9bcc459d35a40e090d4e6e1152180a6a91b9acf459a23212231  ./wiki/Effects
 90ab67d384f2db24f99b22ae355752d259f663429b452940a522e08567f0914f  ./wiki/Getting-Started.md
 f158f170b5749579e0070930f05d1c5ed8359ba02a7892ab07d0bb00fba5271b  ./wiki/Home.md
 5a3b55d34f58ebdd37c9b0fcbf80dab6beccd276c37e1e1455315fc4fd4281fe  ./wiki/Recipes.md
-03d7a1dd7b779c9a35c9aaa718596b76258df89d7cb42e0324701861229ef775  ./wiki/Reference.md
-32cd4a7e728106fcdca4401981abcee314e0629ccee4d7d38d84650348817989  ./wiki/Robots-Wildlife-and-Relay-Moths.md
+7b5a28b73bda64e2e9a08ab9de72a4147359df5fcf69f9d42ee24f8e59fcd3d8  ./wiki/Reference.md
+0383a6ad562f506e9f53b6d5642d6df3866ffdb8d39611707f19278b588ed521  ./wiki/Robots-Wildlife-and-Relay-Moths.md
 d1ec3f2e033d9c36efa4fb38a1039fc34e350e4f9ad9016b1cc4b2805b569937  ./wiki/Rooms-and-Maps.md
 e77a2f46e246903fefa6e606942ba9942a1ec55c0b852e60e5352bc7eed0a932  ./wiki/Sprites-and-Decoration.md
 e9f08aa77f126a5db0d5ff9e46a77f352f337fe5fab5de15f4d0c829cebdc9ff  ./wiki/Story-and-Dialogue.md

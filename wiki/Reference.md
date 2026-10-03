@@ -184,6 +184,6 @@ Current v4.15 `game.js` does not read those fields. Objective placement comes fr
 | Inspect properties | select one supported item; Enter commits, Escape cancels |
 | Validate before persistence | VALIDATE; errors require correction or explicit ANYWAY override |
 
-Right click affects decor only. Objectives and patterns cannot be copied. Undo/redo is room-local; copies of persistent items use globally unused IDs. CLEAN is a loaded/saved/exported map baseline, not a validation verdict or proof of disk save after download.
+Right click affects decor only. Objectives and patterns cannot be copied. Undo/redo is room-local. Moth/wildlife/mini-group copies use globally unused IDs; a persistent robot copy becomes decorative without a persistent ID and reports that explicitly. CLEAN is a loaded/saved/exported map baseline, not a validation verdict or proof of disk save after download.
 
 Product release 4.15 does not rename `relay-moth-maps/v3.99`, `relay-moth-hd-atlas/v4.14`, FoliageFX's internal material version or the browser keys above.

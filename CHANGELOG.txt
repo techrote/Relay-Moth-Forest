@@ -2,7 +2,7 @@
 - Explicit terrain/decor/gameplay/structural capabilities and tool-scoped hit testing keep right-click decor removal away from gameplay objects; deterministic Alt-click cycles eligible overlaps.
 - Shared procedural-decor descriptors make generated plants targetable and keep generic decor off bridge cells/islands, objective tiles and reserved transition footprints, including the Tin Stream bush/rivet case.
 - Room-keyed undo/redo and transactional pointer/Escape cancellation prevent cross-room snapshots and partially committed gestures.
-- Moves retain persistent identities; copies allocate globally unused persistent IDs; wildlife and mini-robot groups are single logical authoring items rather than individual spawned actors.
+- Moves retain persistent identities; moth/wildlife/mini-group copies allocate globally unused IDs, while persistent robot copies explicitly become decorative without duplicating recruitable identity. Wildlife and mini-robot groups are single logical authoring items rather than individual spawned actors.
 - Explicit objective HIDE VISUAL / SHOW VISUAL and SHOW SUPPRESSED / RESTORE recover hidden objectives, generated decor, pattern art and orphan tile exclusions entirely in the UI. Generated decor can be converted to authored decor.
 - A typed property inspector exposes supported decor, grass, lamp, robot, moth, group and objective-placement/visibility fields, with read-only persistent/story identities and undoable edits.
 - Tile move ghosts share snapped/clamped destinations with commits; mixed immovable selections refuse movement, copy reports skipped types, and objective/pattern/generated copying is not silently fabricated.

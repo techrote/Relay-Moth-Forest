@@ -42,7 +42,7 @@ These are presentation/authoring fields. They do not redefine story objective se
 
 Absent arrays stay optional; opening a map does not mass-add defaults or migrate its schema. Orphan tile-exclusion handles can be restored even when current generation emits nothing there; bridge/objective reservation still wins after restoration.
 
-Persistent `id` on robots/moths/creature groups/mini groups is a save-compatible identity. Moves preserve it; permitted copies receive a globally unused ID. Group `count` describes actors within one logical group, not separate authoring objects. Legacy ID-less entries remain supported. History, selection, validation diagnostics and dirty/save fingerprints are in-memory editor state, not a new serialized map schema.
+Persistent `id` on robots/moths/creature groups/mini groups is a save-compatible identity. Moves preserve it. Copies of moths, creature groups and mini groups receive a globally unused ID. A persistent robot copy instead becomes decorative with no persistent ID; the original keeps its identity. Group `count` describes actors within one logical group, not separate authoring objects. Legacy ID-less entries remain supported. History, selection, validation diagnostics and dirty/save fingerprints are in-memory editor state, not a new serialized map schema.
 
 ## `relay_moth_story.json`
 
