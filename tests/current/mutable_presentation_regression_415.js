@@ -20,6 +20,7 @@ for(const token of ['this.drawEditorDecor(ctx,room)','this.drawRobots(ctx,room,s
   assert(!staticBuild.includes(token),`mutable presentation leaked into static bake: ${token}`);
 }
 assert(staticBuild.includes('bridgeCell=room.bridgeCells.has(k)'),'bridge backing must be stage-invariant');
+assert(!staticBuild.includes('RelayProceduralDecor.enumerate('),'generated decor must not be baked into static backing');
 
 // Runtime progression paths must not fall back to the monolithic background API.
 const robot=between('  checkRobotPickups(){','\n  checkObjectives(){');
@@ -33,7 +34,10 @@ assert(objective.includes("this.room.key==='tin_stream'")&&objective.includes('t
 const sig=between('  bgSignature(){','\n  releaseCurrentStatic()');
 for(const token of ['isDone(','hasRobot(','bridgeBuilt','bridgeProgress'])assert(!sig.includes(token),token);
 assert(js.includes('renderMutablePresentation(){'));
-for(const token of ['renderMutablePattern()','renderMutableEditorDecor()','renderMutableRobots()','renderMutableCompletedObjectives()','renderMutableGates()'])assert(js.includes(token),token);
+for(const token of ['renderMutablePattern()','renderMutableProceduralDecor()','renderMutableEditorDecor()','renderMutableRobots()','renderMutableCompletedObjectives()','renderMutableGates()'])assert(js.includes(token),token);
+const end=between('  end(grade=','\n}\n\nclass ParticleField');
+assert(end.indexOf('renderBackground(settings)')<end.indexOf('spriteFlush(this.mutableNormal')&&end.indexOf('spriteFlushMutable()')<end.indexOf('renderWater(water,settings)'),'mutable background presentation must retain pre-water static-layer ordering');
+assert(js.includes('hasTint=!!info?.colour')&&js.includes('tintStrength=hasTint?'),'untinted mutable sprites must not be whitened');
 assert(js.includes('this.renderMutablePresentation();this.renderFloaterFX(now)'));
 
 // Mutable HD presentation has its own exact tint-strength attribute while retaining
