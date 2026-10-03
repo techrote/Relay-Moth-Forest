@@ -52,6 +52,20 @@ This is actual Chromium/WebGL2/Canvas2D/DOM execution, with local JSON/images in
 
 The historical overlap fixture adjusts hit geometry only in its ephemeral test page; it does not change campaign data. Browser assertions and exact state, not screenshots alone, are acceptance authority.
 
+## State-change performance diagnostics
+
+PERF-001A adds an opt-in browser timing probe and localhost Chromium harness for objective, persistent-robot and editor rebuild stalls. It is intentionally separate from the ordinary correctness self-test because absolute CI latency is not a stable release threshold.
+
+Run:
+
+```text
+python tests/current/state_change_performance_415.py --out /tmp/perf-001a.json --samples 3
+```
+
+Repeat `--cpu-throttle` to compare controlled Chromium CPU-throttling rates, for example `--cpu-throttle 1 --cpu-throttle 4 --cpu-throttle 6`. The JSON retains raw samples plus median/p95/max phase and frame-gap summaries. See [PERF-001A measurement record](validation/performance/PERF-001A.md) for scenario definitions and interpretation limits.
+
+Do not use one absolute CI millisecond value as a universal pass/fail target. The harness is intended to establish which synchronous phase dominates and how that work scales; physical low-end hardware evidence remains valuable.
+
 ## Documentation and packaging
 
 ```text

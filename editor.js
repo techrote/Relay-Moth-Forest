@@ -114,7 +114,29 @@
     clearPendingInvalidation(){this.ensureInvalidationState();if(this.invalidationFrame!=null&&root.cancelAnimationFrame)try{root.cancelAnimationFrame(this.invalidationFrame)}catch(_){}this.invalidationFrame=null;this.pendingInvalidation=0;this.pendingInvalidationSkipInspector=false}
     queueInvalidation(mask,{sync=false,skipInspector=false,record=true}={}){this.ensureInvalidationState();mask=Number(mask)||0;if(!mask)return false;if(record&&this.transaction)this.transaction.invalidation=(this.transaction.invalidation||0)|mask;const wasPending=!!this.pendingInvalidation;this.pendingInvalidation=(this.pendingInvalidation||0)|mask;this.pendingInvalidationSkipInspector=wasPending?(this.pendingInvalidationSkipInspector&&!!skipInspector):!!skipInspector;if(sync)return this.flushInvalidation(skipInspector);if(this.invalidationFrame==null&&root.requestAnimationFrame){this.invalidationCounters.scheduled++;this.invalidationFrame=root.requestAnimationFrame(()=>{this.invalidationFrame=null;this.invalidationCounters.frames++;this.flushInvalidation()})}return true}
     rebindRoomData(){if(typeof Room==='undefined'||!this.game?.storyData?.rooms||!this.game?.rooms)return false;const idx=this.game.state.room,spec=this.game.storyData.rooms[idx],old=this.game.room;this.game.rooms[idx]=new Room(idx,spec,this.game.maps);this.game.room=this.game.rooms[idx];this.game.room.bridgeProgress=old?.bridgeProgress||0;this.game.room.bridgeBuilt=old?.bridgeBuilt||false;if(this.game.room.walkablePixel&&Number.isFinite(this.game.x)&&Number.isFinite(this.game.y)&&!this.game.room.walkablePixel(this.game.x,this.game.y,PLAYER_COLLISION_R)){const t=this.game.room.nearestClearWalkable(this.game.room.tile(this.game.x,this.game.y),PLAYER_COLLISION_R);[this.game.x,this.game.y]=this.game.room.center(t)}this.invalidationCounters.room++;return true}
-    applyInvalidation(mask,skipInspector=false){this.ensureInvalidationState();if(!mask)return false;const selected=this.selectionKeys?.()||[],needsRoom=!!(mask&(EDITOR_INVALIDATION.TERRAIN|EDITOR_INVALIDATION.OBJECTS|EDITOR_INVALIDATION.ROOM_DATA));if(needsRoom)this.rebindRoomData();if(mask&EDITOR_INVALIDATION.TERRAIN){this.game.refreshEditorStatic?.();this.invalidationCounters.static++;this.game.refreshEditorWater?.();this.invalidationCounters.water++;this.game.refreshEditorFoliage?.();this.invalidationCounters.foliage++}else{if(mask&EDITOR_INVALIDATION.STATIC){this.game.refreshEditorStatic?.();this.invalidationCounters.static++}if(mask&EDITOR_INVALIDATION.FOLIAGE){this.game.refreshEditorFoliage?.();this.invalidationCounters.foliage++}if(mask&EDITOR_INVALIDATION.OBJECTS){this.game.refreshEditorStatic?.();this.invalidationCounters.static++;this.invalidationCounters.objects++}}if(mask&EDITOR_INVALIDATION.CREATURES){this.game.creatures?.init?.(this.game.room);this.invalidationCounters.creatures++}if(mask&EDITOR_INVALIDATION.MINI_ROBOTS){this.game.miniGuides?.init?.(this.game.room,this.game.state);this.invalidationCounters.miniRobots++}this.refreshSelection?.(selected);this.renderOverlay?.();this.updateStatus?.(skipInspector);return true}
+    applyInvalidation(mask,skipInspector=false){
+      this.ensureInvalidationState();if(!mask)return false;
+      const probe=root.relayMothPerf,perf=probe?.begin?.('editor-invalidation',{room:this.roomKey(),mask})??null,measure=(name,fn)=>probe?.measure?probe.measure(name,fn):fn();
+      try{
+        const selected=this.selectionKeys?.()||[],needsRoom=!!(mask&(EDITOR_INVALIDATION.TERRAIN|EDITOR_INVALIDATION.OBJECTS|EDITOR_INVALIDATION.ROOM_DATA));
+        if(needsRoom)measure('editor.room.rebind',()=>this.rebindRoomData());
+        if(mask&EDITOR_INVALIDATION.TERRAIN){
+          this.game.refreshEditorStatic?.();this.invalidationCounters.static++;
+          this.game.refreshEditorWater?.();this.invalidationCounters.water++;
+          this.game.refreshEditorFoliage?.();this.invalidationCounters.foliage++;
+        }else{
+          if(mask&EDITOR_INVALIDATION.STATIC){this.game.refreshEditorStatic?.();this.invalidationCounters.static++}
+          if(mask&EDITOR_INVALIDATION.FOLIAGE){this.game.refreshEditorFoliage?.();this.invalidationCounters.foliage++}
+          if(mask&EDITOR_INVALIDATION.OBJECTS){this.game.refreshEditorStatic?.();this.invalidationCounters.static++;this.invalidationCounters.objects++}
+        }
+        if(mask&EDITOR_INVALIDATION.CREATURES){measure('editor.creatures.init',()=>this.game.creatures?.init?.(this.game.room));this.invalidationCounters.creatures++}
+        if(mask&EDITOR_INVALIDATION.MINI_ROBOTS){measure('editor.mini-robots.init',()=>this.game.miniGuides?.init?.(this.game.room,this.game.state));this.invalidationCounters.miniRobots++}
+        measure('editor.selection.refresh',()=>this.refreshSelection?.(selected));
+        measure('editor.overlay.render',()=>this.renderOverlay?.());
+        measure('editor.status.update',()=>this.updateStatus?.(skipInspector));
+        return true;
+      }finally{probe?.end?.(perf,{mask})}
+    }
     flushInvalidation(skipInspector=null){this.ensureInvalidationState();if(!this.pendingInvalidation)return false;if(this.invalidationFrame!=null&&root.cancelAnimationFrame)try{root.cancelAnimationFrame(this.invalidationFrame)}catch(_){}this.invalidationFrame=null;const mask=this.pendingInvalidation,skip=skipInspector==null?this.pendingInvalidationSkipInspector:!!skipInspector;this.pendingInvalidation=0;this.pendingInvalidationSkipInspector=false;this.invalidationCounters.flushes++;return this.applyInvalidation(mask,skip)}
     historyFor(roomKey=this.roomKey()){let h=this.history.get(roomKey);if(!h){h={undo:[],redo:[]};this.history.set(roomKey,h)}return h}
     syncRoomContext(){const current=this.roomKey();if(this.activeRoomKey===current)return false;if(this.transaction)this.cancelTransaction(false);else this.flushInvalidation();this.inspectorEdit=null;this.overlapCycle=null;this.selection=[];this.resetPointerState();this.activeRoomKey=current;this.renderOverlay();this.updateStatus();return true}
