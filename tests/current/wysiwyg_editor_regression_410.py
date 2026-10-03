@@ -40,8 +40,9 @@ assert "e.key==='Delete'||e.key==='Backspace'" in editor
 
 # Live preview and persistent authored decoration path.
 assert 'this.editorDecor=r.editor_decor||[]' in game
-assert 'drawEditorDecor(ctx,room)' in game
-assert 'this.drawEditorDecor(ctx,room)' in game
+assert 'drawEditorDecor(ctx,room)' in game  # retained as historical/static helper; no longer called by the bake
+assert 'renderMutableEditorDecor()' in game and 'this.renderMutableEditorDecor()' in game
+assert 'this.drawEditorDecor(ctx,room)' not in game[game.index('  build(room,state,renderW=W,renderH=H){'):game.index('\n}\n\nclass SpriteAtlas')]
 assert 'new Room(idx,spec,this.game.maps)' in editor
 assert 'EDITOR_INVALIDATION' in editor and 'queueInvalidation(' in editor and 'applyInvalidation(' in editor
 assert 'refreshEditorStatic()' in game and 'refreshEditorWater()' in game and 'refreshEditorFoliage()' in game
