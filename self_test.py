@@ -238,7 +238,9 @@ def main():
     subprocess.run(['python',str(ROOT/'tests'/'current'/'grass_shadow_regression_3999.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'fault_regression.py')],check=True)
     subprocess.run(['python','-m','py_compile',str(ROOT/'tools'/'build_v391_assets.py')],check=True)
-    subprocess.run(['python','-m','py_compile',str(ROOT/'tools'/'generate_material_maps_413.py'),str(ROOT/'tools'/'rebuild_runtime_atlas.py')],check=True)
+    subprocess.run(['python','-m','py_compile',str(ROOT/'tools'/'generate_material_maps_413.py'),str(ROOT/'tools'/'rebuild_runtime_atlas.py'),str(ROOT/'tests'/'current'/'state_change_performance_415.py')],check=True)
+    assert 'globalThis.relayMothPerf=RelayPerfProbe' in js and "perfMeasure('static.build'" in js and "perfMeasure('progress.localStorage'" in js
+    assert "begin('objective-complete'" in js and "begin('robot-recruit'" in js
     subprocess.run(['python',str(ROOT/'tests'/'current'/'release_docs_regression_415.py')],check=True)
     print('Relay Moth Forest — Pretty Graphics Edition 4.15')
     print('  v4.15 editor reliability + authoring behavior validated')
