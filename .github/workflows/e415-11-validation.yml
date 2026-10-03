@@ -1,0 +1,60 @@
+name: E415-11 candidate validation
+on:
+  push:
+    branches: [e415-11/docs-release-consolidation-15]
+permissions:
+  contents: read
+concurrency:
+  group: e415-11-validation
+  cancel-in-progress: true
+jobs:
+  release-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Snapshot exact candidate for review
+        run: |
+          git rev-parse HEAD
+          git ls-files '*AGENTS.md'
+          git archive --format=zip HEAD -o /tmp/relay-candidate.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e415-11-candidate-source
+          path: /tmp/relay-candidate.zip
+          retention-days: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install authoring and native-browser dependencies
+        run: |
+          python -m pip install -r tools/requirements-authoring.txt playwright
+          python -m playwright install --with-deps chromium
+      - name: Full deterministic regression
+        run: python self_test.py
+      - name: Explicit v4.15 editor and inherited renderer gates
+        run: |
+          node tests/current/editor_behavior_regression_415.js
+          node tests/current/render_contracts_414.js
+          python tests/current/sprite_assets_regression_414.py
+          python tests/current/sprite_pixels_regression_414.py --out /tmp/e415-11-pixels
+      - name: Native Chromium editor and all-room renderer regression
+        run: python tests/current/browser_render_regression_414.py --out /tmp/e415-11-browser
+      - name: Release documentation checks when present
+        run: |
+          if test -f tests/current/release_docs_regression_415.py; then
+            python tests/current/release_docs_regression_415.py
+          fi
+      - name: Retain concise diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e415-11-validation-reports
+          path: |
+            /tmp/e415-11-pixels/*.json
+            /tmp/e415-11-browser/*.json
+          if-no-files-found: ignore
+          retention-days: 7
