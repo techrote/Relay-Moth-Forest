@@ -11,10 +11,10 @@ The runtime may render at a larger native framebuffer, but world/material calcul
 The current ordering contract is:
 
 1. static room-invariant colour + material background;
-2. SurfaceFX water;
-3. fine GrassField;
-4. ground/low sprites;
-5. mutable background presentation (generated/authored decor, recruitable robots, completed objectives, gates and bridge-stage art);
+2. mutable background presentation (generated/authored decor, recruitable robots, completed objectives, gates and bridge-stage art);
+3. SurfaceFX water;
+4. fine GrassField;
+5. ground/low sprites;
 6. unified shadow/contact-AO mask;
 7. physical background foliage;
 8. globally bottom-Y-sorted ordinary/tinted HD world sprites;
