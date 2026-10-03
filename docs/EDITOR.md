@@ -1,137 +1,90 @@
-# WYSIWYG editor
+# WYSIWYG editor — v4.15
 
-Press **F2** to edit directly on the normal rendered game view.
+Press **F2** to edit on the normal rendered game canvas. Gameplay simulation is suspended while the editor owns pointer input. There is no separate mini-map editor and no dimming/desaturation filter on the game view. Normal gameplay movement remains keyboard/gamepad-driven.
 
-There is no separate miniature map canvas. The rendered room remains the visual reference while gameplay simulation is suspended and the editor owns pointer input.
+## Controls and layers
 
-## Core controls
-
-| Action | Control |
+| Action | Control / scope |
 | --- | --- |
-| Brush | B |
-| Select / area select | S |
-| Object select | O |
-| Move selection | V |
-| Erase | E |
-| Hide/show editor chrome | Tab |
-| Delete selection | Delete / Backspace |
-| Copy / paste | Ctrl+C / Ctrl+V |
-| Undo / redo | Ctrl+Z / Ctrl+Y |
-| Close editor | Esc / F2 |
+| Brush | B; choose an atlas-backed palette entry, then paint with left click |
+| Select / box select | S; authored terrain and decoration, including generated/pattern decor |
+| Object / box select | O; objectives, relay moths, wildlife and mini-robot groups |
+| Add/remove a selection member | Shift+click in the active selection scope |
+| Cycle overlapping items | Alt+click repeatedly in SELECT or OBJECT; only eligible items participate |
+| Move selection | V, or drag an already-selected movable item |
+| Erase | E; terrain/decor only |
+| Remove decoration | Right click; decor only, never objective/gameplay deletion or hiding |
+| Remove selected removable items | Delete / Backspace; respects each item's capabilities |
+| Copy / paste | Ctrl+C / Ctrl+V (also Command on supported platforms) |
+| Undo / redo | Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z; room-local history |
+| Hide/show editor chrome | Tab or HIDE UI; Tab restores the toolbar/palette |
+| Cancel current edit | Escape; cancels an active gesture or inspector edit before closing |
+| Close editor | F2; Escape when no edit is active |
 
-Left click paints/selects/drags according to the active tool.
+The item policy distinguishes **terrain**, **decor**, **gameplay** and **structural/protected** capabilities. Full-size decorative/recruitable robot placements are in SELECT's decor scope, even when they carry persistent IDs. OBJECT is not the tool for room-pattern art. Protected structural geometry is not a generic movable/copyable object; terrain painting is not a guarantee of safe bridge/gate editing, so validate layout changes.
 
-Right click removes the topmost authored decoration under the pointer. Where the visible decoration is procedural, the editor can store an exclusion instead.
+The palette contains Tiles, Blockers, Trees, Decor, Grass FX, Lamps, Robots, Moths, Wildlife, Mini Robots and Ambient. There is deliberately **no objective-creation palette**: story definitions remain external data.
 
-## Palette
+## Hidden and suppressed content
 
-The palette is built from the runtime atlas/roles so its thumbnails match the game art.
+**Objectives:** use OBJECT, select the objective, then **HIDE VISUAL** or **SHOW VISUAL** (also the inspector's visual-visible checkbox). A hidden visual retains a labelled editor ghost/handle and the same map placement, ID and story authority. Delete does not hide or remove an objective; Copy does not duplicate one. Showing it never requires moving it.
 
-Current categories:
+**Generated decor:** use SELECT or right click to target the actual generated item. Removal records a tile exclusion instead of deleting a story object. Its inspector offers **HIDE** and **CONVERT TO AUTHORED**. Conversion suppresses the generated source and adds one explicit `editor_decor` record that can be moved/copied/edited; it is undoable. Restoring that source later does not delete the authored copy, so check for overlap.
 
-- Tiles;
-- Blockers;
-- Trees;
-- Decor;
-- Grass FX;
-- Lamps;
-- Robots;
-- Moths;
-- Wildlife;
-- Mini Robots;
-- Ambient.
+**Suppressed generated/pattern art:** enable **SHOW SUPPRESSED**, use SELECT on the ghost/handle, then **RESTORE**. Tile-exclusion handles remain available even when no generated descriptor currently occupies the tile. Restoration removes the exclusion; normal reservation/generation rules still apply, so restoring an empty/reserved tile does not promise a new plant.
 
-## Object mode
+**Quiet Nest moon/stars:** the named pattern is `nest:swirl` (Moon / star swirl). Use F2 → SELECT → select the pattern → Delete (or right click). To recover it, SHOW SUPPRESSED → SELECT its ghost → RESTORE. Patterns cannot be moved or copied; the Ambient palette adds separate authored artwork when free placement is needed.
 
-**OBJECT** mode prioritises gameplay/ambient objects instead of ordinary terrain/grass.
+Generic procedural decoration avoids bridge cells, bridge islands, exact objective tiles and reserved transition footprints. This is shared editor/static-painter generation policy, not a change to Tin Stream water, bridge progression or collision authority. It does not automatically remove explicitly authored decoration.
 
-Selectable object classes include:
+## Move, copy and identity
 
-- objective waypoint visuals;
-- relay moth pickups;
-- wildlife spawn groups;
-- mini-robot groups;
-- procedural ambient/pattern decoration.
+Tile-backed objects use the same snapped/clamped movement plan for the ghost and the committed tile. Free-position decor and grass retain logical-pixel coordinates. Group movement preserves relative offsets within the applicable bounds. A selection containing an immovable item refuses the entire move rather than silently moving a subset.
 
-Moving an objective changes its map placement. Deleting an objective editor item hides its waypoint visual rather than deleting the story definition.
+Copy reports unsupported/skipped types. Objectives, generated decor and room patterns are not copyable; convert generated decor first. Paste selects the newly created items. It never creates a second story objective as a side effect.
 
-### Quiet Nest moon/stars
+Persistent robot IDs survive moves, as do their other authored fields. Copying a persistent robot creates a **decorative robot without a persistent ID**, with an explicit paste message; it does not create another recruitable identity. An ID-less robot copies normally. New/copy IDs for moths, wildlife and mini-robot groups are allocated against IDs in all rooms and persistent types, including robots. One wildlife/mini-robot group is one editor item, regardless of its actor count; copying it creates one logical group. Legacy entries without IDs are not rewritten merely by opening or selecting the editor.
 
-The large transparent moon/star swirl is the procedural \`nest:swirl\` object.
+## Property inspector
 
-To remove it:
+Select one supported item to see typed controls. Multiple selection shows a summary rather than misleading single-item fields.
 
-1. F2;
-2. O / OBJECT;
-3. select **Moon / star swirl**;
-4. Delete or right click;
-5. Save to Project.
+| Item | Editable properties |
+| --- | --- |
+| Authored decor | sprite, pixel x/y, scale, rotation in radians, flip, alpha, semantic element, tint strength |
+| Grass clump | pixel x/y, radius, density, seed |
+| Lamp | tile x/y, lamp sprite; base only when that field already exists |
+| Full-size robot | tile x/y, variant, facing, name; persistent ID is read-only |
+| Relay moth | tile x/y, variant, colour index; ID is read-only |
+| Wildlife group | spawn tile, kind, count, seed; ID is read-only |
+| Mini-robot group | spawn tile, variant, count, seed, requires; ID is read-only |
+| Objective | map tile and visual visibility; story ID/kind/label are read-only |
+| Generated/suppressed content | source/identity information and explicit hide/convert/restore actions |
 
-The exclusion is stored in \`pattern_exclusions\`.
+Terrain/blocker/tree items do not gain arbitrary property fields. Numeric input is bounded, but field bounds alone are not semantic validation: for example, a zero-count group or an unknown sprite/variant still needs correction in **VALIDATE**.
 
-## Live preview
+Field input previews live. Enter or leaving the field commits the transaction; Escape restores the pre-edit value. A sequence of input events in one field is one undo step. Text-entry keys do not trigger canvas tools.
 
-Every editor mutation updates the in-memory map and rebuilds the current Room.
+## Transactions and live updates
 
-Renderer caches are invalidated using geometry-sensitive identities. Moving a grass clump or replacing a water cell must refresh rendering even when the number of objects has not changed.
+History is keyed by room, with up to 48 undo entries per room. Room changes cancel an unfinished gesture in its owning room and clear selection/pointer context; Undo in the new room cannot apply the old room's snapshot. Pointer cancellation and Escape restore the pre-gesture room data and release pointer capture. Closing the editor cancels an unfinished edit rather than committing it accidentally.
 
-Editor mode does **not** apply a dimming/desaturation filter to the game canvas. What you see underneath the editor chrome is the normal renderer.
+Mutations update the same in-memory map used by gameplay. Invalidation is coalesced per animation frame and flushed at transaction, room-change and persistence boundaries. Static decor, foliage, wildlife, mini robots, objects and terrain have separate refresh scopes. Terrain changes refresh dependent static/water/foliage geometry; unrelated edits do not restart unrelated ambient simulations. Same-count water/grass edits still invalidate geometry-sensitive caches.
 
-## Authored editor fields
+## Validation and dirty state
 
-### \`editor_decor\`
+**VALIDATE** opens deterministic errors/warnings with codes, room and item references. The shared validator checks duplicate persistent IDs, story/map objective joins and approachability, coordinates, sprite/variant references, malformed groups, bridge/gate integrity and stale hidden/suppressed metadata. It is not a complete route/GPU proof; also run the repository tests.
 
-Explicit free-position static decoration.
+The toolbar shows **CLEAN**, **DIRTY PROJECT**, or **DIRTY PROJECT/ROOM**, plus error/warning counts. Clean means map data matches the loaded/saved/exported baseline, not that the map has no validation errors. Undo back to the baseline becomes clean; Redo away from it becomes dirty. Switching rooms does not mark changes saved. The browser receives a before-unload warning request when the project is dirty.
 
-Example:
+## Save and export
 
-\`\`\`json
-{
-  "editor_id": "decor_1",
-  "x": 320,
-  "y": 160,
-  "sprite": "foliage_v401_ground_r0c0",
-  "scale": 1.0,
-  "flip": false
-}
-\`\`\`
+**SAVE TO PROJECT** sends the complete maps object to `POST /__editor/save_maps`. The localhost server bounds the payload, checks the map schema/room shape, backs up the old file to `editor_backups/relay_moth_maps-<timestamp>.json`, writes a temporary file and atomically replaces `relay_moth_maps.json`. The Python endpoint performs structural checks; semantic diagnostics are the editor/shared-JavaScript validator's responsibility.
 
-### \`decor_exclusions\`
+Errors stop the first Save/Download attempt and expose **SAVE ANYWAY** or **DOWNLOAD ANYWAY** for explicit recovery. That acknowledgement belongs to the unchanged map fingerprint and action; editing again invalidates it. Warnings are shown without blocking. Prefer fixing errors to overriding them. A failed save leaves the dirty baseline unchanged and offers Download JSON; it does not silently export or claim success.
 
-Tile positions where generated non-authoritative decoration is suppressed.
+**DOWNLOAD JSON** is the explicit fallback for a hosted/static build. The editor marks an issued download as its clean exported baseline, but cannot verify the browser's eventual download destination or completion. Downloading does **not** write the project file: keep the file and replace the local map deliberately. Successful project saves establish the saved baseline. Active pointer gestures are cancelled and field edits are committed before validation/persistence.
 
-### \`pattern_exclusions\`
+## Optional metadata and compatibility
 
-IDs of room-pattern ambient objects to omit, such as \`nest:swirl\`.
-
-### \`object_fx_hidden\`
-
-Objective IDs whose waypoint visual is hidden while retaining gameplay/story authority.
-
-These fields are optional. Existing rooms do not require migration.
-
-## Save behavior
-
-**SAVE TO PROJECT** sends the current maps object to:
-
-\`\`\`text
-POST /__editor/save_maps
-\`\`\`
-
-The localhost server:
-
-- validates the map schema/rooms object;
-- caps payload size;
-- creates \`editor_backups/relay_moth_maps-<timestamp>.json\`;
-- writes a temporary file;
-- atomically replaces \`relay_moth_maps.json\`.
-
-**DOWNLOAD JSON** is the fallback when the localhost save endpoint is unavailable.
-
-## Input ownership
-
-Editor pointer ownership is deliberately isolated from gameplay input.
-
-The editor DOM toolbar/palette sits above the canvas interaction overlay. Pointer capture is only acquired for valid world-edit gestures and is explicitly released.
-
-Do not route normal gameplay world movement through editor pointer code.
+`editor_decor`, `decor_exclusions`, `pattern_exclusions` and `object_fx_hidden` remain optional. Existing v4.14 maps load without migration. Map schema/storage/material version numbers are not release labels; see [Data formats](DATA_FORMATS.md). The audited starting point and implementation provenance remain in [editor-v415 RAG](rag/editor-v415/README.md); this page describes the shipped implementation.

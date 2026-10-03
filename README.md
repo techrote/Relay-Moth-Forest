@@ -4,9 +4,9 @@
 
 This repository is the **original cute exploration game**. The later Steelmoth / cyberpunk-horror / WebGPU renderer experiments are a separate fork and are not the design direction of this project.
 
-Current milestone: **Pretty Graphics Edition 4.14**.
+Current milestone: **Pretty Graphics Edition 4.15**.
 
-![Relay Moth Forest — Tin Stream](milestones/v4.14/Relay_Moth_v414_Tin_Stream.png)
+![Relay Moth Forest — historical v4.14 Tin Stream screenshot](milestones/v4.14/Relay_Moth_v414_Tin_Stream.png)
 
 ## Quick start
 
@@ -14,16 +14,16 @@ Current milestone: **Pretty Graphics Edition 4.14**.
 
 1. Download or clone the repository.
 2. Keep the repository structure intact.
-3. Run \`0Play.cmd\`.
+3. Run `0Play.cmd`.
 4. The launcher starts the local Python server and opens the game in your browser.
 
 The launcher requires **Python 3** and a browser with **WebGL2** support.
 
 ### Manual start
 
-\`\`\`text
+```text
 python relay_moth_server.py
-\`\`\`
+```
 
 Then open the localhost URL printed by the server.
 
@@ -81,18 +81,21 @@ Press **F2** to edit directly on the normal rendered game view.
 The editor supports:
 
 - palette painting with left click;
-- right-click removal/suppression;
-- object selection;
+- decor-only right-click removal/suppression, with generated-decor targeting;
+- separate terrain/decor SELECT and gameplay OBJECT scopes, with Alt-click overlap cycling;
 - area selection;
 - drag/move;
 - copy/paste;
-- undo/redo;
+- room-safe undo/redo and pointer/Escape cancellation;
+- typed property inspection and safe persistent IDs;
+- explicit hidden-objective and suppressed-decor recovery;
+- semantic validation and visible room/project dirty state;
 - tiles, blockers, trees, decor, GrassFX, lamps and robots;
 - relay moths, wildlife, mini robots and ambient/pattern objects;
 - moving objective waypoint visuals without deleting story definitions;
 - project save with automatic timestamped map backup.
 
-In Quiet Nest, the large transparent moon/star swirl is selectable in **OBJECT** mode as \`nest:swirl\`.
+In Quiet Nest, SELECT targets the transparent moon/star pattern `nest:swirl`; SHOW SUPPRESSED → SELECT → RESTORE brings it back after suppression. Objectives use OBJECT with HIDE VISUAL / SHOW VISUAL and are not deleted or copied.
 
 See [Editor](docs/EDITOR.md).
 
@@ -100,11 +103,11 @@ See [Editor](docs/EDITOR.md).
 
 The game deliberately keeps content in external JSON rather than burying it in code:
 
-- \`relay_moth_maps.json\` — room geometry, authored visual placement and editor fields;
-- \`relay_moth_story.json\` — room/story/objective progression;
-- \`relay_moth_pixel_luts.json\` — semantic colour/LUT data;
-- \`relay_moth_effects.json\` — effect presets;
-- \`hd_remake_atlas.json\` — sprite regions, roles and material metadata.
+- `relay_moth_maps.json` — room geometry, authored visual placement and editor fields;
+- `relay_moth_story.json` — room/story/objective progression;
+- `relay_moth_pixel_luts.json` — semantic colour/LUT data;
+- `relay_moth_effects.json` — effect presets;
+- `hd_remake_atlas.json` — sprite regions, roles and material metadata.
 
 See [Data formats and authority](docs/DATA_FORMATS.md).
 
@@ -120,19 +123,19 @@ See [Asset pipeline](docs/ASSET_PIPELINE.md).
 
 Run:
 
-\`\`\`text
+```text
 python self_test.py
-\`\`\`
+```
 
 Authoring and test dependencies:
 
-\`\`\`text
+```text
 python -m pip install -r tools/requirements-authoring.txt
-\`\`\`
+```
 
 The current test suite includes movement/collision invariants, bridge progression, follower recovery, editor persistence, strict sprite/material alpha checks, exact tree reconstruction, shader compilation, real GLES rendered-pixel tests and native Chromium WebGL2 integration where the required browser tooling is available.
 
-The v4.14 validation was performed under Linux software-rendered Chromium/GLES. It is strong renderer evidence, but it is **not** a Windows/Firefox hardware-performance certification.
+The v4.15 release gates retain the v4.14 material/GLES suite and add deterministic editor safety plus native Chromium interactions. See the [final validation record](docs/validation/v4.15/README.md) for exact candidates/results. Software-rendered evidence is **not** a Windows/Firefox hardware-performance certification.
 
 See [Testing and validation](docs/TESTING.md).
 
@@ -159,13 +162,13 @@ The detailed documentation is organised by concern rather than by release number
 - development/release workflow;
 - design history and rejected approaches.
 
-The pre-reorganisation documentation has been preserved intact in **[docs/4.14 milestone archive](docs/4.14%20milestone%20archive/README.md)**. Release artefacts for the milestone remain under [milestones/v4.14](milestones/v4.14/).
+The pre-reorganisation documentation has been preserved intact in **[docs/4.14 milestone archive](docs/4.14%20milestone%20archive/README.md)**. Historical v4.14 release artefacts remain under [milestones/v4.14](milestones/v4.14/).
 
 ## Preserving local edits
 
-The in-game editor can write \`relay_moth_maps.json\` through the localhost server. Before replacing a working folder with another version, preserve:
+The in-game editor can write `relay_moth_maps.json` through the localhost server. Before replacing a working folder with another version, preserve:
 
-- your edited \`relay_moth_maps.json\`;
-- \`editor_backups/\`.
+- your edited `relay_moth_maps.json`;
+- `editor_backups/`.
 
 Do not overwrite a newer runtime atlas/material set with older generated sprite maps when carrying map edits forward.

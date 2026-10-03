@@ -6,18 +6,21 @@ Relay Moth Forest is a browser game built around a 640×360 logical scene, a 640
 
 The runtime is intentionally small and explicit:
 
-\`\`\`text
+```text
 index.html / style.css
         |
         +-- surfacefx.js         WaterField + fine GrassField
         +-- sprite_material.js   shared sprite material math
         +-- foliagefx.js         physical readable foliage
+        +-- procedural_decor.js  shared reserved-surface decor enumeration
+        +-- editor_identity.js   cross-room persistent identity scan/allocation
+        +-- editor_validation.js deterministic semantic validation + fingerprints
         +-- editor.js            F2 WYSIWYG authoring overlay
         +-- game.js              world, gameplay, renderer orchestration
         |
         +-- relay_moth_*.json    maps/story/LUTs/effects/sprites
         +-- hd_remake_atlas.json atlas regions/roles/material metadata
-\`\`\`
+```
 
 The local Python launcher serves the files and exposes the map-save endpoint used by the editor.
 
@@ -56,7 +59,7 @@ Builds native-resolution static room imagery and aligned material buffers. It mi
 
 ### Sprite material
 
-\`sprite_material.js\` is the common source of truth for static/live/clipped sprite lighting.
+`sprite_material.js` is the common source of truth for static/live/clipped sprite lighting.
 
 It owns:
 
@@ -69,11 +72,11 @@ Turning sprite material lighting off returns the source/tinted colour instead of
 
 ### SurfaceFX
 
-\`surfacefx.js\` owns visual water and fine grass. It accepts masks/descriptors and bounded interaction sources. It knows nothing about story completion or collision.
+`surfacefx.js` owns visual water and fine grass. It accepts masks/descriptors and bounded interaction sources. It knows nothing about story completion or collision.
 
 ### FoliageFX
 
-\`foliagefx.js\` owns readable rooted foliage:
+`foliagefx.js` owns readable rooted foliage:
 
 - deterministic instances;
 - rooted deformation;
@@ -87,13 +90,21 @@ It does not own collision, navigation, story or saves.
 
 ### Editor
 
-\`editor.js\` owns authoring input only while F2 edit mode is active.
+`editor.js` owns authoring input only while F2 edit mode is active, explicit item/layer capability policy, room-keyed transactions/history, selection/clipboard, inspector UI, recovery controls and save/export UX. `RelayEditorPolicy` and `RelayEditorInvalidation` expose the policy/invalidation contracts to focused tests.
+
+`procedural_decor.js` supplies the same deterministic generated-decor descriptors to the editor and static painter. Its reserved cells include bridge/island geometry, objective tiles and gate footprints. Exclusions affect presentation only.
+
+`editor_identity.js` scans persistent robot/moth/wildlife/mini IDs across rooms and allocates unused IDs without renaming existing content. `editor_validation.js` provides deterministic semantic diagnostics plus canonical snapshots/dirty comparison to browser and Node tests; story definitions remain authoritative.
+
+Editor invalidation uses STATIC, TERRAIN, FOLIAGE, CREATURES, MINI_ROBOTS, OBJECTS and ROOM_DATA flags. Repeated mutations coalesce through requestAnimationFrame; transaction completion, cancellation, room switches and persistence flush or discard pending work as appropriate. Room rebinding preserves bridge progress. Terrain refreshes static/water/foliage dependencies; static edits do not rebuild the Room or reinitialise wildlife/mini robots. Object edits rebind room data and dependent visuals; group edits refresh only their own actor subsystem. Undo/cancel records carry the affected scope, with room-data rebinding where needed.
+
+`Game.refreshEditorStatic`, `refreshEditorWater` and `refreshEditorFoliage` bridge rendering scopes to runtime subsystems. Creature and mini-robot scopes invoke `game.creatures.init(room)` and `game.miniGuides.init(room, state)` respectively. Geometry-sensitive descriptor keys preserve same-count invalidation. See [Editor](EDITOR.md) for transaction, recovery and persistence behavior.
 
 Gameplay world movement remains keyboard/gamepad-driven. Editor pointer input is deliberately separate from gameplay input.
 
 ## Data flow
 
-\`\`\`text
+```text
 maps/story/save
     |
     +--> Room / objective state / actors
@@ -109,7 +120,7 @@ maps/story/save
     +--> live actors/decor ------> shared HD sprite queues
     |
     +--> GLRenderer -------------> post/light/LUT composite
-\`\`\`
+```
 
 The same map JSON is used by both gameplay and the editor. There is no separate editor scene format.
 
@@ -117,7 +128,7 @@ The same map JSON is used by both gameplay and the editor. There is no separate 
 
 At a high level:
 
-\`\`\`text
+```text
 static ground / room background
 water
 fine GrassField
@@ -129,7 +140,7 @@ foreground physical foliage
 foreground scenery / tree canopies
 guide / objective / top FX
 bloom / light / post / LUT composite
-\`\`\`
+```
 
 Tree trunks are not submitted twice. Canopies remain explicit foreground occluders.
 
@@ -149,15 +160,15 @@ WebGL state cleanup is part of this contract: optional instanced paths restore V
 
 ## Local server
 
-\`relay_moth_server.py\`:
+`relay_moth_server.py`:
 
 - binds only to localhost;
 - serves repository files;
 - uses bounded transfer concurrency;
 - caches large image assets briefly but revalidates source/config files;
-- exposes \`POST /__editor/save_maps\`;
-- validates a Relay Moth map object;
-- writes a timestamped backup before atomically replacing \`relay_moth_maps.json\`.
+- exposes `POST /__editor/save_maps`;
+- structurally validates a Relay Moth map object (semantic validation is shared JavaScript in the editor/tests, not an independent Python implementation);
+- writes a timestamped backup before atomically replacing `relay_moth_maps.json`.
 
 The runtime itself does not require a framework or external web server.
 

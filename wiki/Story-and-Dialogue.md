@@ -159,7 +159,7 @@ Objective kinds also map to effect presets in `relay_moth_effects.json`.
 
 The story JSON still contains `x_fraction`, `y_fraction` and `required` fields on objective definitions.
 
-In the current v4.14 runtime, objective world placement comes from `relay_moth_maps.json -> rooms -> <room> -> objects`, and `game.js` does not read those three story fields.
+In the current v4.15 runtime, objective world placement comes from `relay_moth_maps.json -> rooms -> <room> -> objects`, and `game.js` does not read those three story fields.
 
 Treat them as retained/historical metadata unless you deliberately change the runtime to use them.
 
@@ -204,3 +204,7 @@ all story-room object_ids are present in the completed set
 So adding another story objective makes it required for room completion.
 
 Run `python self_test.py` after changing objective count/order.
+
+## Objective visual visibility
+
+F2 → OBJECT → select an objective → HIDE VISUAL / SHOW VISUAL controls its waypoint art. Hidden visuals retain an editor handle at the same map tile. Showing one does not require moving it, clearing story progress or editing JSON. Delete/Copy do not remove/duplicate story definitions; the inspector keeps ID/kind/label read-only. Validate story/map joins and routes after deliberate story edits.

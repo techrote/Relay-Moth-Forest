@@ -1,3 +1,16 @@
+4.15 — EDITOR RELIABILITY + AUTHORING
+- Explicit terrain/decor/gameplay/structural capabilities and tool-scoped hit testing keep right-click decor removal away from gameplay objects; deterministic Alt-click cycles eligible overlaps.
+- Shared procedural-decor descriptors make generated plants targetable and keep generic decor off bridge cells/islands, objective tiles and reserved transition footprints, including the Tin Stream bush/rivet case.
+- Room-keyed undo/redo and transactional pointer/Escape cancellation prevent cross-room snapshots and partially committed gestures.
+- Moves retain persistent identities; moth/wildlife/mini-group copies allocate globally unused IDs, while persistent robot copies explicitly become decorative without duplicating recruitable identity. Wildlife and mini-robot groups are single logical authoring items rather than individual spawned actors.
+- Explicit objective HIDE VISUAL / SHOW VISUAL and SHOW SUPPRESSED / RESTORE recover hidden objectives, generated decor, pattern art and orphan tile exclusions entirely in the UI. Generated decor can be converted to authored decor.
+- A typed property inspector exposes supported decor, grass, lamp, robot, moth, group and objective-placement/visibility fields, with read-only persistent/story identities and undoable edits.
+- Tile move ghosts share snapped/clamped destinations with commits; mixed immovable selections refuse movement, copy reports skipped types, and objective/pattern/generated copying is not silently fabricated.
+- Shared deterministic semantic validation reports identity, story/map placement, sprite, group, bridge/gate and suppression integrity; save/export diagnostics and fingerprint-bound override accompany visible project/room dirty state.
+- Frame-coalesced invalidation refreshes affected room/render/ambient systems without restarting unrelated simulations; same-count geometry changes remain visible.
+- Expanded deterministic editor tests cover all 14 programme safety cases; native Chromium exercises real pointer/keyboard/inspector/recovery interactions alongside inherited all-nine-room renderer/material checks.
+- Developer documentation and version-controlled Modding Guide now describe the shipped workflow. Existing map schemas, browser keys and the v4.14 sprite-material interfaces remain compatible; no map migration is required.
+
 4.14 — SPRITE RENDERING AUDIT / PIXEL-VERIFIED CORRECTIONS
 - Repaired robot material alpha and exact split-tree colour/material inheritance; deterministic staged source-art derivation.
 - Shared source-normal lighting across static/live/clipped sprites; corrected off states, mirrored/rotated normals and source-space resolution behavior.

@@ -57,7 +57,7 @@ Example:
 }
 ```
 
-This is a free-position world decoration.
+This is a free-position world decoration. Select it with SELECT to edit sprite, pixel position, scale, rotation in radians, flip, alpha, element or tint strength in the inspector. It can be moved/copied; it does not create story or collision authority.
 
 ## Blocker vs decoration
 
@@ -104,7 +104,7 @@ Do not independently edit generated trunk/canopy normal/specular resources.
 
 ## Removing procedural decoration
 
-If something visible was generated procedurally, deleting a non-existent explicit object would not normally work.
+Generated decor is a real selectable item in v4.15. SELECT it and use Delete/HIDE, or right click the decor. The operation cannot hide/delete an overlapping objective. To move or copy a generated plant, choose **CONVERT TO AUTHORED** first: this suppresses the source and creates editable `editor_decor`. Patterns are not movable/copyable; choose the Ambient palette for independent authored artwork.
 
 The editor uses exclusion fields:
 
@@ -130,7 +130,11 @@ The big transparent moon/star object is the room-pattern object:
 nest:swirl
 ```
 
-F2 -> OBJECT -> select “Moon / star swirl” -> Delete.
+F2 → SELECT → select “Moon / star swirl” → Delete (or right click).
+
+To recover generated decor or this pattern, enable **SHOW SUPPRESSED**, use **SELECT** on its ghost, then **RESTORE**. Exclusion-tile handles also support restoring records with no current generated sprite. Restoring a converted source does not remove its authored copy; avoid unintended duplicates.
+
+Generic generated plants/decor do not occupy bridge reserved cells/islands, exact objective tiles or reserved gate footprints. Restore removes suppression, not these gameplay reservations. Objective visibility is separate: use OBJECT → HIDE VISUAL / SHOW VISUAL, not decor removal.
 
 ## Adding genuinely new sprite art
 

@@ -1,6 +1,6 @@
 # Reference
 
-This page is a quick lookup for common current v4.14 values.
+This page is a quick lookup for common current v4.15 values.
 
 ## Files
 
@@ -161,7 +161,7 @@ Water:
 
 Uses logical-pixel `x` / `y`, not tile coordinates.
 
-## Story fields retained but not consumed by v4.14 objective placement
+## Story fields retained but not consumed by v4.15 objective placement
 
 Current story objectives still contain:
 
@@ -169,4 +169,21 @@ Current story objectives still contain:
 - `y_fraction`
 - `required`
 
-Current v4.14 `game.js` does not read those fields. Objective placement comes from the map room's `objects` table.
+Current v4.15 `game.js` does not read those fields. Objective placement comes from the map room's `objects` table.
+
+## v4.15 editor quick reference
+
+| Task | UI |
+| --- | --- |
+| Terrain/decor/robot/pattern selection | SELECT (S) |
+| Objective/moth/wildlife/mini-group selection | OBJECT (O) |
+| Eligible overlap cycling | Alt+click in SELECT/OBJECT |
+| Restore hidden objective | OBJECT handle → SHOW VISUAL |
+| Recover generated/pattern/tile suppression | SHOW SUPPRESSED → SELECT ghost/handle → RESTORE |
+| Move/copy generated decor | CONVERT TO AUTHORED first |
+| Inspect properties | select one supported item; Enter commits, Escape cancels |
+| Validate before persistence | VALIDATE; errors require correction or explicit ANYWAY override |
+
+Right click affects decor only. Objectives and patterns cannot be copied. Undo/redo is room-local. Moth/wildlife/mini-group copies use globally unused IDs; a persistent robot copy becomes decorative without a persistent ID and reports that explicitly. CLEAN is a loaded/saved/exported map baseline, not a validation verdict or proof of disk save after download.
+
+Product release 4.15 does not rename `relay-moth-maps/v3.99`, `relay-moth-hd-atlas/v4.14`, FoliageFX's internal material version or the browser keys above.

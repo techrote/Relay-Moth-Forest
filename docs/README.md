@@ -1,6 +1,6 @@
 # Relay Moth Forest documentation
 
-This directory describes the **current v4.14 architecture and authoring contract**.
+This directory describes the **current v4.15 architecture and authoring contract**.
 
 Documentation is organised by subsystem. Version-specific implementation notes, old diagnostics, previous validation logs and superseded architecture descriptions were moved to [4.14 milestone archive](4.14%20milestone%20archive/README.md).
 
@@ -26,19 +26,21 @@ When documents disagree, use this order:
 1. current runtime/data in the repository;
 2. executable regression tests;
 3. current documents in this directory;
-4. \`CHANGELOG.txt\`;
+4. `CHANGELOG.txt`;
 5. the milestone archive.
 
 The archive is retained as evidence of how the project evolved. It is **not** the current implementation contract.
 
 ## Current baseline
 
-- milestone: **Pretty Graphics Edition 4.14**;
+- milestone: **Pretty Graphics Edition 4.15**;
 - logical render size: **640×360**;
 - playable area: **640×304**;
 - gameplay grid: **40×19 at 16 px per tile**;
 - rooms: **9**;
 - staged traversal routes exercised by the suite: **27**;
-- primary runtime scripts: \`surfacefx.js\`, \`sprite_material.js\`, \`foliagefx.js\`, \`editor.js\`, \`game.js\`.
+- primary runtime scripts: `surfacefx.js`, `sprite_material.js`, `foliagefx.js`, `procedural_decor.js`, `editor_identity.js`, `editor_validation.js`, `editor.js`, `game.js`.
 
 The project intentionally keeps gameplay authority separate from rendering subsystems. SurfaceFX, FoliageFX and sprite material code may consume visual descriptors and actor positions, but do not own story completion, collision or save progression.
+
+The [v4.15 editor RAG](rag/editor-v415/README.md) preserves the audited v4.14 starting point and implementation programme. It is provenance, not a replacement for the shipped [Editor](EDITOR.md) contract. Final release evidence is in [validation/v4.15](validation/v4.15/README.md).
