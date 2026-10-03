@@ -136,10 +136,10 @@ At a high level:
 
 ```text
 static ground / invariant room background
+mutable background presentation (source-normal/specular)
 water
 fine GrassField
 low/ground sprite material
-mutable background presentation (source-normal/specular)
 unified shadow + contact-AO mask
 background physical foliage
 globally bottom-Y-sorted live HD world sprites
