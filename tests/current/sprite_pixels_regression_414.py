@@ -64,6 +64,16 @@ def main():
         cc[132:228,272:368]=col;nn[132:228,272:368]=normals;ss[132:228,272:368]=spec;bb[132:228,272:368]=bump
         bg=render('bgMaterialProg',quad(),{'uTex':np.flipud(cc).copy(),'uNormalTex':np.flipud(nn).copy(),'uSpecularTex':np.flipud(ss).copy(),'uBumpTex':np.flipud(bb).copy()})
         check('static_live_material_equivalence',np.abs(base[134:226,274:366,:3].astype(int)-bg[134:226,274:366,:3]).max(),2)
+        # PERF-002 mutable presentation must reproduce the static painter's source-atop
+        # tint before applying the same source-normal/specular material shading.
+        tint=np.array([54,192,226],dtype=np.float32);strength=.18
+        tinted=col.copy();tinted[...,:3]=np.round(col[...,:3].astype(np.float32)*(1-strength)+tint*strength).clip(0,255).astype('uint8')
+        tc=solid(640,360,[18,26,33,255]);tn=solid(640,360,[128,128,255,0]);ts=solid(640,360,[0,0,0,0])
+        tc[132:228,272:368]=tinted;tn[132:228,272:368]=normals;ts[132:228,272:368]=spec
+        static_tinted=render('bgMaterialProg',quad(),{'uTex':np.flipud(tc).copy(),'uNormalTex':np.flipud(tn).copy(),'uSpecularTex':np.flipud(ts).copy(),'uBumpTex':np.flipud(ts).copy()})
+        ma=sprite();ma['aColor']=np.tile(np.array([tint[0]/255,tint[1]/255,tint[2]/255,1],dtype=np.float32),(6,1));ma['aTintStrength']=np.full((6,1),strength,dtype=np.float32)
+        mutable_tinted=render('mutableHDProg',ma)
+        check('mutable_static_tint_material_equivalence',np.abs(static_tinted[134:226,274:366,:3].astype(int)-mutable_tinted[134:226,274:366,:3].astype(int)).max(),2)
         # One sprite clipped into lower static and upper dynamic sections must reconstruct its material.
         top=48;cc[132:132+top,272:368]=[18,26,33,255];nn[132:132+top,272:368]=[128,128,255,0];ss[132:132+top,272:368]=0;bb[132:132+top,272:368]=0
         target=g.target(clear=clear)
@@ -87,7 +97,7 @@ def main():
             target=g.target(clear=clear);g.draw(progs['foliage'],attrs,dict(fu,uTime=time,uQuality=3,uWindStrength=4.,uBendAmount=3.,uPass=0),ft,blend=True,instances=1);roots.append(g.read(target))
         check('root_lock_pixel_motion',max(np.abs(x[197:228,:,:].astype(int)-roots[0][197:228,:,:].astype(int)).max() for x in roots),0)
         if args.out:
-            for name,im in [('material_lit',base),('material_unlit',off1),('material_mirrored',mirror),('material_rotated',rotate),('static_live_compare',bg),('split_material',split),('foliage_layer0',blends[0]),('foliage_layer1',blends[-1])]:Image.fromarray(im).save(args.out/(name+'.png'))
+            for name,im in [('material_lit',base),('material_unlit',off1),('material_mirrored',mirror),('material_rotated',rotate),('static_live_compare',bg),('mutable_static_tint_compare',mutable_tinted),('split_material',split),('foliage_layer0',blends[0]),('foliage_layer1',blends[-1])]:Image.fromarray(im).save(args.out/(name+'.png'))
         report['failures']=failures
     finally:g.close()
     if args.out:(args.out/'pixel_results.json').write_text(json.dumps(report,indent=2))

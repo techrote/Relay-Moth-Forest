@@ -70,14 +70,15 @@ function runFrames(){
 
 // Invalidation classes are explicit and stable.
 assert.strictEqual(I.STATIC,1);
-assert(I.TERRAIN&&I.FOLIAGE&&I.CREATURES&&I.MINI_ROBOTS&&I.OBJECTS&&I.ROOM_DATA);
+assert(I.TERRAIN&&I.FOLIAGE&&I.CREATURES&&I.MINI_ROBOTS&&I.OBJECTS&&I.ROOM_DATA&&I.PRESENTATION);
 
-// Moving authored decor refreshes static presentation only.
+// Moving authored decor is live presentation only: no static colour/material rebake.
 {
   const {e,raw,calls}=makeEditor();
   raw.editor_decor[0].x+=11;
-  e.queueInvalidation(I.STATIC,{sync:true});
-  assert.deepStrictEqual(calls,{static:1,water:0,foliage:0,creatures:0,mini:0});
+  e.queueInvalidation(I.PRESENTATION,{sync:true});
+  assert.deepStrictEqual(calls,{static:0,water:0,foliage:0,creatures:0,mini:0});
+  assert.strictEqual(e.getInvalidationDiagnostics().counters.presentation,1);
 }
 
 // Grass changes rebuild only grass/foliage descriptors; same-count movement changes identity.
@@ -142,11 +143,12 @@ assert(I.TERRAIN&&I.FOLIAGE&&I.CREATURES&&I.MINI_ROBOTS&&I.OBJECTS&&I.ROOM_DATA)
   const {e,raw,calls}=makeEditor();
   e.beginTransaction('paint');
   raw.editor_decor[0].x=44;
-  e.queueInvalidation(I.STATIC);
+  e.queueInvalidation(I.PRESENTATION);
   e.pointerDown=true;e.pointerId=7;e.dragMode='paint';
   e.logical=()=>({x:44,y:44});
   e.onUp({pointerId:7,stopPropagation(){}});
-  assert.strictEqual(calls.static,1);
+  assert.strictEqual(calls.static,0);
+  assert.strictEqual(e.getInvalidationDiagnostics().counters.presentation,1);
   assert.strictEqual(e.getInvalidationDiagnostics().pending,0);
   assert.strictEqual(e.historyFor('room_a').undo.length,1);
 }
@@ -157,9 +159,9 @@ assert(I.TERRAIN&&I.FOLIAGE&&I.CREATURES&&I.MINI_ROBOTS&&I.OBJECTS&&I.ROOM_DATA)
   const {e,raw,calls}=makeEditor();
   e.beginTransaction('decor property');
   raw.editor_decor[0].x=90;
-  e.queueInvalidation(I.STATIC);
+  e.queueInvalidation(I.PRESENTATION);
   e.commitTransaction();
-  const afterCommit={...calls};
+  const afterCommit={...calls},presentationAfter=e.getInvalidationDiagnostics().counters.presentation;
   assert(e.undoOne());
   assert.strictEqual(e.game.maps.rooms.room_a.editor_decor[0].x,20);
   assert(e.redoOne());
@@ -167,7 +169,8 @@ assert(I.TERRAIN&&I.FOLIAGE&&I.CREATURES&&I.MINI_ROBOTS&&I.OBJECTS&&I.ROOM_DATA)
   assert.strictEqual(calls.water,afterCommit.water);
   assert.strictEqual(calls.creatures,afterCommit.creatures);
   assert.strictEqual(calls.mini,afterCommit.mini);
-  assert(calls.static>=afterCommit.static+2);
+  assert.strictEqual(calls.static,afterCommit.static);
+  assert(e.getInvalidationDiagnostics().counters.presentation>=presentationAfter+2);
 }
 
 // Persistence/validation flush path cannot observe a queued stale descriptor.

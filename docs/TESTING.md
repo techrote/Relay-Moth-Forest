@@ -62,7 +62,7 @@ Run:
 python tests/current/state_change_performance_415.py --out /tmp/perf-001a.json --samples 3
 ```
 
-Repeat `--cpu-throttle` to compare controlled Chromium CPU-throttling rates, for example `--cpu-throttle 1 --cpu-throttle 4 --cpu-throttle 6`. The JSON retains raw samples plus median/p95/max phase and frame-gap summaries. See [PERF-001A measurement record](validation/performance/PERF-001A.md) for scenario definitions and interpretation limits.
+Repeat `--cpu-throttle` to compare controlled Chromium CPU-throttling rates, for example `--cpu-throttle 1 --cpu-throttle 4 --cpu-throttle 6`. The JSON retains raw samples plus median/p95/max phase and frame-gap summaries. See [PERF-001A measurement record](validation/performance/PERF-001A.md) for the baseline methodology and [PERF-002 validation](validation/performance/PERF-002.md) for the mutable-presentation before/after result.
 
 Do not use one absolute CI millisecond value as a universal pass/fail target. The harness is intended to establish which synchronous phase dominates and how that work scales; physical low-end hardware evidence remains valuable.
 

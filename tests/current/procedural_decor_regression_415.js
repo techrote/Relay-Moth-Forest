@@ -104,7 +104,7 @@ assert.strictEqual(authored.editor_decor[0].editor_id, 'intentional_bridge_decor
 const gameSrc = fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8');
 const editorSrc = fs.readFileSync(path.join(ROOT, 'editor.js'), 'utf8');
 const indexSrc = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-assert(gameSrc.includes('RelayProceduralDecor.enumerate(room,this.art.roles)'));
+assert(gameSrc.includes('renderMutableProceduralDecor()')&&gameSrc.includes('RelayProceduralDecor.enumerate(this.room,this.art.roles)'));
 assert(editorSrc.includes('RelayProceduralDecor.enumerate(this.game.room,this.game.art.roles)'));
 assert(!gameSrc.includes('const decorCount=Math.floor(78*'), 'legacy renderer-local generator still present');
 assert(indexSrc.indexOf('procedural_decor.js') < indexSrc.indexOf('editor.js'));

@@ -86,7 +86,10 @@ async (name) => {
   }
   if(name==='objective-final'){
     await reset('lantern_lane',['lane_a','lane_b']);
-    game.bgKey='';game.ensureBackground(true);game.updateUI();
+    // PERF-002 static backing is progression-invariant; only refresh objective/UI state.
+    // Forcing a second full backing rebuild here would contaminate the first post-event
+    // frame with unrelated warm-up GPU work.
+    game.updateUI();
     await twoFrames();relayMothPerf.clear();
     const obj=game.room.spec.objects.find(o=>o.object_id==='lane_c'),tile=game.room.objects[obj.object_id];
     [game.x,game.y]=game.room.center(tile);game.checkObjectives();
@@ -105,11 +108,11 @@ async (name) => {
     if(!sprite)throw Error('Decor sprite fixture missing');
     raw.editor_decor=raw.editor_decor||[];
     raw.editor_decor.push({editor_id:'perf_decor',x:116,y:142,sprite,scale:1,alpha:1});
-    relayMothPerf.enable(false);rmfEditor.queueInvalidation(RelayEditorInvalidation.STATIC,{sync:true});await twoFrames();
+    relayMothPerf.enable(false);rmfEditor.queueInvalidation(rmfEditor.invalidationForType('decor'),{sync:true});await twoFrames();
     relayMothPerf.enable(true);relayMothPerf.clear();
     return manual('editor-decor',{room:game.room.key,mutation:'free-position-decor'},()=>{
       raw.editor_decor.find(d=>d.editor_id==='perf_decor').x+=7;
-      rmfEditor.queueInvalidation(RelayEditorInvalidation.STATIC,{sync:true});
+      rmfEditor.queueInvalidation(rmfEditor.invalidationForType('decor'),{sync:true});
     });
   }
   if(name==='editor-objective'){
@@ -117,7 +120,7 @@ async (name) => {
     const raw=rmfEditor.rawRoom(),id='lane_a',old=raw.objects[id];
     return manual('editor-objective',{room:game.room.key,mutation:'objective-tile'},()=>{
       raw.objects[id]=[old[0]+1,old[1]];
-      rmfEditor.queueInvalidation(RelayEditorInvalidation.OBJECTS,{sync:true});
+      rmfEditor.queueInvalidation(rmfEditor.invalidationForType('objective'),{sync:true});
     });
   }
   if(name==='editor-grass'){
