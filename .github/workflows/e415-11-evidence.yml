@@ -1,0 +1,62 @@
+name: E415-11 final evidence transport
+on:
+  push:
+    branches: [e415-11/docs-release-consolidation-15]
+    paths: ['.github/e415-11-final-edits.json']
+permissions:
+  contents: write
+jobs:
+  apply-reviewed-evidence:
+    if: contains(github.event.head_commit.message, '[e415-transport]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply reviewed documentation corrections and evidence
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          payload = Path('.github/e415-11-final-edits.json')
+          changes = json.loads(payload.read_text())
+          assert len(changes) == 7
+          for change in changes:
+              path = Path(change['path'])
+              assert not path.is_absolute() and '..' not in path.parts
+              assert path.suffix in ('.md', '.txt', '.py') and path.parts[0] not in ('.github','assets','milestones')
+              before = path.read_bytes()
+              assert hashlib.sha256(before).hexdigest() == change['before'], str(path)
+              result = before.decode('utf-8')
+              for start,end,replacement in reversed(change['edits']):
+                  assert 0 <= start <= end <= len(result)
+                  result = result[:start] + replacement + result[end:]
+              encoded = result.encode('utf-8')
+              assert hashlib.sha256(encoded).hexdigest() == change['after'], str(path)
+              path.write_bytes(encoded)
+              print(str(path),change['after'])
+          payload.unlink()
+          Path('.github/workflows/e415-11-evidence.yml').unlink()
+          PY
+          python tests/current/release_docs_regression_415.py
+          git diff --check
+      - name: Refresh manifest and commit exact candidate
+        run: |
+          git add -A
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,subprocess
+          paths = sorted(p for p in subprocess.check_output(['git','ls-files','-z']).decode().split('\0') if p)
+          with open('SHA256SUMS.txt','w',encoding='utf-8') as out:
+              for name in paths:
+                  if name == 'SHA256SUMS.txt' or name.startswith('.github/workflows/e415-11-'):
+                      continue
+                  out.write(f'{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  ./{name}\n')
+          PY
+          sha256sum -c SHA256SUMS.txt > /tmp/e415-11-manifest-check.txt
+          git add SHA256SUMS.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'E415-11: record candidate evidence and clarify decorative robot copy semantics'
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}
+          git push origin HEAD:refs/heads/e415-11/docs-release-consolidation-15
