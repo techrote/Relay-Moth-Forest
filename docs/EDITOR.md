@@ -69,7 +69,9 @@ Field input previews live. Enter or leaving the field commits the transaction; E
 
 History is keyed by room, with up to 48 undo entries per room. Room changes cancel an unfinished gesture in its owning room and clear selection/pointer context; Undo in the new room cannot apply the old room's snapshot. Pointer cancellation and Escape restore the pre-gesture room data and release pointer capture. Closing the editor cancels an unfinished edit rather than committing it accidentally.
 
-Mutations update the same in-memory map used by gameplay. Invalidation is coalesced per animation frame and flushed at transaction, room-change and persistence boundaries. Static decor, foliage, wildlife, mini robots, objects and terrain have separate refresh scopes. Terrain changes refresh dependent static/water/foliage geometry; unrelated edits do not restart unrelated ambient simulations. Same-count water/grass edits still invalidate geometry-sensitive caches.
+Mutations update the same in-memory map used by gameplay. Invalidation is coalesced per animation frame and flushed at transaction, room-change and persistence boundaries. The editor distinguishes mutable PRESENTATION from expensive STATIC/TERRAIN work: ordinary authored decor and objective presentation update through the live source-normal/specular layer and do not rebake the native-resolution room backing. Room-data rebinding still occurs when a mutation changes placement/reservation authority.
+
+Generated decor also renders through the mutable layer, so moving an objective immediately re-evaluates its reserved tile without a static bake. Pattern suppression and genuinely structural terrain can still require static reconstruction. Terrain changes refresh dependent static/water/foliage geometry; unrelated edits do not restart unrelated ambient simulations. Same-count water/grass edits still invalidate geometry-sensitive caches.
 
 ## Validation and dirty state
 
