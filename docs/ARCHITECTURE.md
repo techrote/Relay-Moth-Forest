@@ -53,9 +53,13 @@ Owns the WebGL2 render graph:
 - bloom/light/post passes;
 - semantic FX and guide/objective layers.
 
-### StaticPainter
+### StaticPainter and mutable presentation
 
-Builds native-resolution static room imagery and aligned material buffers. It mirrors the same placement transforms into colour, normal and specular targets so static scenery and live scenery share the same lighting contract.
+`StaticPainter` builds the expensive native-resolution **room-invariant backing** and aligned colour/normal/specular material buffers. Base terrain, blockers and scenery that do not change during ordinary progression remain baked.
+
+Small stateful presentation is deliberately **not** part of that cache. Generated/editor decor, recruitable robot placements, completed-objective visuals, gates, Tin Stream bridge-stage art and other completion-sensitive presentation are submitted through a mutable live layer before shadows/actors. The mutable HD shader uses the same source colour/normal/specular atlases and accepts the exact per-item tint strength used by Canvas2D baking.
+
+This boundary prevents an objective, robot recruitment or ordinary authored-decor edit from invalidating three full native-resolution backing textures while retaining the same material authority.
 
 ### Sprite material
 
@@ -92,11 +96,11 @@ It does not own collision, navigation, story or saves.
 
 `editor.js` owns authoring input only while F2 edit mode is active, explicit item/layer capability policy, room-keyed transactions/history, selection/clipboard, inspector UI, recovery controls and save/export UX. `RelayEditorPolicy` and `RelayEditorInvalidation` expose the policy/invalidation contracts to focused tests.
 
-`procedural_decor.js` supplies the same deterministic generated-decor descriptors to the editor and static painter. Its reserved cells include bridge/island geometry, objective tiles and gate footprints. Exclusions affect presentation only.
+`procedural_decor.js` supplies the same deterministic generated-decor descriptors to the editor and mutable runtime presentation. Its reserved cells include bridge/island geometry, objective tiles and gate footprints. Exclusions affect presentation only.
 
 `editor_identity.js` scans persistent robot/moth/wildlife/mini IDs across rooms and allocates unused IDs without renaming existing content. `editor_validation.js` provides deterministic semantic diagnostics plus canonical snapshots/dirty comparison to browser and Node tests; story definitions remain authoritative.
 
-Editor invalidation uses STATIC, TERRAIN, FOLIAGE, CREATURES, MINI_ROBOTS, OBJECTS and ROOM_DATA flags. Repeated mutations coalesce through requestAnimationFrame; transaction completion, cancellation, room switches and persistence flush or discard pending work as appropriate. Room rebinding preserves bridge progress. Terrain refreshes static/water/foliage dependencies; static edits do not rebuild the Room or reinitialise wildlife/mini robots. Object edits rebind room data and dependent visuals; group edits refresh only their own actor subsystem. Undo/cancel records carry the affected scope, with room-data rebinding where needed.
+Editor invalidation uses STATIC, TERRAIN, FOLIAGE, CREATURES, MINI_ROBOTS, OBJECTS, ROOM_DATA and PRESENTATION flags. Repeated mutations coalesce through requestAnimationFrame; transaction completion, cancellation, room switches and persistence flush or discard pending work as appropriate. Room rebinding preserves bridge progress. Terrain refreshes static/water/foliage dependencies; common authored decor and object presentation update through the live mutable layer without a static bake. Object edits still rebind Room authority where placement/reservation data changed; group edits refresh only their own actor subsystem. Undo/cancel records carry the affected scope, with room-data rebinding where needed.
 
 `Game.refreshEditorStatic`, `refreshEditorWater` and `refreshEditorFoliage` bridge rendering scopes to runtime subsystems. Creature and mini-robot scopes invoke `game.creatures.init(room)` and `game.miniGuides.init(room, state)` respectively. Geometry-sensitive descriptor keys preserve same-count invalidation. See [Editor](EDITOR.md) for transaction, recovery and persistence behavior.
 
@@ -109,7 +113,9 @@ maps/story/save
     |
     +--> Room / objective state / actors
     |
-    +--> static painter ----------> colour + normal/spec world buffers
+    +--> static painter ----------> invariant colour + normal/spec backing
+    |
+    +--> mutable presentation ---> generated/authored decor, robots, objectives, gates, bridge stage
     |
     +--> water mask -------------> SurfaceFX WaterField
     |
@@ -129,10 +135,11 @@ The same map JSON is used by both gameplay and the editor. There is no separate 
 At a high level:
 
 ```text
-static ground / room background
+static ground / invariant room background
 water
 fine GrassField
 low/ground sprite material
+mutable background presentation (source-normal/specular)
 unified shadow + contact-AO mask
 background physical foliage
 globally bottom-Y-sorted live HD world sprites
