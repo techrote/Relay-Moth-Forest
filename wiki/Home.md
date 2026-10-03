@@ -48,7 +48,7 @@ The main editable files are:
 | `hd_remake_atlas.json` | sprite names/roles/metadata |
 | `game.js` | default settings and advanced behavior that is not data-driven |
 
-For map work, try the built-in **F2 WYSIWYG editor** before hand-editing JSON.
+For map work, try the **v4.15 F2 WYSIWYG editor** before hand-editing JSON: scoped selection, property inspection, room-safe history, hidden/suppressed recovery and validation are built in. See [Getting Started](Getting-Started).
 
 ## Local build vs hosted web build
 
@@ -64,7 +64,7 @@ The local launcher can use **SAVE TO PROJECT** in the F2 editor. It creates a ti
 
 ### techrote.github.io build
 
-The hosted build is static. It cannot write back to GitHub. Its editor therefore downloads the modified `relay_moth_maps.json` instead.
+The hosted build is static. It cannot write back to GitHub. Use **DOWNLOAD JSON** to export the modified `relay_moth_maps.json`; SAVE TO PROJECT reports the unavailable endpoint. An exported clean baseline does not mean the project file was written or that the browser completed the download.
 
 ## Back up first
 

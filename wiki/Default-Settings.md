@@ -22,7 +22,7 @@ After changing defaults, use the in-game **RESET DEFAULTS** button or clear the 
 
 The loader also understands older graphics keys for migration. Do not delete that compatibility logic unless you intentionally plan a settings migration.
 
-## Current v4.14 defaults
+## Current v4.15 defaults (unchanged by the editor pass)
 
 ### Display and post
 

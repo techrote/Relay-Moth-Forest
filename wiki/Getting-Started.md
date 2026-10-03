@@ -79,7 +79,11 @@ Useful editor shortcuts:
 
 The editor palette includes tiles, blockers, trees, decor, Grass FX, lamps, robots, moths, wildlife, mini robots and ambient objects.
 
-Use **OBJECT** mode when you want to select objectives, moths, wildlife, mini robots or procedural ambient items instead of terrain.
+In v4.15, **SELECT** targets terrain, decor, full-size robot placements and generated/pattern art. **OBJECT** targets objectives, moths, wildlife and mini-robot groups. Alt+click cycles overlapping items within that scope. Right click only removes/suppresses decor, never a gameplay objective.
+
+Select one supported item to edit its properties in the inspector. Enter or leaving a field commits; Escape cancels an unfinished field/gesture. Undo/redo is room-local. Existing persistent IDs are read-only and survive moves; copyable persistent objects get fresh IDs. Objectives and patterns are not copyable; generated decor can first be converted to authored decor.
+
+Use OBJECT → HIDE VISUAL / SHOW VISUAL for objectives. For removed generated or pattern art, SHOW SUPPRESSED → SELECT the ghost → RESTORE. No coordinate trick or hand-edited exclusion is needed.
 
 ## 4. Save safely
 
@@ -90,7 +94,7 @@ Local launcher:
 
 Hosted GitHub Pages build:
 
-- **SAVE / DOWNLOAD MAP** downloads the JSON;
+- use **DOWNLOAD JSON** explicitly; SAVE TO PROJECT reports that its endpoint is unavailable;
 - copy that file into a local source checkout if you want to continue from it.
 
 ## 5. Know what browser saves can hide
@@ -120,3 +124,9 @@ python self_test.py
 ```
 
 If you edited JSON by hand, this is especially useful because it checks route/progression and many map assumptions that a JSON parser alone cannot catch.
+
+## Read the save indicator
+
+Use **VALIDATE** before saving. Errors expose diagnostics and stop the first Save/Download attempt; fix them rather than routinely using SAVE ANYWAY / DOWNLOAD ANYWAY. Warnings are shown without blocking. CLEAN means the map matches its loaded/saved/exported baseline, not that validation found no errors. Undo to that baseline becomes clean; switching rooms does not save.
+
+A successful project save marks the map clean. Download JSON also marks an exported baseline clean, but does not write the project file or confirm that your browser retained the download. Keep the downloaded file and install it deliberately. Failed saves do not clear dirty state.

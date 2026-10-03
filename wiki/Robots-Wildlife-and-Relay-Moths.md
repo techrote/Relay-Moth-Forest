@@ -177,3 +177,9 @@ Current story state persists sets of:
 - current room.
 
 That is why IDs should be treated as save-compatible identifiers, not cosmetic labels.
+
+## Editing safely in v4.15
+
+Use SELECT for full-size robot placements, including persistent robots, and OBJECT for moths/wildlife/mini groups. The inspector exposes placement and supported appearance/group fields; persistent IDs are read-only. Moves preserve IDs and metadata. Copyable persistent items receive IDs unused across all rooms and persistent types.
+
+One wildlife/mini group is one editor item even when count is greater than one. Copy creates one group, not a copy of every runtime actor. Legacy ID-less entries are not mass-rewritten. Use VALIDATE after edits: inspector numeric bounds alone do not guarantee valid variants, group counts or reachable placement.

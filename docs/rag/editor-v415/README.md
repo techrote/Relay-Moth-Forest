@@ -1,8 +1,8 @@
 # v4.15 Editor Reliability + Authoring RAG
 
-This directory is the reference corpus for the v4.15 editor implementation issues.
+This directory is retained implementation provenance for the v4.15 editor programme. The shipped behavior is described in [the current Editor guide](../../EDITOR.md); see also [final validation](../../validation/v4.15/README.md).
 
-It records the **current v4.14 behavior, exact reproductions, data shapes, accepted design constraints, test coverage, and release gates**. Implementation agents should read the RAG files named in their issue before changing code.
+It records the **audited v4.14 starting behavior, exact reproductions, data shapes, accepted design constraints, test coverage, and release gates**. Implementation agents should read the RAG files named in their issue before changing code.
 
 The issue body is the implementation prompt. These files are reference context; they should not be treated as a substitute for the acceptance criteria in the issue.
 

@@ -1,1 +1,1 @@
-Relay Moth Forest Modding Guide · current baseline: Pretty Graphics Edition 4.14 · [source](https://github.com/techrote/Relay-Moth-Forest) · [play online](https://techrote.github.io/relay-moth-forest/)
+Relay Moth Forest Modding Guide · current baseline: Pretty Graphics Edition 4.15 · [source](https://github.com/techrote/Relay-Moth-Forest) · [play online](https://techrote.github.io/relay-moth-forest/)

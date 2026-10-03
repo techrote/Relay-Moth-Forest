@@ -134,7 +134,7 @@ Map objective placement:
 
 The key must match a story `object_id`.
 
-Use F2 -> OBJECT if you only want to move an objective.
+Use F2 → OBJECT to select an objective, then move it or edit its tile in the inspector. HIDE VISUAL / SHOW VISUAL changes only its waypoint visibility; hidden objectives retain an editor handle. Delete and Copy do not remove/duplicate story objectives, and showing a visual never requires moving it. Story ID/kind/label are read-only here.
 
 ## Large trees
 
@@ -188,7 +188,7 @@ Optional fields include alpha, rotation, tint/element overrides and flip.
 
 ### `decor_exclusions`
 
-Suppress generated non-authoritative decoration at tile locations.
+Suppress generated non-authoritative decoration at tile locations. `[x,y]` and legacy `"x,y"` entries remain compatible. Use SHOW SUPPRESSED → SELECT the generated ghost or exclusion-tile handle → RESTORE. This removes the exclusion even when no sprite currently occupies the tile; reservation rules still apply.
 
 ### `pattern_exclusions`
 
@@ -200,15 +200,15 @@ Example:
 "pattern_exclusions": ["nest:swirl"]
 ```
 
-This is how the editor removes Quiet Nest's large transparent moon/star swirl without deleting the room pattern.
+Use SELECT to suppress Quiet Nest's large moon/star swirl, then SHOW SUPPRESSED → SELECT → RESTORE to bring it back. The room's pattern definition is not deleted.
 
 ### `object_fx_hidden`
 
-Hides an objective waypoint visual while preserving the story objective itself.
+Hides an objective waypoint visual while preserving its placement and story authority. OBJECT → SHOW VISUAL removes this flag without changing coordinates.
 
 ## Tin Stream bridge
 
-Tin Stream is special and should be edited carefully.
+Tin Stream is special and should be edited carefully. Generic procedural plants/decor avoid bridge cells/islands and exact objective tiles, as well as reserved transition footprints. Explicit authored art is not automatically removed by this rule.
 
 Its bridge uses:
 
@@ -233,9 +233,11 @@ For ordinary layout work:
 
 1. launch locally;
 2. F2;
-3. use Brush/Select/Object/Move;
-4. save;
+3. use Brush/Select/Object/Move and the inspector; inspect snapped move ghosts and use Alt+click for overlaps;
+4. use VALIDATE, resolve errors, then save;
 5. inspect the resulting JSON diff;
 6. run the self-test.
 
 This is safer than hand-writing coordinates for large batches of decorations.
+
+Room histories are separate: an unfinished gesture is cancelled on room change, and Undo cannot apply one room to another. Existing v4.14 maps require no migration; new editor metadata remains optional.

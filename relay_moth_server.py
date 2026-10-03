@@ -109,7 +109,7 @@ def main():
     port=choose_port(args.port)
     with BoundedThreadingHTTPServer(('127.0.0.1',port),Handler,max_workers=max(1,min(8,args.http_workers))) as httpd:
         url=f'http://127.0.0.1:{port}/index.html'
-        print('Relay Moth Forest — Pretty Graphics Edition 4.14')
+        print('Relay Moth Forest — Pretty Graphics Edition 4.15')
         print(url)
         print('Ctrl+C closes the local server.')
         if not args.no_browser:

@@ -82,7 +82,7 @@ Current variant names are listed in [Robots, Wildlife and Relay Moths](Robots-Wi
 
 ## Move an objective
 
-Do **not** change `x_fraction` / `y_fraction` in story data for v4.14.
+Do **not** change retained `x_fraction` / `y_fraction` fields to position an objective in v4.15.
 
 Move the map placement instead.
 
@@ -94,7 +94,7 @@ Example:
 }
 ```
 
-Easier: F2 -> OBJECT -> select -> move.
+Easier: F2 → OBJECT → select → move, or edit tile coordinates in the inspector. The move ghost and committed tile agree. Persistent story identity is unchanged.
 
 ## Add a relay moth pickup
 
@@ -128,7 +128,7 @@ Then use **RESET DEFAULTS** in the graphics menu because previously saved browse
 Use:
 
 1. F2;
-2. O / OBJECT;
+2. S / SELECT;
 3. select “Moon / star swirl”;
 4. Delete;
 5. Save.
@@ -186,3 +186,21 @@ At minimum:
 8. run self-test and fix any route assumptions/tests that intentionally encode the nine-room campaign.
 
 The current regression suite assumes nine rooms, so a true campaign expansion also requires updating the tests to describe the new intended campaign.
+
+## Restore hidden or suppressed artwork
+
+For an objective: F2 → OBJECT → select its hidden handle → SHOW VISUAL. This does not move it or change the story.
+
+For generated decor or `nest:swirl`: SHOW SUPPRESSED → SELECT its ghost → RESTORE. An empty tile-exclusion handle can also be restored. No JSON editing is required; normal generation/reservations still decide what appears.
+
+## Reposition a generated plant
+
+SELECT the plant → CONVERT TO AUTHORED → move/edit the resulting authored item. Conversion is undoable. Its source remains suppressed; restoring the source separately can create overlap with the authored copy.
+
+## Copy a group without duplicating identities
+
+OBJECT-select one wildlife or mini-robot group, Ctrl+C, point to the destination, Ctrl+V. The new selection is one copied group with a fresh ID, not one copy for each spawned actor. Adjust count/seed/spawn in the inspector and use VALIDATE. Robot placements use SELECT; moving one preserves its existing persistent ID.
+
+## Fix an overlap without moving the wrong object
+
+Choose SELECT for decor or OBJECT for gameplay, then Alt+click repeatedly to cycle eligible overlaps. A mixed selection containing immovable content refuses movement. Copy reports skipped unsupported items; it never manufactures a new objective.

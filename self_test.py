@@ -145,17 +145,17 @@ def main():
     assert 'this.editorDecor=r.editor_decor||[]' in js and 'drawEditorDecor(ctx,room)' in js and 'decorExclusions=new Set' in js
     assert 'patternExclusions=new Set' in js and 'objectFxHidden=new Set' in js and "skip('nest:swirl')" in js
     assert "fetch('/__editor/save_maps'" in editor and "path != '/__editor/save_maps'" in server and "backups = ROOT / 'editor_backups'" in server
-    assert 'relay-moth-runtime-diagnostics-414.json' in js
+    assert 'relay-moth-runtime-diagnostics-415.json' in js
     # SurfaceFX v3.995.2 bridge architecture: separate reusable file, bounded water/grass resources, clean fallback.
     assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('procedural_decor.js') < html.index('editor_identity.js') < html.index('editor_validation.js') < html.index('editor.js') < html.index('game.js')
     for token in ('class SurfaceFX','class WaterField','class GrassField','buildShoreField','drawArraysInstanced','GRASS_HARD_CAP=4600','MAX_RIPPLES=12',"const VERSION='3.999'",'uRefractionStrength','sampler2D uScene'): assert token in surface,token
     assert 'settings.waterQuality??2' in js and 'this.waterProg' in js
     assert 'buildGrassSurfaceDescriptor' in js and "this.updateStep('surface-fx'" in js
     assert 'relayMothGraphics3999' in js and 'relayMothGraphics39981' in js and 'relayMothGraphics3998' in js and 'relayMothGraphics39955' in js and 'relayMothGraphics39954' in js and 'relayMothGraphics39953' in js and 'relayMothGraphics39952' in js and 'relayMothGraphics3995' in js and 'relayMothGraphics399' in js
-    assert 'relay-moth-runtime-diagnostics-414.json' in js
+    assert 'relay-moth-runtime-diagnostics-415.json' in js
     # v4.14 FoliageFX architecture: standalone reusable module, static instancing, bounded sources and root-locked GPU deformation.
     for token in ('class FoliageRegistry','class FoliageInstanceBuffer','class WindField','class InteractionField','class RootedDeformation','class FoliageMaterial','class DepthClassifier','class DebugView','class FoliageFX','FOLIAGE_HARD_CAP=208','MAX_INTERACTION_SOURCES=8',"const VERSION='4.14'",'drawArraysInstanced','renderContactMask'): assert token in foliage,token
-    assert 'relayMothGraphics400' in js and 'relay-moth-runtime-diagnostics-414.json' in js
+    assert 'relayMothGraphics400' in js and 'relay-moth-runtime-diagnostics-415.json' in js
     assert "this.updateStep('foliage-fx'" in js and 'buildFoliageDescriptor' in js and 'foliageInteractionSources' in js
     assert "foliageFX?.render('background'" in end and "foliageFX?.render('foreground'" in end
     assert end.index('renderShadowOverlay') < end.index("foliageFX?.render('background'") < end.index('flushWorldHD()') < end.index("foliageFX?.render('foreground'") < end.index('spriteFlush(this.foregroundHDNormal')
@@ -239,7 +239,9 @@ def main():
     subprocess.run(['python',str(ROOT/'tests'/'current'/'fault_regression.py')],check=True)
     subprocess.run(['python','-m','py_compile',str(ROOT/'tools'/'build_v391_assets.py')],check=True)
     subprocess.run(['python','-m','py_compile',str(ROOT/'tools'/'generate_material_maps_413.py'),str(ROOT/'tools'/'rebuild_runtime_atlas.py')],check=True)
-    print('Relay Moth Forest — Pretty Graphics Edition 4.14')
+    subprocess.run(['python',str(ROOT/'tests'/'current'/'release_docs_regression_415.py')],check=True)
+    print('Relay Moth Forest — Pretty Graphics Edition 4.15')
+    print('  v4.15 editor reliability + authoring behavior validated')
     print('SELF-TEST PASSED')
     print(f'  {routes} staged objective/exit routes')
     print(f'  {mini_units} mini robots; {wild_units} woodland creatures incl mushroom pixies/cats')

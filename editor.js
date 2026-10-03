@@ -1,6 +1,6 @@
 'use strict';
 
-/* Relay Moth Forest v4.14 — on-canvas WYSIWYG room editor.
+/* Relay Moth Forest v4.15 — on-canvas WYSIWYG room editor.
  * Editor ownership is deliberately presentation/authoring-only. Runtime gameplay
  * systems continue to consume relay_moth_maps.json through Room as before.
  */

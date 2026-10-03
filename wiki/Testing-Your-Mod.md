@@ -140,3 +140,21 @@ For larger mods:
 5. move to the next class.
 
 This makes it much easier to identify whether a failure came from story, map geometry, IDs or rendering.
+
+## Validate editor state before saving
+
+In F2, choose **VALIDATE**. Review errors/warnings with their room, item and code: duplicate persistent IDs, missing/unknown objectives, bad coordinates or approachability, sprite/variant references, malformed groups, bridge/gate integrity and stale suppression metadata all need attention. The Python save endpoint checks payload structure; it does not independently repeat these semantic checks.
+
+Errors stop the first Save/Download and expose an explicit ANYWAY action for recovery; warnings do not block. Clean/dirty state is separate from validity. Undo to the loaded/saved/exported baseline becomes CLEAN; Redo makes it dirty again. A failed save must not clear dirty state. A downloaded baseline is not proof that the project file was updated.
+
+After layout changes, test right-click near objectives, Alt-click overlap selection, inspector edit/Undo, room switching and pointer/Escape cancellation. Use OBJECT → HIDE VISUAL / SHOW VISUAL for an objective; use SELECT to suppress a pattern, then SHOW SUPPRESSED → SELECT → RESTORE to recover it entirely through the UI. Generic generated decor must remain absent from bridge reserved surfaces and exact objective tiles.
+
+Explicit developer regression commands:
+
+```text
+node tests/current/editor_behavior_regression_415.js
+node tests/current/procedural_decor_regression_415.js
+python tests/current/release_docs_regression_415.py
+```
+
+With Playwright/Chromium installed, also run `python tests/current/browser_render_regression_414.py --out /tmp/relay-v415-browser`. The historical filename preserves inherited material/render checks while running v4.15 editor interactions. Browser tooling unavailable means no fresh browser pass, not an assumed success. See repository `docs/TESTING.md` for installation and limits.
