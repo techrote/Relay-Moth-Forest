@@ -1,0 +1,15 @@
+{
+  "archive": "Relay-Moth-Forest_PERF-003_prepass_e4628f6.zip",
+  "sha256": "24856be038a98fb4da62fe948f3460f122b12927b621aa37129086653e17c6a4",
+  "archiveBytes": 307413,
+  "archiveFiles": 98,
+  "manifestRecords": 97,
+  "zipCRC": "PASS",
+  "freshExtractionFileSetAndHashes": "PASS",
+  "freshExtractionComparatorReplay": "PASS",
+  "replayedResultsAnd74CompleteFieldsByteIdentical": "PASS",
+  "extractedManifestStillValidAfterReplay": "PASS",
+  "comparisonCount": 19486,
+  "mismatchedBytes": 0,
+  "scope": "CPU prepass and additive patch; browser acquisition / WebGL / real hardware / remote publication not established"
+}
