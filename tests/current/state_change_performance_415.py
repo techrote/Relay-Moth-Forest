@@ -36,6 +36,7 @@ SCENARIOS = [
 SCENARIO_JS = r"""
 async (name) => {
   const twoFrames=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  const decorate=r=>({...r,waterDiagnostics:game.renderer.surfaceFX?.diagnostics?.().water||null,legacyWater:game.renderer.lastWaterMaskUpdate||null});
   const reset=async(roomKey,completed=[],editor=false)=>{
     relayMothPerf.enable(false);relayMothPerf.clear();
     if(globalThis.rmfEditor?.active)rmfEditor.toggle(false);
@@ -60,7 +61,7 @@ async (name) => {
     for(let i=0;i<8;i++){
       await new Promise(resolve=>requestAnimationFrame(resolve));
       const records=relayMothPerf.snapshot().records;
-      if(records.length&&!records[records.length-1].pendingFrame)return records[records.length-1];
+      if(records.length&&!records[records.length-1].pendingFrame)return decorate(records[records.length-1]);
     }
     const snap=relayMothPerf.snapshot();
     if(!snap.records.length)throw Error('Scenario '+name+' produced no timing record');
@@ -303,6 +304,14 @@ def main():
                 for _ in range(args.samples):
                     record = page.evaluate(SCENARIO_JS, scenario)
                     records.append(record)
+                if scenario in {"objective-rivet", "editor-water"}:
+                    for record in records:
+                        water = (record.get("waterDiagnostics") or {}).get("lastUpdate") or {}
+                        legacy = record.get("legacyWater") or {}
+                        assert water.get("mode") == "bounded", (scenario, "SurfaceFX did not use bounded update", water)
+                        assert legacy.get("mode") == "bounded", (scenario, "legacy mask did not use bounded update", legacy)
+                        field = water.get("field") or [0, 0]
+                        assert water.get("uploadBytes", 10**12) < field[0] * field[1] * 4, (scenario, "bounded field uploaded full texture", water)
                 run["scenarios"][scenario] = {
                     "summary": summarize(records),
                     "records": records,

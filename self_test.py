@@ -198,6 +198,7 @@ def main():
     subprocess.run(['node','--check',str(ROOT/'sprite_material.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'editor.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'surfacefx_regression.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'waterfield_bounded_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'foliagefx_regression_400.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'foliagefx_depth_regression_400.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'foliagefx_occlusion_regression_404.js')],check=True)
