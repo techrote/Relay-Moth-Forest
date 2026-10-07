@@ -36,6 +36,10 @@ function counterexampleAndPlanning(){
   const mapped=S.logicalRectsToFieldRects([{x0:16,y0:16,x1:32,y1:32}],224,126,640,360);assert(mapped&&mapped.length===1);assert(mapped[0].x0<=5&&mapped[0].x1>=12,'logical projection must conservatively cover the tile');
   const fragmented=verify(fixture(80,50),80,50,[[81,0],[158,0],[2401,0],[2478,0]],8,'fragmented fallback',{maxRects:1,maxWorkRatio:10});assert.strictEqual(fragmented.mode,'full');
   assert.strictEqual(S.buildShoreField(Uint8Array.from([1,0]),2,1,10).rgba[2],230,'blue quantization remains independent');
+  verify(Uint8Array.from([1,1,1,1,1,1,1,1,1]),3,3,[[4,0]],2,'all-wet gains first shoreline',{maxWorkRatio:10});
+  verify(Uint8Array.from([0,1,1,1,1,1,1,1,1,1,1,1,0]),13,1,[[0,1]],3,'removed nearest shore uses replacement outside output',{maxWorkRatio:10});
+  const overlap=fixture(20,8),overlapEdits=[[2*20+5,0],[2*20+12,0]];
+  verify(overlap,20,8,overlapEdits,3,'disjoint outputs with overlapping source halos',{maxWorkRatio:10});
 }
 function integrationContracts(){
   const game=fs.readFileSync(path.join(ROOT,'game.js'),'utf8'),editor=fs.readFileSync(path.join(ROOT,'editor.js'),'utf8');
