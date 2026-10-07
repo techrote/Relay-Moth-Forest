@@ -508,7 +508,7 @@ class GLRenderer{
       g.bindTexture(g.TEXTURE_2D,this.waterMaskTex);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);
       try{
         if(requestedBounded){
-          try{const ctx=canvas.getContext('2d',{willReadFrequently:true});for(const r of delta.logicalRects){const image=ctx.getImageData(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);g.texSubImage2D(g.TEXTURE_2D,0,r.x0,H-r.y1,g.RGBA,g.UNSIGNED_BYTE,image);uploadBytes+=image.data.byteLength;uploadCalls++}}
+          try{const ctx=canvas.getContext('2d',{willReadFrequently:true});for(const r of delta.logicalRects){const image=ctx.getImageData(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);g.texSubImage2D(g.TEXTURE_2D,0,r.x0,H-r.y1,r.x1-r.x0,r.y1-r.y0,g.RGBA,g.UNSIGNED_BYTE,image.data);uploadBytes+=image.data.byteLength;uploadCalls++}}
           catch(_e){legacyMode='full';uploadBytes=0;uploadCalls=0;g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,canvas);uploadBytes=W*H*4;uploadCalls=1}
         }else{g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,canvas);uploadBytes=W*H*4;uploadCalls=1}
       }finally{g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false)}
