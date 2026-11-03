@@ -81,6 +81,87 @@
     return {bytes,pixels,max,examples};
   }
 
+  // Run only after a strict full-build parity failure. Canvas2D can select a
+  // different backing path as sources are reused; diagnose that independently
+  // of the full-builder refactor before changing either code or pixel gates.
+  function rasterDiagnostics(actual,firstLegacy){
+    const r=game.renderer,g=r.gl,width=r.nativeW,height=r.nativeH,temporaryArts=[],snapshots=new Map();
+    const report={room:game.room.key,native:[width,height],comparisons:[],surfaces:[],normalCaches:{},sourceSampling:[]};
+    const compact=(a,b,w)=>{const d=differences(a,b,w),channelBytes=[0,0,0,0],channelMax=[0,0,0,0];let rgbMaxAtAlpha32=0;
+      for(let i=0;i<a.length;i+=4)for(let k=0;k<4;k++){const delta=Math.abs(a[i+k]-b[i+k]);if(delta)channelBytes[k]++;channelMax[k]=Math.max(channelMax[k],delta);if(k<3&&a[i+3]>=32&&b[i+3]>=32)rgbMaxAtAlpha32=Math.max(rgbMaxAtAlpha32,delta)}
+      return{bytes:d.bytes,pixels:d.pixels,max:d.max,channelBytes,channelMax,rgbMaxAtAlpha32,examples:d.examples.slice(0,2)}};
+    const newArt=()=>{const art=Object.create(game.art);art.tintCache=new Map();art.normalTransformCache=new Map();temporaryArts.push(art);return art};
+    const metadata=art=>({size:art.normalTransformCache.size,entries:[...art.normalTransformCache].slice(0,8).map(([key,c])=>({key,width:c.width,height:c.height,attributes:c.getContext('2d').getContextAttributes()}))});
+    const render=(name,builder,art,forceCPU=false)=>{
+      const painter=new StaticPainter(art,game.luts),prototype=OffscreenCanvas.prototype,original=prototype.getContext;
+      let color=null,maps=null;
+      if(forceCPU)prototype.getContext=function(type,options){return original.call(this,type,type==='2d'&&this.width===width&&this.height===height?{...options,willReadFrequently:true}:options)};
+      try{
+        color=(builder||painter.build).call(painter,game.room,game.state,width,height);maps=painter.lastMaterialMaps;
+        const surfaces=[color,maps.normal,maps.spec];
+        snapshots.set(name,surfaces.map(c=>uploadReference(g,c,width,height)));
+        report.surfaces.push({name,forceCPU,normalAttributes:maps.normal.getContext('2d').getContextAttributes(),normalTransform:Array.from(['a','b','c','d','e','f'],key=>maps.normal.getContext('2d').getTransform()[key])});
+      }finally{prototype.getContext=original;release(color);release(maps?.normal);release(maps?.spec)}
+    };
+    const compare=(left,right)=>report.comparisons.push({left,right,maps:Object.fromEntries(channels.map((channel,i)=>[channel,compact(snapshots.get(left)[i],snapshots.get(right)[i],width)]))});
+    const cachePixels=art=>new Map([...art.normalTransformCache].map(([key,c])=>[key,{width:c.width,height:c.height,bytes:c.getContext('2d').getImageData(0,0,c.width,c.height).data}]));
+    const compareCaches=(a,b)=>{
+      const out={shared:0,missingWarm:[],missingFresh:[],mismatched:[],totalMismatchBytes:0};
+      for(const [key,left] of a){const right=b.get(key);if(!right){out.missingFresh.push(key);continue}out.shared++;
+        if(left.width!==right.width||left.height!==right.height){out.mismatched.push({key,dimensions:[[left.width,left.height],[right.width,right.height]]});continue}
+        const diff=compact(left.bytes,right.bytes,left.width);out.totalMismatchBytes+=diff.bytes;if(diff.bytes)out.mismatched.push({key,...diff});
+      }
+      for(const key of b.keys())if(!a.has(key))out.missingWarm.push(key);
+      out.mismatched=out.mismatched.slice(0,8);return out;
+    };
+    const sample=(source,name,forceCPU)=>{
+      const canvas=new OffscreenCanvas(width,height),ctx=canvas.getContext('2d',{alpha:true,willReadFrequently:forceCPU});
+      try{
+        const [w,h]=game.art.worldSize(name);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+        ctx.scale(width/640,height/360);ctx.globalAlpha=.94;ctx.translate(120,306);ctx.scale(-1,1);
+        ctx.drawImage(source,0,0,source.width,source.height,-w/2,-h,w,h);
+        const gpu=uploadReference(g,canvas,width,height),cpu=ctx.getImageData(0,0,width,height).data;
+        return{gpu,cpu,attributes:ctx.getContextAttributes()};
+      }finally{release(canvas)}
+    };
+    try{
+      snapshots.set('runtime',actual.maps);snapshots.set('first-fresh-legacy',firstLegacy);
+      report.normalCaches.before=metadata(game.art);
+      render('current-shared-1',null,game.art);render('legacy-shared-1',legacyFullBuild,game.art);
+      render('current-shared-2',null,game.art);render('legacy-shared-2',legacyFullBuild,game.art);
+      const a=newArt(),b=newArt(),c=newArt(),d=newArt(),cpuArt=newArt();
+      render('current-cold-A',null,a);render('legacy-warm-A',legacyFullBuild,a);
+      render('legacy-cold-B',legacyFullBuild,b);render('current-warm-B',null,b);
+      render('current-cold-C',null,c);render('legacy-cold-D',legacyFullBuild,d);
+      render('current-shared-cpu',null,game.art,true);render('legacy-shared-cpu',legacyFullBuild,game.art,true);
+      render('legacy-cold-cpu',legacyFullBuild,cpuArt,true);render('current-warm-cpu',null,cpuArt,true);
+      for(const pair of [
+        ['runtime','current-shared-1'],['current-shared-1','legacy-shared-1'],['current-shared-1','current-shared-2'],['legacy-shared-1','legacy-shared-2'],
+        ['current-cold-A','legacy-warm-A'],['legacy-cold-B','current-warm-B'],['current-cold-A','current-cold-C'],['legacy-cold-B','legacy-cold-D'],
+        ['first-fresh-legacy','legacy-cold-B'],['runtime','current-cold-A'],['current-cold-A','current-warm-B'],
+        ['current-shared-cpu','legacy-shared-cpu'],['legacy-cold-cpu','current-warm-cpu'],['current-shared-cpu','current-warm-cpu'],['current-shared-2','current-shared-cpu']
+      ])compare(...pair);
+      report.normalCaches.warm=metadata(game.art);report.normalCaches.fresh=metadata(a);
+      const warmPixels=cachePixels(game.art),freshPixels=cachePixels(a);
+      report.normalCaches.pixelComparison=compareCaches(warmPixels,freshPixels);
+      render('current-shared-after-cache-read',null,game.art);compare('current-shared-2','current-shared-after-cache-read');
+      const priority=['blocker_mixed_27|1|0.000000','foliage_v391_17|1|0.000000','blocker_foliage_01|1|0.000000'];
+      const keys=[...priority.filter(key=>game.art.normalTransformCache.has(key)),...[...game.art.normalTransformCache.keys()].filter(key=>!priority.includes(key))].slice(0,3);
+      for(const key of keys){
+        const [name,flip,rotation]=key.split('|'),warm=game.art.normalTransformCache.get(key),fresh=b.transformedNormal(name,flip==='1',Number(rotation));
+        const warmDefault=sample(warm,name,false),freshDefault=sample(fresh,name,false),repeatDefault=sample(warm,name,false),warmCPU=sample(warm,name,true),freshCPU=sample(fresh,name,true);
+        report.sourceSampling.push({key,sourceAttributes:warm.getContext('2d').getContextAttributes(),defaultAttributes:warmDefault.attributes,cpuAttributes:warmCPU.attributes,
+          sourcePixels:compact(warm.getContext('2d').getImageData(0,0,warm.width,warm.height).data,fresh.getContext('2d').getImageData(0,0,fresh.width,fresh.height).data,warm.width),
+          warmVsFreshDefault:compact(warmDefault.gpu,freshDefault.gpu,width),warmDefaultRepeat:compact(warmDefault.gpu,repeatDefault.gpu,width),
+          warmVsFreshCPU:compact(warmCPU.gpu,freshCPU.gpu,width),warmDefaultVsCPU:compact(warmDefault.gpu,warmCPU.gpu,width),
+          canvasWarmVsFreshDefault:compact(warmDefault.cpu,freshDefault.cpu,width),canvasWarmVsFreshCPU:compact(warmCPU.cpu,freshCPU.cpu,width)});
+      }
+      return report;
+    }finally{
+      for(const art of temporaryArts)for(const cache of [art.tintCache,art.normalTransformCache]){for(const canvas of cache.values())release(canvas);cache.clear()}
+    }
+  }
+
   function parity(label,before=null,uploads=[]){
     const actual=capture(),expected=reference(),result={};
     for(let c=0;c<channels.length;c++){
@@ -226,7 +307,10 @@
         const actual=capture(),expected=reference(legacyFullBuild),textures={};
         for(let c=0;c<channels.length;c++){
           const diff=differences(actual.maps[c],expected[c],width);textures[channels[c]]=diff;
-          check(!diff.bytes,'full builder changed accepted composition '+game.room.key+' '+width+'x'+height+' '+channels[c]+' '+JSON.stringify(diff));
+          if(diff.bytes){
+            try{root.__staticRasterDiagnostics=rasterDiagnostics(actual,expected)}catch(error){root.__staticRasterDiagnostics={diagnosticError:String(error),stack:error?.stack}}
+            check(false,'full builder changed accepted composition '+game.room.key+' '+width+'x'+height+' '+channels[c]+' '+JSON.stringify(diff)+'\nPERF-004 raster diagnostics '+JSON.stringify(root.__staticRasterDiagnostics));
+          }
         }
         out.push({room:game.room.key,native:[width,height],textures});
       }

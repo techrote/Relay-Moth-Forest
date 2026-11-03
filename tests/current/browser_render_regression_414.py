@@ -323,7 +323,16 @@ def main():
         result['waterfield_optional_effect_faults']=page.evaluate(WATER_FAULT_CASE)
         page.add_script_tag(content=(ROOT/'tests/current/static_terrain_browser_415.js').read_text())
         print('NATIVE WEBGL bounded static color/material textures',flush=True)
-        result['static_terrain']=page.evaluate('()=>auditStaticTerrain.run()')
+        try:
+            result['static_terrain']=page.evaluate('()=>auditStaticTerrain.run()')
+        except Exception:
+            if args.out:
+                try:
+                    diagnostic=page.evaluate('window.__staticRasterDiagnostics||null')
+                    if diagnostic:(args.out/'static_raster_failure.json').write_text(json.dumps(diagnostic,indent=2))
+                except Exception:
+                    pass  # Preserve the original native assertion/driver error.
+            raise
         result['runtime_errors']=logs;assert not logs,logs
         if args.out:(args.out/'browser_results.json').write_text(json.dumps(result,indent=2))
         print('NATIVE BROWSER WEBGL2 PASS: nine rooms, material/quality toggles, same-count invalidation, v4.15 right-click/inspector/cycle/recovery/dirty interactions, ghost geometry, UI input and q1-q4 bounded-water GPU/collision/history/fallback parity; '+result['driver']['renderer'],flush=True)

@@ -874,6 +874,9 @@ class Game{
       try{renderer.setBackground(staticCanvas,materialMaps)}finally{releaseCanvasBacking(staticCanvas);releaseCanvasBacking(materialMaps?.normal);releaseCanvasBacking(materialMaps?.spec);this.painter.lastMaterialMaps=null}
     };
     try{
+      // A no-op is valid only while the previous GPU contents still exist.
+      // Context loss can occur without a terrain mutation or a revision bump.
+      if(renderer.gl?.isContextLost?.())throw new Error('Static background context lost');
       if(plan.kind==='patch'){
         try{
           for(const region of plan.regions){
@@ -886,7 +889,7 @@ class Game{
       // The only retained authority is data. Commit after every color/material
       // region succeeded, or after the complete synchronous repair succeeded.
       this.staticTerrainSnapshot=snapshot;this.staticBackgroundRevision=renderer.backgroundRevision;this.bgKey=this.editorBackgroundKey();
-    }catch(err){this.staticTerrainSnapshot=null;this.staticBackgroundRevision=null;this.bgKey='';stats.reason='refresh-failed';throw err}
+    }catch(err){renderer.backgroundReady=false;this.staticTerrainSnapshot=null;this.staticBackgroundRevision=null;this.bgKey='';stats.reason='refresh-failed';throw err}
     finally{stats.uploadCalls=(renderer.backgroundUploadCalls||0)-startCalls;stats.uploadBytes=(renderer.backgroundUploadBytes||0)-startBytes;stats.scratchBytes=stats.scratchPixels*12}
     perfMeasure('ui.update',()=>this.updateUI());return stats;
   }

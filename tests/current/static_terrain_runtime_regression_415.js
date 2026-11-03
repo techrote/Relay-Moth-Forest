@@ -123,9 +123,41 @@ function repairedUploadFailures(){
   const first=allocations.length;assert.throws(()=>g.refreshEditorStatic(),/injected full upload failure/);released(g,first);
   assert.strictEqual(g.staticTerrainSnapshot,null);assert.strictEqual(g.staticBackgroundRevision,null);assert.strictEqual(g.bgKey,'');assert.strictEqual(g.renderer.backgroundReady,false);assert.strictEqual(g.staticRefreshStats.reason,'refresh-failed');
   gl.failSubAt=gl.failFullAt=0;assert.strictEqual(refresh(g).reason,'missing-baseline');assert.strictEqual(g.renderer.backgroundReady,true);scenarios++;
-  // Context loss is reported without an exception from texSubImage2D. The
-  // repair must still fail closed, and recovery starts with a complete build.
-  g.room.paths.add('9,9');gl.lost=true;assert.throws(()=>g.refreshEditorStatic(),/Static background upload failed/);assert.strictEqual(g.staticTerrainSnapshot,null);assert.strictEqual(g.bgKey,'');released(g);gl.lost=false;assert.strictEqual(refresh(g).mode,'full');scenarios++;
+}
+
+function contextLossSkipsWork(){
+  // A lost context invalidates the uploaded authority even when no terrain has
+  // changed. Detect it before allocating scratch or attempting any GPU work.
+  for(const changed of [false,true]){
+    const g=fixture();refresh(g);const r=g.renderer,gl=r.gl,revision=r.backgroundRevision,first=allocations.length,uploads=gl.uploads.length;
+    if(changed)g.room.paths.add('9,9');
+    gl.lost=true;assert.throws(()=>g.refreshEditorStatic(),/(?:context.*lost|lost.*context)/i);
+    assert.strictEqual(allocations.length,first,'lost context must not allocate a patch or full repair');
+    assert.strictEqual(gl.uploads.length,uploads,'lost context must not submit texture uploads');
+    assert.strictEqual(r.backgroundReady,false,'lost context cannot retain ready texture authority');
+    assert.strictEqual(r.backgroundRevision,revision,'failed refresh cannot advance renderer revision');
+    assert.strictEqual(g.staticTerrainSnapshot,null);assert.strictEqual(g.staticBackgroundRevision,null);assert.strictEqual(g.bgKey,'');released(g,first);
+    gl.lost=false;const stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'missing-baseline');
+    assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(r.backgroundReady,true);assert.strictEqual(r.backgroundRevision,revision+1);scenarios++;
+  }
+}
+
+function laterRasterFailureInvalidatesReadiness(){
+  const g=fixture();refresh(g);const r=g.renderer,gl=r.gl,previous=g.staticTerrainSnapshot,revision=r.backgroundRevision,first=allocations.length;
+  g.room.water.add('6,7');g.room.water.add('30,14');
+  const build=g.painter.build,patch=g.painter.buildPatch;let patches=0;
+  g.painter.buildPatch=function(...args){if(++patches===2)throw Error('injected later patch raster failure');return patch.apply(this,args)};
+  g.painter.build=()=>{throw Error('injected full repair raster failure')};
+  assert.throws(()=>g.refreshEditorStatic(),/injected full repair raster failure/);
+  assert.strictEqual(patches,2,'first region must succeed before the raster failure');
+  assert.strictEqual(gl.subCount,3,'first region must upload all three material channels');
+  assert.strictEqual(r.backgroundRevision,revision+1,'only the first complete region advanced renderer revision');
+  assert.strictEqual(r.backgroundReady,false,'later raster/repair failure must invalidate readiness left by the first region');
+  assert.strictEqual(g.staticTerrainSnapshot,null);assert.strictEqual(g.staticBackgroundRevision,null);assert.strictEqual(g.bgKey,'');
+  assert.strictEqual(g.staticRefreshStats.reason,'refresh-failed');released(g,first);
+  g.painter.build=build;g.painter.buildPatch=patch;
+  const stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'missing-baseline');assert.strictEqual(stats.uploadCalls,3);
+  assert.strictEqual(r.backgroundReady,true);assert.strictEqual(r.backgroundRevision,revision+2);assert.notStrictEqual(g.staticTerrainSnapshot,previous);scenarios++;
 }
 
 function rasterAndAllocationFailures(){
@@ -150,7 +182,7 @@ function rejectInvalidPatches(){
   c.width=c.height=normal.width=normal.height=spec.width=spec.height=1;scenarios++;
 }
 
-fullPatchNoopAndHistory();staticIdentityAndStaleness();repairedUploadFailures();rasterAndAllocationFailures();rejectInvalidPatches();
+fullPatchNoopAndHistory();staticIdentityAndStaleness();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();rejectInvalidPatches();
 console.log('STATIC TERRAIN RUNTIME REGRESSION PERF-004 PASS');
 console.log('  production Game / StaticPainter / GLRenderer scenarios:',scenarios);
 console.log('  bounded uploads, coherent snapshot/revision commits, native Y offsets, exact resource/source invalidation and editor history');

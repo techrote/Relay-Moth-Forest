@@ -9,6 +9,7 @@ operations. Chromium CPU throttling can be used to expose low-end sensitivity.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import shutil
@@ -285,6 +286,23 @@ def parse_args():
     return ap.parse_args()
 
 
+def source_identity(root):
+    """Keep archive benchmarking usable without pretending it has a Git SHA."""
+    root = root.resolve()
+    manifest = root / "SHA256SUMS.txt"
+    record = {"commit": None, "tree": None, "trackedDirty": None,
+              "manifestSha256": hashlib.sha256(manifest.read_bytes()).hexdigest() if manifest.is_file() else None}
+    try:
+        git = lambda *args: subprocess.check_output(["git", "-C", str(root), *args], text=True, stderr=subprocess.DEVNULL).strip()
+        # An archive extracted inside another checkout is still an archive.
+        if Path(git("rev-parse", "--show-toplevel")).resolve() == root:
+            record.update(commit=git("rev-parse", "HEAD"), tree=git("rev-parse", "HEAD^{tree}"),
+                          trackedDirty=bool(git("status", "--porcelain", "--untracked-files=no")))
+    except (OSError, subprocess.CalledProcessError):
+        pass
+    return record
+
+
 def measure_source(args, root, validate_static=True):
     if args.samples < 1:
         raise SystemExit("--samples must be >= 1")
@@ -296,10 +314,7 @@ def measure_source(args, root, validate_static=True):
         "note": "Diagnostic relative evidence; absolute CI milliseconds are not a universal performance target.",
         "samplesPerScenario": args.samples,
         "runs": [],
-        "source": {
-            "commit": subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip(),
-            "tree": subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD^{tree}"], text=True).strip(),
-        },
+        "source": source_identity(root),
     }
 
     with local_server(root) as base, sync_playwright() as p:
