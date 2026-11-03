@@ -199,11 +199,16 @@ RASTER_EXPORT_CASE = r'''async()=>{
       });
       check(game.room.paths.has('2,2')&&e.rawRoom().path_cells.some(p=>p[0]===2&&p[1]===2),'post-export edit lost authoritative terrain');
       check(work.diagnostics.mode==='patch'&&work.diagnostics.reason==='terrain'&&work.diagnostics.changedCells===1,'post-export terrain did not remain eligible');
-      check(work.fullBuilds===0&&work.fullUploads.length===0&&work.patchBuilds===1&&work.floorCalls===25,'post-export edit rebuilt full terrain or lost its bounded prefix');
+      check(work.fullBuilds===0&&work.fullUploads.length===0&&work.patchBuilds===1&&work.floorCalls===25,'post-export edit rebuilt full terrain or lost its bounded floor inputs');
       check(work.subUploads.length===1&&work.subUploads[0].channel==='color'&&work.subUploads[0].x===49&&work.subUploads[0].y===484&&work.subUploads[0].width===31&&work.subUploads[0].height===29,'post-export edit did not issue the expected color-only crop');
       check(work.patchMaterialMaps===0&&work.normalTransformRequests===0&&work.materialHandlesUnchanged&&work.normalSourceGenerationUnchanged,'post-export edit changed material resources');
       check(work.releasedPatchCanvases&&work.unpackRestored&&!game.currentStatic&&!game.painter.lastMaterialMaps,'post-export edit retained scratch or changed unpack state');
-      check(work.diagnostics.rasterPixels===112*112&&work.diagnostics.scratchPixels===112*112&&work.diagnostics.scratchBytes===112*112*4&&work.diagnostics.uploadBytes===31*29*4,'post-export bounded work accounting changed');
+      const capacity=997*563,allocations=work.patchContextAllocations.filter(c=>c.explicitAlpha===false);
+      check(allocations.length===1&&allocations[0].width===997&&allocations[0].height===563&&work.peakLiveScratchPixels===capacity,'post-export redraw did not preserve its bounded native target capacity');
+      check(work.patchClips.length===1&&JSON.stringify(work.patchClips[0].rectangles)===JSON.stringify([[16,16,96,96]]),'post-export redraw lost its independently observed local guard clip');
+      check(work.diagnostics.scratchMode==='native-clip'&&work.diagnostics.rasterPixels===96*96&&work.diagnostics.scratchPixels===capacity&&work.diagnostics.scratchBytes===capacity*4&&work.diagnostics.uploadBytes===31*29*4,'post-export capacity/redraw/upload accounting changed');
+      check(work.diagnostics.scratchAllocationAttempts===1&&work.diagnostics.scratchAllocations===1&&work.diagnostics.scratchAllocationPixels===capacity&&work.diagnostics.scratchAllocationBytes===capacity*4,'post-export cumulative allocation accounting changed');
+      check(!work.readbacks.some(read=>read.staticPatch),'post-export terrain introduced a static patch readback');
       const textures=audit.parity('terrain immediately after F8 tint-cache pressure',before,work.subUploads);
       result.exportThenTerrain={native:[997,563],authoredTintKeys:requestedKeys.size,evictedSources:evicted.length,evictedBaselineSources:evictedBaseline.length,
         peakTintCache:peakTintSize,peakNormalCache:peakNormalSize,exportTextureMismatch:exportMismatch,exportAuthorityUnchanged:true,work,textures};

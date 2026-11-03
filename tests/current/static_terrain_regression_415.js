@@ -49,7 +49,7 @@ function authorityAndNoops(){
   assert(Object.isFrozen(before)&&Object.isFrozen(before.cellTypes)&&Object.isFrozen(before.dependencies));
   assert.throws(()=>{before.cellTypes[0]=99},TypeError);assert.throws(()=>{before.dependencies[0][1]='bad'},TypeError);
   assert(Object.isFrozen(delta)&&Object.isFrozen(delta.regions[0])&&Object.isFrozen(delta.changedCells[0]));
-  assert(Object.values(delta.regions[0]).every(value=>typeof value==='number'),'patch regions remain immutable flat numeric records');
+  assert(Object.entries(delta.regions[0]).every(([key,value])=>key==='canvasMode'?value==='local':Number.isSafeInteger(value)),'patch geometry remains an immutable flat record with an explicit source mode');
   authorityCases+=14;
 }
 
@@ -81,17 +81,19 @@ function budgetAndValidation(){
   assert.strictEqual(S.plan(null,after).reason,'missing-baseline');
   const full=S.plan(null,after),noop=S.plan(before,before);
   assert.strictEqual(full.pixelCount,640*360);assert.strictEqual(full.rasterPixels,full.pixelCount);assert.strictEqual(full.scratchPixels,full.pixelCount);assert.strictEqual(full.scratchBytes,full.pixelCount*12);
+  assert.strictEqual(full.scratchMode,'full');assert.strictEqual(full.scratchAllocationAttempts,3);assert.strictEqual(full.scratchAllocations,3);assert.strictEqual(full.scratchAllocationPixels,full.pixelCount*3);assert.strictEqual(full.scratchAllocationBytes,full.pixelCount*12);
   assert.strictEqual(full.uploadCalls,3);assert.strictEqual(full.uploadBytes,full.pixelCount*12,'full rebuild retains the complete three-map contract');
-  for(const key of ['pixelCount','rasterPixels','rasterCellCount','scratchPixels','scratchBytes','uploadCalls','uploadBytes'])assert.strictEqual(noop[key],0,`noop ${key} must report no work`);
+  assert.strictEqual(noop.scratchMode,'none');
+  for(const key of ['pixelCount','rasterPixels','rasterCellCount','scratchPixels','scratchBytes','scratchAllocationAttempts','scratchAllocations','scratchAllocationPixels','scratchAllocationBytes','uploadCalls','uploadBytes'])assert.strictEqual(noop[key],0,`noop ${key} must report no work`);
   assert.strictEqual(S.plan({...before},after).reason,'invalid-baseline','untrusted/serialized snapshots must not claim rendered authority');
   assert(S.plan(before,{...after}).reason.startsWith('invalid-next'));
-  const limits=[['maxChangedCells',0,'changed-cell-budget'],['maxRegions',0,'fragmentation'],['maxPixelRatio',0,'pixel-budget'],['maxRasterRatio',0,'raster-budget'],['maxScratchPixels',0,'scratch-budget']];
+  const limits=[['maxChangedCells',0,'changed-cell-budget'],['maxRegions',0,'fragmentation'],['maxPixelRatio',0,'pixel-budget'],['maxRasterRatio',0,'raster-budget'],['maxScratchPixels',0,'scratch-budget'],['maxScratchAllocationPixels',0,'scratch-allocation-budget']];
   for(const [key,value,reason] of limits)assert.strictEqual(S.plan(before,after,{[key]:value}).reason,reason);
   const fragmented=clone(room);for(const [x,y] of [[2,2],[12,2],[22,2],[32,2],[2,8],[12,8],[22,8],[32,8],[2,14]])fragmented.water.add(`${x},${y}`);
   assert.strictEqual(S.plan(before,capture(fragmented)).reason,'fragmentation');
   const oversized=clone(room);for(let x=1;x<18;x++)oversized.paths.add(`${x},4`);
   assert.strictEqual(S.plan(before,capture(oversized)).reason,'changed-cell-budget');
-  for(const options of [null,{maxChangedCells:NaN},{maxRegions:-1},{maxPixelRatio:2},{maxRasterRatio:Infinity},{maxScratchPixels:1.5}])assert.strictEqual(S.plan(before,after,options).reason,'invalid-options');
+  for(const options of [null,{maxChangedCells:NaN},{maxRegions:-1},{maxPixelRatio:2},{maxRasterRatio:Infinity},{maxScratchPixels:1.5},{maxNativeScratchPixels:-1},{maxNativeScratchPixels:Infinity},{maxScratchAllocationPixels:1.5},{maxScratchAllocationPixels:NaN}])assert.strictEqual(S.plan(before,after,options).reason,'invalid-options');
   for(const microtile of [3,5,6,7,12]){const unusual=fixture();unusual.floorMicrotile=microtile;assert.strictEqual(plan(unusual,r=>r.water.add('8,8')).reason,'unsupported-microtile');assert.strictEqual(plan(unusual,()=>{}).kind,'noop')}
   for(const microtile of [4,8,16]){const supported=fixture();supported.floorMicrotile=microtile;assert.strictEqual(plan(supported,r=>r.water.add('8,8')).kind,'patch')}
   const invalidRooms=[r=>r.paths.add('40,0'),r=>r.water.add('-1,1'),r=>r.water.add('01,1'),r=>r.walls=new Set(['2,3','bad']),r=>r.border=[],r=>r.floorMicrotile=Infinity,r=>r.decorLamps.push({tile:[2,3],alpha:NaN}),r=>r.blockerStyles.loop=r.blockerStyles,r=>r.decorLamps.push(new Date()),r=>r.largeTrees=new Array(2)];
@@ -137,7 +139,7 @@ function intersects(a,b){return a.x0<b.x1&&b.x0<a.x1&&a.y0<b.y1&&b.y0<a.y1}
 function expectedRegion(x,y,microtile,width,height,logicalHeight=360){
   const output=project({x0:x*16,y0:y*16,x1:(x+1)*16+(microtile===4?3:0),y1:(y+1)*16+(microtile===4?2:0)},width,height,0,logicalHeight);
   const fractional=width%640!==0||height%logicalHeight!==0;
-  const raster={x0:fractional?0:Math.max(0,Math.floor((output.x0-32)/16)*16),y0:fractional?0:Math.max(0,Math.floor((output.y0-32)/16)*16),x1:Math.min(width,Math.ceil((output.x1+32)/16)*16),y1:Math.min(height,Math.ceil((output.y1+32)/16)*16)};
+  const raster={x0:Math.max(0,Math.floor((output.x0-32)/16)*16),y0:Math.max(0,Math.floor((output.y0-32)/16)*16),x1:Math.min(width,Math.ceil((output.x1+32)/16)*16),y1:Math.min(height,Math.ceil((output.y1+32)/16)*16)};
   // Find the source strip by intersecting logical tile intervals with the
   // expanded input bounds, rather than reusing the production index formula.
   const axis=(lo,hi,scale,count)=>{
@@ -146,33 +148,35 @@ function expectedRegion(x,y,microtile,width,height,logicalHeight=360){
     return[indices[0],indices[indices.length-1]+1];
   };
   const [tx0,tx1]=axis(raster.x0,raster.x1,width/640,40),[ty0,ty1]=axis(raster.y0,raster.y1,height/logicalHeight,19);
-  return{x:output.x0,y:output.y0,width:output.x1-output.x0,height:output.y1-output.y0,rasterX:raster.x0,rasterY:raster.y0,rasterWidth:raster.x1-raster.x0,rasterHeight:raster.y1-raster.y0,tx0,ty0,tx1,ty1};
+  return{x:output.x0,y:output.y0,width:output.x1-output.x0,height:output.y1-output.y0,rasterX:raster.x0,rasterY:raster.y0,rasterWidth:raster.x1-raster.x0,rasterHeight:raster.y1-raster.y0,canvasMode:fractional?'native-clip':'local',canvasX:fractional?0:raster.x0,canvasY:fractional?0:raster.y0,canvasWidth:fractional?width:raster.x1-raster.x0,canvasHeight:fractional?height:raster.y1-raster.y0,tx0,ty0,tx1,ty1};
 }
 function defaultBudgetReason(regions,width,height){
-  const outputPixels=regions.reduce((n,r)=>n+r.width*r.height,0),rasterPixels=regions.reduce((n,r)=>n+r.rasterWidth*r.rasterHeight,0),sourceCells=regions.reduce((n,r)=>n+(r.tx1-r.tx0)*(r.ty1-r.ty0),0),peakPixels=Math.max(...regions.map(r=>r.rasterWidth*r.rasterHeight));
+  const outputPixels=regions.reduce((n,r)=>n+r.width*r.height,0),rasterPixels=regions.reduce((n,r)=>n+r.rasterWidth*r.rasterHeight,0),sourceCells=regions.reduce((n,r)=>n+(r.tx1-r.tx0)*(r.ty1-r.ty0),0),peakPixels=Math.max(...regions.map(r=>r.canvasWidth*r.canvasHeight)),allocatedPixels=regions.reduce((n,r)=>n+r.canvasWidth*r.canvasHeight,0);
   if(outputPixels>width*height*.20)return'pixel-budget';
   if(rasterPixels>width*height*.20)return'raster-pixel-budget';
   if(sourceCells>760*.35)return'raster-budget';
-  if(peakPixels>262144)return'scratch-budget';
+  if(peakPixels>(regions[0].canvasMode==='native-clip'?1048576:262144))return'scratch-budget';
+  if(allocatedPixels>2097152)return'scratch-allocation-budget';
   return'terrain';
 }
 function assertCrop(region,nativeHeight){
-  const cropX=region.x-region.rasterX,cropY=region.y-region.rasterY;
-  const skipRows=region.rasterHeight-cropY-region.height;
+  const cropX=region.x-region.canvasX,cropY=region.y-region.canvasY;
+  const skipRows=region.canvasHeight-cropY-region.height;
   assert(cropX>=0&&cropY>=0&&skipRows>=0);
-  assert(cropX+region.width<=region.rasterWidth&&cropY+region.height<=region.rasterHeight);
+  assert(cropX+region.width<=region.canvasWidth&&cropY+region.height<=region.canvasHeight);
+  assert(region.x>=region.rasterX&&region.y>=region.rasterY&&region.x+region.width<=region.rasterX+region.rasterWidth&&region.y+region.height<=region.rasterY+region.rasterHeight,'uploaded output stays inside the guarded redraw clip');
   // WebGL2 TexImageSource skip rows count from the bottom when FLIP_Y is
   // enabled. Check the crop against top-origin geometry, including unequal
   // clipped guards, independently of the planner's tile-input formulas.
-  assert.strictEqual(region.rasterHeight-skipRows-region.height,cropY);
+  assert.strictEqual(region.canvasHeight-skipRows-region.height,cropY);
   const glY=nativeHeight-region.y-region.height;
   for(const row of [0,region.height-1]){
-    const sourceY=region.rasterY+region.rasterHeight-1-skipRows-row;
+    const sourceY=region.canvasY+region.canvasHeight-1-skipRows-row;
     const destinationY=nativeHeight-1-glY-row;
     assert.strictEqual(sourceY,destinationY,'flipped source crop and destination texture rows must agree');
   }
-  assert.strictEqual(region.rasterX+cropX,region.x);
-  assert.strictEqual(region.rasterX+cropX+region.width-1,region.x+region.width-1);
+  assert.strictEqual(region.canvasX+cropX,region.x);
+  assert.strictEqual(region.canvasX+cropX+region.width-1,region.x+region.width-1);
   return{cropX,cropY,skipRows};
 }
 function geometryOracle(){
@@ -189,22 +193,27 @@ function geometryOracle(){
       geometryCases++;
       if(wantReason!=='terrain'){
         geometryFallbacks++;
-        assert.strictEqual(delta.kind,'full');assert.strictEqual(delta.regions.length,0,'oversized prefix must not expose a partial upload');
+        assert.strictEqual(delta.kind,'full');assert.strictEqual(delta.regions.length,0,'an over-budget canvas must not expose a partial upload');
         assert.strictEqual(delta.changedCellCount,1);assert.strictEqual(delta.pixelCount,width*height);assert.strictEqual(delta.rasterPixels,width*height);assert.strictEqual(delta.rasterCellCount,760);assert.strictEqual(delta.scratchBytes,width*height*12);assert.strictEqual(delta.uploadCalls,3);assert.strictEqual(delta.uploadBytes,width*height*12);
+        assert.strictEqual(delta.scratchMode,'full');assert.strictEqual(delta.scratchAllocationAttempts,3);assert.strictEqual(delta.scratchAllocations,3);assert.strictEqual(delta.scratchAllocationPixels,width*height*3);assert.strictEqual(delta.scratchAllocationBytes,width*height*12);
         continue;
       }
       geometryPatches++;
       assert.strictEqual(delta.kind,'patch');assert.strictEqual(delta.regions.length,1);const r=delta.regions[0],raster={x0:r.rasterX,y0:r.rasterY,x1:r.rasterX+r.rasterWidth,y1:r.rasterY+r.rasterHeight};
-      for(const value of Object.values(r))assert(Number.isSafeInteger(value));
+      for(const [key,value] of Object.entries(r))if(key!=='canvasMode')assert(Number.isSafeInteger(value));
       assert.deepStrictEqual(r,expected,'tight upload, raster origin, guarded maxima and source strip must match independently derived geometry');
       assert(r.x>=0&&r.y>=0&&output.x1<=width&&output.y1<=height);
       assert(raster.x0%16===0&&raster.y0%16===0,'guarded scratch retains the top-origin raster grid and dither phase');
       assert(raster.x1===width||raster.x1%16===0);assert(raster.y1===height||raster.y1%16===0);
+      assert(r.canvasX>=0&&r.canvasY>=0&&r.canvasX+r.canvasWidth<=width&&r.canvasY+r.canvasHeight<=height);
+      assert(raster.x0>=r.canvasX&&raster.y0>=r.canvasY&&raster.x1<=r.canvasX+r.canvasWidth&&raster.y1<=r.canvasY+r.canvasHeight,'guard clip stays inside its separate source canvas');
       assertCrop(r,height);
       assert(r.tx0<=x&&r.tx1>x&&r.ty0<=y&&r.ty1>y);
-      if(width%640||height%360){assert.strictEqual(r.rasterX,0);assert.strictEqual(r.rasterY,0);assert.strictEqual(r.tx0,0);assert.strictEqual(r.ty0,0);assert(delta.rasterCellCount<=760*.35,'fractional prefix retains the unchanged source-cell limit')}
-      else assert(delta.rasterCellCount<=81,'integer-scale local single-cell work stays within nine source tiles per axis at these native scales');
-      assert.strictEqual(delta.pixelCount,r.width*r.height);assert.strictEqual(delta.rasterPixels,r.rasterWidth*r.rasterHeight);assert.strictEqual(delta.scratchPixels,delta.rasterPixels);assert.strictEqual(delta.scratchBytes,delta.scratchPixels*4);
+      if(width%640||height%360){assert.strictEqual(r.canvasMode,'native-clip');assert.strictEqual(r.canvasX,0);assert.strictEqual(r.canvasY,0);assert.strictEqual(r.canvasWidth,width);assert.strictEqual(r.canvasHeight,height);assert.strictEqual(delta.scratchPixels,width*height)}
+      else{assert.strictEqual(r.canvasMode,'local');assert.deepStrictEqual([r.canvasX,r.canvasY,r.canvasWidth,r.canvasHeight],[r.rasterX,r.rasterY,r.rasterWidth,r.rasterHeight])}
+      assert(delta.rasterCellCount<=81,'all-scale local single-cell redraw stays within nine source tiles per axis at these native scales');
+      assert.strictEqual(delta.scratchMode,r.canvasMode);assert.strictEqual(delta.pixelCount,r.width*r.height);assert.strictEqual(delta.rasterPixels,r.rasterWidth*r.rasterHeight);assert.strictEqual(delta.scratchPixels,r.canvasWidth*r.canvasHeight);assert.strictEqual(delta.scratchBytes,delta.scratchPixels*4);
+      assert.strictEqual(delta.scratchAllocationAttempts,1);assert.strictEqual(delta.scratchAllocations,1);assert.strictEqual(delta.scratchAllocationPixels,delta.scratchPixels);assert.strictEqual(delta.scratchAllocationBytes,delta.scratchBytes);
       assert.strictEqual(delta.uploadBytes,delta.pixelCount*4);assert.strictEqual(delta.uploadCalls,1,'eligible terrain patch uploads color once and retains unchanged material maps');
       if(i%31===0||x===39||y===18){
         // Examine every potential predecessor against actual primitive bounds,
@@ -238,14 +247,15 @@ function geometryOracle(){
   assert.deepStrictEqual(assertCrop(normal,360),{cropX:32,cropY:32,skipRows:46});
   const fractionalPlan=plan(wet,r=>r.water.delete('11,6'),undefined,context({renderWidth:997,renderHeight:563})),fractional=fractionalPlan.regions[0];
   assert.deepStrictEqual([fractional.x,fractional.y,fractional.width,fractional.height],[274,150,30,29]);
-  assert.deepStrictEqual([fractional.rasterX,fractional.rasterY,fractional.rasterWidth,fractional.rasterHeight],[0,0,336,224]);
-  assert.strictEqual(fractionalPlan.rasterPixels,75264);assert.strictEqual(fractionalPlan.rasterCellCount,140);assert.strictEqual(fractionalPlan.scratchBytes,75264*4);assert.strictEqual(fractionalPlan.uploadBytes,870*4);
+  assert.deepStrictEqual([fractional.rasterX,fractional.rasterY,fractional.rasterWidth,fractional.rasterHeight],[240,112,96,112]);
+  assert.deepStrictEqual([fractional.canvasX,fractional.canvasY,fractional.canvasWidth,fractional.canvasHeight],[0,0,997,563]);
+  assert.strictEqual(fractionalPlan.rasterPixels,10752);assert.strictEqual(fractionalPlan.rasterCellCount,30);assert.strictEqual(fractionalPlan.scratchBytes,997*563*4);assert.strictEqual(fractionalPlan.uploadBytes,870*4);
   for(const [x,y] of [[289,187],[266,178]])assert(!(x>=fractional.x&&x<fractional.x+fractional.width&&y>=fractional.y&&y<fractional.y+fractional.height),'observed fractional mismatch outside the changed floor must remain untouched');
-  assert.deepStrictEqual(assertCrop(fractional,563),{cropX:274,cropY:150,skipRows:45});
+  assert.deepStrictEqual(assertCrop(fractional,563),{cropX:274,cropY:150,skipRows:384},'source crop uses full canvas height rather than local guard height');
   const pathRoom=fixture();pathRoom.paths.add('13,6');
   const pathErase=plan(pathRoom,r=>r.paths.delete('13,6'),undefined,context({renderWidth:997,renderHeight:563})).regions[0];
   assert.deepStrictEqual([pathErase.x,pathErase.y,pathErase.width,pathErase.height],[324,150,30,29]);
-  assert.deepStrictEqual([pathErase.rasterX,pathErase.rasterY,pathErase.rasterWidth,pathErase.rasterHeight],[0,0,400,224]);
+  assert.deepStrictEqual([pathErase.rasterX,pathErase.rasterY,pathErase.rasterWidth,pathErase.rasterHeight],[288,112,112,112]);
   assert(149<pathErase.y,'observed top-edge mismatch at348,149 must remain untouched');
   const overlappingChange=room=>{room.paths.add('9,10');room.paths.add('13,10')},overlapping=plan(fixture(),overlappingChange);
   assert.strictEqual(overlapping.kind,'patch');assert.strictEqual(overlapping.regions.length,2,'overlapping raster guards must not merge disjoint upload rectangles');
@@ -253,67 +263,92 @@ function geometryOracle(){
   assert.deepStrictEqual(overlapping.regions.map(r=>[r.x,r.y,r.width,r.height]),[[144,160,19,18],[208,160,19,18]]);
   assert(a.rasterX+a.rasterWidth>b.rasterX,'fixture must overlap guarded raster work');
   assert.strictEqual(overlapping.pixelCount,684);assert.strictEqual(overlapping.rasterPixels,18432);assert.strictEqual(overlapping.rasterCellCount,128);assert.strictEqual(overlapping.scratchPixels,9216);assert.strictEqual(overlapping.scratchBytes,9216*4);assert.strictEqual(overlapping.uploadBytes,684*4);assert.strictEqual(overlapping.uploadCalls,2);
+  assert.strictEqual(overlapping.scratchMode,'local');assert.strictEqual(overlapping.scratchAllocationAttempts,2);assert.strictEqual(overlapping.scratchAllocations,2);assert.strictEqual(overlapping.scratchAllocationPixels,18432);assert.strictEqual(overlapping.scratchAllocationBytes,18432*4);
   assert.strictEqual(plan(fixture(),overlappingChange,{maxPixelRatio:(overlapping.rasterPixels-1)/(640*360)}).reason,'raster-pixel-budget','overlapping guards are charged independently rather than as their geometric union');
   const sparseGuard=plan(fixture(),room=>{for(const key of ['5,5','15,5','25,5','35,5','5,13','15,13'])room.water.add(key)});
   assert.strictEqual(sparseGuard.reason,'raster-pixel-budget','six sparse small uploads can exceed the unchanged 20% guarded raster work gate');
-  assert.deepStrictEqual(S.DEFAULT_LIMITS,{maxChangedCells:16,maxRegions:8,maxPixelRatio:.20,maxRasterRatio:.35,maxScratchPixels:262144},'native alignment and raster guards must not weaken default work budgets');
+  assert.deepStrictEqual(S.DEFAULT_LIMITS,{maxChangedCells:16,maxRegions:8,maxPixelRatio:.20,maxRasterRatio:.35,maxScratchPixels:262144,maxNativeScratchPixels:1048576,maxScratchAllocationPixels:2097152},'preserve existing work/local limits while explicitly separating the 4MiB native peak and 8MiB cumulative policy');
   const edgeRoom=fixture(),edgeMeta=context({renderWidth:997,renderHeight:563,logicalHeight:304}),edgeBefore=capture(edgeRoom,edgeMeta);edgeRoom.water.add('39,18');
   const edge=S.plan(edgeBefore,capture(edgeRoom,edgeMeta));
-  assert.strictEqual(edge.kind,'full');assert.strictEqual(edge.reason,'raster-pixel-budget','bottom-right fractional prefix exceeds the unchanged limit');
-  assert.strictEqual(edge.regions.length,0);assert.strictEqual(edge.uploadCalls,3);
-  for(const [x,y] of [[39,0],[0,18]]){
+  assert.strictEqual(edge.kind,'patch');assert.deepStrictEqual(edge.regions[0],expectedRegion(39,18,4,997,563,304),'bottom-right fractional edit retains bounded local redraw');
+  assert.strictEqual(edge.regions.length,1);assert.strictEqual(edge.uploadCalls,1);
+  for(const [x,y] of [[39,18],[39,0],[0,18]]){
     const clipped=plan(fixture(),room=>room.water.add(`${x},${y}`),undefined,edgeMeta);assert.strictEqual(clipped.kind,'patch');
     const r=clipped.regions[0];assert.deepStrictEqual(r,expectedRegion(x,y,4,997,563,304));
     const crop=assertCrop(r,563);
-    if(x===39){assert.strictEqual(r.x+r.width,997);assert.strictEqual(r.rasterWidth,997);assert.strictEqual(crop.cropX+r.width,r.rasterWidth)}
-    if(y===18){assert.strictEqual(r.y+r.height,563);assert.strictEqual(r.rasterHeight,563);assert.strictEqual(crop.skipRows,0,'bottom-clipped source crop must skip zero flipped rows')}
+    if(x===39){assert.strictEqual(r.x+r.width,997);assert.strictEqual(r.rasterX+r.rasterWidth,997);assert.strictEqual(crop.cropX+r.width,r.canvasWidth)}
+    if(y===18){assert.strictEqual(r.y+r.height,563);assert.strictEqual(r.rasterY+r.rasterHeight,563);assert.strictEqual(crop.skipRows,0,'bottom-clipped source crop must skip zero flipped rows')}
   }
 }
 
-function fractionalPrefixBudgets(){
-  const metadata=context({renderWidth:997,renderHeight:563});
-  // Fractional on either axis requires the same unshifted origin on both axes.
-  for(const [width,height,rasterWidth,rasterHeight,cells] of [[640,563,240,224,160],[997,360,336,160,154]]){
+function canvasCapacityBudgets(){
+  const metadata=context({renderWidth:997,renderHeight:563}),nativePixels=997*563;
+  // A fractional scale on either axis needs the same full target on both axes,
+  // while its floor input and guarded clip remain local to the changed cell.
+  for(const [width,height,cells] of [[640,563,48],[997,360,40]]){
     const delta=plan(fixture(),room=>room.water.add('11,6'),undefined,context({renderWidth:width,renderHeight:height}));
     assert.strictEqual(delta.kind,'patch');const r=delta.regions[0];
-    assert.deepStrictEqual([r.rasterX,r.rasterY,r.rasterWidth,r.rasterHeight],[0,0,rasterWidth,rasterHeight]);
-    assert.strictEqual(r.tx0,0);assert.strictEqual(r.ty0,0);assert.strictEqual(delta.rasterCellCount,cells);
+    assert.deepStrictEqual(r,expectedRegion(11,6,4,width,height));assert(r.rasterX>0&&r.rasterY>0&&r.tx0>0&&r.ty0>0);
+    assert.strictEqual(r.canvasMode,'native-clip');assert.deepStrictEqual([r.canvasX,r.canvasY,r.canvasWidth,r.canvasHeight],[0,0,width,height]);
+    assert.strictEqual(delta.scratchPixels,width*height);assert.strictEqual(delta.scratchBytes,width*height*4);assert.strictEqual(delta.rasterCellCount,cells);
+    assert(delta.rasterPixels<delta.scratchPixels,'redraw work must not be mislabeled as canvas capacity');assertCrop(r,height);
   }
   const mounted=fixture();mounted.decorLamps.push({tile:[10,8],lamp:'lamp_blue'});
   const underLamp=plan(mounted,room=>room.water.add('10,7'),undefined,metadata);
-  assert.strictEqual(underLamp.kind,'patch','the data planner derives the prefix before the painter checks mounted-sprite sampling eligibility');
-  assert.deepStrictEqual(underLamp.regions[0],{x:249,y:175,width:30,height:29,rasterX:0,rasterY:0,rasterWidth:320,rasterHeight:240,tx0:0,ty0:0,tx1:14,ty1:10});
-  assert.strictEqual(underLamp.rasterPixels,76800);assert.strictEqual(underLamp.rasterCellCount,140);
+  assert.strictEqual(underLamp.kind,'patch','unchanged mounted art does not change local redraw or target policy');
+  assert.deepStrictEqual(underLamp.regions[0],expectedRegion(10,7,4,997,563));
+  assert.strictEqual(underLamp.rasterPixels,12544);assert.strictEqual(underLamp.rasterCellCount,36);
   const far=plan(fixture(),room=>room.paths.add('19,10'),undefined,metadata);
-  const farRegion=expectedRegion(19,10,4,997,563);
-  assert.deepStrictEqual([farRegion.rasterWidth,farRegion.rasterHeight],[544,320]);
-  assert.strictEqual(farRegion.rasterWidth*farRegion.rasterHeight,174080);
-  assert.strictEqual(far.kind,'full');assert.strictEqual(far.reason,'raster-pixel-budget');assert.strictEqual(far.regions.length,0);
-  const overlap=plan(fixture(),room=>{room.water.add('3,2');room.water.add('6,2')},undefined,metadata);
-  assert.strictEqual(overlap.kind,'patch');assert.strictEqual(overlap.regions.length,2,'nested prefixes must not merge disjoint uploads');
-  assert.deepStrictEqual(overlap.regions.map(r=>[r.rasterX,r.rasterY,r.rasterWidth,r.rasterHeight]),[[0,0,144,112],[0,0,224,112]]);
-  assert.strictEqual(overlap.pixelCount,1798);assert.strictEqual(overlap.rasterPixels,41216);assert.strictEqual(overlap.rasterCellCount,85);assert.strictEqual(overlap.scratchPixels,25088);assert.strictEqual(overlap.scratchBytes,25088*4);assert.strictEqual(overlap.uploadCalls,2);assert.strictEqual(overlap.uploadBytes,1798*4);
-  const singles=['9,5','13,5'].map(key=>plan(fixture(),room=>room.water.add(key),undefined,metadata));
-  for(const single of singles)assert.strictEqual(single.kind,'patch');
-  assert.strictEqual(Math.max(...singles.map(p=>p.rasterPixels)),76800,'nested-prefix union would fit the default pixel gate');
-  assert.strictEqual(singles.reduce((n,p)=>n+p.rasterPixels,0),132096,'actual repeated raster work exceeds the gate');
-  const summed=plan(fixture(),room=>{room.water.add('9,5');room.water.add('13,5')},undefined,metadata);
-  assert.strictEqual(summed.kind,'full');assert.strictEqual(summed.reason,'raster-pixel-budget','charge overlapping fractional prefixes separately under default limits');
-  assert.strictEqual(summed.regions.length,0);assert.strictEqual(summed.changedCellCount,2);
-  const scratchMeta=context({renderWidth:2000,renderHeight:1000}),scratchRegion=expectedRegion(14,6,4,2000,1000);
-  assert.strictEqual(scratchRegion.rasterWidth*scratchRegion.rasterHeight,281600);assert(281600<2000*1000*.20);
-  assert.strictEqual(defaultBudgetReason([scratchRegion],2000,1000),'scratch-budget');
-  assert.strictEqual(plan(fixture(),room=>room.water.add('14,6'),undefined,scratchMeta).reason,'scratch-budget','fractional prefix retains the absolute scratch cap even when its area ratio fits');
-  const unchanged=fixture(),baseline=capture(unchanged,metadata);assert.strictEqual(S.plan(baseline,capture(clone(unchanged),metadata)).kind,'noop','fractional origin policy alone is not a static edit');
+  assert.strictEqual(far.kind,'patch','far fractional edits use local clips, not oversized prefixes');assert.deepStrictEqual(far.regions[0],expectedRegion(19,10,4,997,563));
+  assert.strictEqual(far.rasterPixels,12544);assert.strictEqual(far.rasterCellCount,42);assert.strictEqual(far.scratchPixels,nativePixels);
+  const overlapChange=room=>{room.water.add('3,2');room.water.add('6,2')},overlap=plan(fixture(),overlapChange,undefined,metadata);
+  assert.strictEqual(overlap.kind,'patch');assert.strictEqual(overlap.regions.length,2,'overlapping guarded clips must not merge disjoint outputs');
+  assert.deepStrictEqual(overlap.regions.map(r=>[r.rasterX,r.rasterY,r.rasterWidth,r.rasterHeight]),[[32,16,112,96],[112,16,112,96]]);
+  assert.strictEqual(overlap.pixelCount,1798);assert.strictEqual(overlap.rasterPixels,21504);assert.strictEqual(overlap.rasterCellCount,65);
+  assert.strictEqual(overlap.scratchMode,'native-clip');assert.strictEqual(overlap.scratchPixels,nativePixels);assert.strictEqual(overlap.scratchBytes,nativePixels*4);
+  assert.strictEqual(overlap.scratchAllocationAttempts,2);assert.strictEqual(overlap.scratchAllocations,2);assert.strictEqual(overlap.scratchAllocationPixels,nativePixels*2);assert.strictEqual(overlap.scratchAllocationBytes,nativePixels*8);
+  assert.strictEqual(overlap.uploadCalls,2);assert.strictEqual(overlap.uploadBytes,1798*4);
+  assert.strictEqual(plan(fixture(),overlapChange,{maxPixelRatio:(overlap.rasterPixels-1)/nativePixels},metadata).reason,'raster-pixel-budget','overlapping clips are charged separately, not as their geometric union');
+  for(const limit of [nativePixels*2-1,nativePixels*2]){
+    const bounded=plan(fixture(),overlapChange,{maxScratchAllocationPixels:limit},metadata);
+    assert.strictEqual(bounded.reason,limit===nativePixels*2?'terrain':'scratch-allocation-budget','cumulative capacity charges both actual full-native canvases');
+  }
+  assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),{maxScratchPixels:0},metadata).kind,'patch','fractional peak uses the explicit native policy, not the local cap');
+  for(const limit of [nativePixels-1,nativePixels])assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),{maxNativeScratchPixels:limit},metadata).reason,limit===nativePixels?'terrain':'scratch-budget');
+  const local=plan(fixture(),room=>room.water.add('11,6'),{maxNativeScratchPixels:0});assert.strictEqual(local.kind,'patch');assert.strictEqual(local.scratchMode,'local');
+  assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),{maxScratchPixels:local.scratchPixels}).kind,'patch');
+  assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),{maxScratchPixels:local.scratchPixels-1}).reason,'scratch-budget','integer local capacity retains its separate peak gate');
+  assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),undefined,context({renderWidth:25600,renderHeight:14400})).reason,'scratch-budget','large integral targets still use the original local 1MiB peak');
+  // Repeated full-native canvases can fit peak and all redraw limits while
+  // exceeding cumulative allocation. This is an additional preflight gate.
+  const keys=['3,3','13,3','23,3','33,3'];
+  for(const [width,height,allowed] of [[997,563,3],[1278,718,2],[1024,1024,2]]){
+    const meta=context({renderWidth:width,renderHeight:height}),area=width*height;
+    const accepted=plan(fixture(),room=>{for(const key of keys.slice(0,allowed))room.water.add(key)},undefined,meta);
+    assert.strictEqual(accepted.kind,'patch');assert.strictEqual(accepted.scratchAllocationAttempts,allowed);assert.strictEqual(accepted.scratchAllocations,allowed);
+    assert.strictEqual(accepted.scratchPixels,area);assert.strictEqual(accepted.scratchBytes,area*4);assert.strictEqual(accepted.scratchAllocationPixels,area*allowed);assert.strictEqual(accepted.scratchAllocationBytes,area*allowed*4);
+    assert(accepted.scratchBytes<=4*1024*1024&&accepted.scratchAllocationBytes<=8*1024*1024);
+    const rejected=plan(fixture(),room=>{for(const key of keys.slice(0,allowed+1))room.water.add(key)},undefined,meta);
+    assert.strictEqual(rejected.kind,'full');assert.strictEqual(rejected.reason,'scratch-allocation-budget');assert.strictEqual(rejected.regions.length,0);
+    assert.strictEqual(rejected.changedCellCount,allowed+1);assert.strictEqual(rejected.scratchMode,'full');assert.strictEqual(rejected.scratchAllocationAttempts,3);assert.strictEqual(rejected.scratchAllocations,3);
+    assert.strictEqual(rejected.scratchPixels,area);assert.strictEqual(rejected.scratchBytes,area*12);assert.strictEqual(rejected.scratchAllocationPixels,area*3);assert.strictEqual(rejected.scratchAllocationBytes,area*12);
+    assert.strictEqual(rejected.uploadCalls,3);assert.strictEqual(rejected.uploadBytes,area*12,'full fallback reports the actual three-map rebuild, not hypothetical partial work');
+  }
+  for(const [width,height] of [[1025,1024],[1400,800],[2000,1000]])for(const key of ['0,0','11,6','39,18']){
+    const rejected=plan(fixture(),room=>room.water.add(key),undefined,context({renderWidth:width,renderHeight:height}));
+    assert.strictEqual(rejected.kind,'full');assert.strictEqual(rejected.reason,'scratch-budget','oversized native target must fall back at every location before allocation');assert.strictEqual(rejected.regions.length,0);
+  }
+  const unchanged=fixture(),baseline=capture(unchanged,metadata),noop=S.plan(baseline,capture(clone(unchanged),metadata),{maxNativeScratchPixels:0,maxScratchAllocationPixels:0});
+  assert.strictEqual(noop.kind,'noop');assert.strictEqual(noop.scratchMode,'none');assert.strictEqual(noop.scratchAllocationAttempts,0);assert.strictEqual(noop.scratchAllocations,0);assert.strictEqual(noop.scratchAllocationPixels,0);assert.strictEqual(noop.scratchAllocationBytes,0,'unchanged authority needs no canvas despite a zero capacity budget');
 }
 
-authorityAndNoops();dependencyFallbacks();budgetAndValidation();productionRoomAuthority();geometryOracle();fractionalPrefixBudgets();
+authorityAndNoops();dependencyFallbacks();budgetAndValidation();productionRoomAuthority();geometryOracle();canvasCapacityBudgets();
 const browser={};vm.runInNewContext(fs.readFileSync(path.join(ROOT,'static_terrain.js'),'utf8'),browser);assert.strictEqual(typeof browser.RelayStaticTerrain.capture,'function');assert.strictEqual(browser.RelayStaticTerrain.VERSION,S.VERSION);
 console.log('STATIC TERRAIN PLANNER REGRESSION PERF-004 PASS');
 console.log('  authoritative classifications / invalidation checks:',authorityCases);
 console.log('  native single-cell geometry cases:',geometryCases,'; production floor primitive footprints:',footprintCases);
 console.log('  default-budget geometry outcomes:',geometryPatches,'patches /',geometryFallbacks,'full fallbacks');
 console.log('  exact same-count moves, undo/redo, live-state noops, all static dependencies, identities, budgets and malformed/stale authority');
-console.log('  1x / fractional / 2x / 4x floor envelopes, tight outputs, integer local rasters, fractional global-origin prefixes and flipped crops');
-console.log('  fractional single-axis origins, safe / oversized / summed overlapping prefixes, clipped native edges and unchanged work budgets');
+console.log('  1x / fractional / 2x / 4x floor envelopes, tight outputs, local guarded redraw, native target geometry and flipped source crops');
+console.log('  1MiB local / 4MiB native peak, 8MiB cumulative allocation, separate attempted/allocation counts, clipped edges and unchanged redraw budgets');
 console.log('  bounded color-only bytes/calls, unchanged material authority, complete three-map full-build accounting');

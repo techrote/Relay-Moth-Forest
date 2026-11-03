@@ -422,16 +422,35 @@ def measure_source(args, root, validate_static=True):
                 if validate_static and scenario in {"editor-water", "editor-path"}:
                     for record in records:
                         static = record.get("staticDiagnostics") or {}
+                        native_width, native_height = env["native"]
+                        native_area = native_width * native_height
+                        fractional = native_width % 640 != 0 or native_height % 360 != 0
+                        scratch_mode = "native-clip" if fractional else "local"
+                        regions = static.get("regions") or []
                         assert static.get("mode") == "patch", (scenario, "static backing did not use a bounded patch", static)
                         assert record.get("phaseCalls", {}).get("static.build", 0) == 0, (scenario, "small terrain edit invoked full painter")
-                        assert 0 < static.get("rasterCells", 10**12) < 40 * 19, (scenario, "unbounded floor raster", static)
-                        assert 0 < static.get("rasterPixels", 10**12) <= env["native"][0] * env["native"][1] * .20, (scenario, "unbounded guarded raster", static)
-                        assert 0 < static.get("uploadBytes", 10**12) < env["native"][0] * env["native"][1] * 4, (scenario, "full static color upload", static)
-                        assert static.get("uploadCalls") == len(static.get("regions", [])), (scenario, "expected one color upload per region", static)
+                        assert 0 < static.get("rasterCells", 10**12) <= 40 * 19 * .35, (scenario, "unbounded floor raster", static)
+                        assert 0 < static.get("rasterPixels", 10**12) <= native_area * .20, (scenario, "unbounded clipped redraw area", static)
+                        assert 0 < static.get("pixels", 10**12) <= native_area * .20, (scenario, "unbounded output area", static)
+                        assert 0 < static.get("uploadBytes", 10**12) < native_area * 4, (scenario, "full static color upload", static)
+                        assert regions and static.get("uploadCalls") == len(regions), (scenario, "expected one color upload per region", static)
                         assert static.get("uploadBytes") == static.get("pixels", -1) * 4, (scenario, "color upload byte accounting differs", static)
-                        assert static.get("scratchBytes") == static.get("scratchPixels", -1) * 4, (scenario, "expected one guarded color scratch canvas", static)
+                        capacities = []
+                        for region in regions:
+                            canvas_x, canvas_y = (0, 0) if fractional else (region["rasterX"], region["rasterY"])
+                            canvas_width, canvas_height = env["native"] if fractional else (region["rasterWidth"], region["rasterHeight"])
+                            assert region.get("canvasMode") == scratch_mode and region.get("canvasX") == canvas_x and region.get("canvasY") == canvas_y, (scenario, "wrong source canvas mode or origin", region)
+                            assert region.get("canvasWidth") == canvas_width and region.get("canvasHeight") == canvas_height, (scenario, "wrong source canvas dimensions", region)
+                            capacities.append(canvas_width * canvas_height)
+                        assert static.get("scratchMode") == scratch_mode, (scenario, "wrong scratch policy for native scale", static)
+                        assert static.get("scratchPixels") == max(capacities) and static.get("scratchBytes") == max(capacities) * 4, (scenario, "peak source canvas capacity accounting differs", static)
+                        assert max(capacities) <= (1048576 if fractional else 262144), (scenario, "source canvas exceeds native4MiB/local1MiB capacity", static)
+                        assert static.get("scratchAllocationAttempts") == len(regions) and static.get("scratchAllocations") == len(regions), (scenario, "unexpected scratch allocation count", static)
+                        assert static.get("scratchAllocationPixels") == sum(capacities) and static.get("scratchAllocationBytes") == sum(capacities) * 4, (scenario, "cumulative source canvas allocation accounting differs", static)
+                        assert sum(capacities) <= 2097152, (scenario, "source canvas allocations exceed8MiB cumulative capacity", static)
+                        assert static.get("rasterPixels") == sum(region["rasterWidth"] * region["rasterHeight"] for region in regions), (scenario, "clipped redraw area conflates canvas capacity", static)
                         assert record.get("phaseCalls", {}).get("static.patch.upload.normal", 0) == 0 and record.get("phaseCalls", {}).get("static.patch.upload.specular", 0) == 0, (scenario, "unchanged material textures were uploaded", static)
-                        assert static.get("scratchPixels", 10**12) <= 262144 and static.get("retainedScratchPixels") == 0, (scenario, "unbounded or retained scratch", static)
+                        assert static.get("retainedScratchPixels") == 0, (scenario, "retained scratch", static)
                 run["scenarios"][scenario] = {
                     "summary": summarize(records),
                     "records": records,
