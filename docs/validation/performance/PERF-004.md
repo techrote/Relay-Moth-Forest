@@ -21,6 +21,13 @@ Painting, clearing, same-count moves, undo/redo, cancellation and persistence
 flushes use the same comparison. No editor tool name is trusted as proof that
 only terrain changed.
 
+At fractional native scales, an otherwise eligible edit that intersects a mounted
+lamp or pillar sprite uses the full renderer. Native comparison isolated a
+one-byte sampling difference in a mounted sprite; neither a larger guard nor
+rounding its translation to the full renderer's global float coordinates fixed
+it. This explicit correctness fallback does not include glow-only overlap and
+does not disable the representative small water/path benchmark actions.
+
 ## Authority and fallback
 
 `static_terrain.js` is a data-only UMD module. `capture(room, context)` copies
@@ -41,6 +48,17 @@ baselines, static dependency changes and excessive work use the full renderer.
 The wall dependency deliberately catches the vegetation overlap threshold:
 changing a row pair from three shared blockers to four can change its whole
 interstitial population. Replacing a blocker/tree with water also falls back.
+
+After the data planner finds a bounded patch, the painter checks its output
+against the real `drawDecor` sprite placements when either native scale is
+fractional. A temporary receiver records those placement calls without creating
+a canvas, sampling an image or touching a cache. It uses actual atlas dimensions,
+sprite scale, anchor, rotation and flip, including objective-based lamp
+substitution. Projected sprite bounds receive a conservative two-native-pixel
+filter margin. An intersection selects `fractional-mounted-sprite` before any
+partial allocation or upload; malformed geometry selects a full fallback too.
+Lamp posts and radial glows alone do not trigger this sprite-specific restriction.
+The check adds no retained image data and does not change full composition.
 
 Generated decor, authored editor decor, recruitable robots, completed objectives,
 gates and bridge progression remain live presentation under PERF-002. Their
@@ -182,6 +200,39 @@ no comparison tolerance. Native qualification must still establish color
 equality inside the tightened output; alignment and guard constants alone are
 not proof.
 
+### Fractional mounted-sprite fallback
+
+The next [native stage diagnostic](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41571669664)
+tested the required changed pixel, rather than an unrelated surrounding pixel.
+For a ground-to-path edit at `(10,7)` in the lamp fixture at 997x563, native color
+pixel `(266,178)` in top-left Canvas coordinates changed from `[85,114,83,255]`
+to the full reference `[103,120,92,255]`; translated scratch produced
+`[104,120,92,255]`. Normal/specular textures and every exterior pixel agreed.
+
+| Production composition prefix | Differing bytes in the complete output crop |
+| --- | ---: |
+| Floor only | 0 |
+| Floor and pattern | 0 |
+| Plus blockers | 0 |
+| Plus interstitials | 0 |
+| Plus mounted decor | 1 |
+| All overlays with glows disabled | 1 |
+| All overlays with sprites disabled | 0 |
+| Patch sprite translations rounded in global native coordinates | 1 |
+
+The translation experiment changed the lamp's local matrix as intended, but did
+not fix the sampled byte. It remains a failure-only diagnostic, not a production
+correction. The observed first divergence is a mounted sprite; the tests do not
+claim to establish the complete browser-internal filtering cause.
+
+The production response is to rebuild all three maps for fractional edits whose
+output reaches a mounted sprite footprint. The same editor actions remain in
+native acceptance and must equal the clean full reference exactly, with an
+asserted fallback reason. Integer-scale lamp overlaps and fractional glow-only,
+pattern, blocker and interstitial overlaps retain patch paths subject to the
+same native qualification. No fixture is moved to avoid the affected art, and the original
+representative benchmark edits must still perform bounded updates.
+
 Default planning limits are 16 changed cells, eight merged regions, at most 20%
 of native output pixels and guarded raster pixels, 35% of logical floor raster
 work, and 262,144 pixels in the largest scratch map. Overlapping guards are counted
@@ -316,7 +367,9 @@ authored rooms with larger working sets.
 ## Practical limits
 
 Large strokes and edits to static overlay dependencies intentionally rebuild the
-room. Replaying overlay draw commands still has CPU cost, although native raster
+room. Fractional-scale output intersecting mounted sprite footprints also uses
+the full renderer until an exact bounded sampling method is independently
+qualified. Replaying overlay draw commands still has CPU cost, although native raster
 and texture-transfer work is bounded. Linux software-rendered evidence does not
 certify Windows/Firefox drivers or physical low-end frame times. No gameplay,
 campaign data, art, schema or material appearance change is intended.

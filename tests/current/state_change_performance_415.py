@@ -375,9 +375,16 @@ def measure_source(args, root, validate_static=True):
                             record["staticParity"] = page.evaluate(
                                 """label => {
                                     relayMothPerf.enable(false);
+                                    const native=[game.renderer.nativeW,game.renderer.nativeH];
+                                    // These are reported output bounds for failure
+                                    // diagnostics, not timed upload instrumentation.
+                                    const outputs=(game.staticRefreshStats?.regions||[]).map(r=>({
+                                      channel:'color',x:r.x,y:native[1]-r.y-r.height,
+                                      width:r.width,height:r.height
+                                    }));
                                     return {
-                                      native:[game.renderer.nativeW,game.renderer.nativeH],
-                                      maps:auditStaticTerrain.parity(label)
+                                      native,
+                                      maps:auditStaticTerrain.parity(label,null,outputs)
                                     };
                                 }""",
                                 f"performance {rate:g}x {scenario} sample {sample + 1}",

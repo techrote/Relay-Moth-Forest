@@ -6,6 +6,7 @@ const vm=require('vm');
 const ROOT=path.resolve(__dirname,'../..');
 const terrain=require(path.join(ROOT,'static_terrain.js'));
 const gameSource=fs.readFileSync(path.join(ROOT,'game.js'),'utf8');
+const artManifest=JSON.parse(fs.readFileSync(path.join(ROOT,'hd_remake_atlas.json'),'utf8'));
 const source=(start,end)=>{const a=gameSource.indexOf(start),b=gameSource.indexOf(end,a+start.length);assert(a>=0&&b>a);return gameSource.slice(a,b)};
 const allocations=[],phases=[],faults={allocationAt:0,rasterAt:0,allocationCalls:0,rasterCalls:0};
 class FakeCanvas{
@@ -13,7 +14,7 @@ class FakeCanvas{
   getContext(kind){assert.strictEqual(kind,'2d');return this.context}
 }
 class FakeContext{
-  constructor(canvas){this.canvas=canvas;this.transforms=[];this.matrix=[1,0,0,1,0,0];this.stack=[]}
+  constructor(canvas){this.canvas=canvas;this.transforms=[];this.matrix=[1,0,0,1,0,0];this.stack=[];this.images=[]}
   // Record the effective matrix at drawing/restoration boundaries, so the first
   // entry remains the full native transform after translate followed by scale.
   recordTransform(){const last=this.transforms.at(-1);if(!last||this.matrix.some((value,i)=>value!==last[i]))this.transforms.push([...this.matrix])}
@@ -26,19 +27,26 @@ class FakeContext{
   createLinearGradient(){return{addColorStop(){}}}
   createRadialGradient(){return{addColorStop(){}}}
   fillRect(){this.recordTransform();if(++faults.rasterCalls===faults.rasterAt)throw new Error('injected floor raster failure')}
+  drawImage(...args){
+    this.recordTransform();assert.strictEqual(args.length,9,'atlas drawing uses an explicit source and destination rectangle');
+    const[image,sx,sy,sw,sh,x,y,w,h]=args;assert([sx,sy,sw,sh,x,y,w,h].every(Number.isFinite),'drawImage coordinates must be finite');
+    const[a,b,c,d,e,f]=this.matrix,corners=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([px,py])=>[a*px+c*py+e,b*px+d*py+f]);
+    this.images.push({image,source:[sx,sy,sw,sh],destination:[x,y,w,h],matrix:[...this.matrix],corners});
+  }
   clearRect(){this.recordTransform()}beginPath(){}arc(){this.recordTransform()}fill(){this.recordTransform()}strokeRect(){this.recordTransform()}
 }
 const sandbox={OffscreenCanvas:FakeCanvas,RelayStaticTerrain:terrain,perfMeasure:(name,fn)=>{phases.push(name);return fn()}};
 const production=vm.runInNewContext(`
-  const W=640,H=360,TILE=16,FLOOR_TILE=4,GRID_W=40,GRID_H=19,PLAY_H=304,BOTTOM_H=56,TAU=Math.PI*2;
+  const W=640,H=360,TILE=16,FLOOR_TILE=4,GRID_W=40,GRID_H=19,PLAY_H=304,BOTTOM_H=56,TAU=Math.PI*2,HD_WORLD_SCALE_DEFAULT=.18;
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   ${source('function hash32(','\nfunction h01(')}
   ${source('function releaseCanvasBacking(','\n\n// PERF-001A:')}
   ${source('class Room{','\n// Low-cost steering helpers')}
+  ${source('class HDArtSheet{','\nclass StaticPainter')}
   ${source('class StaticPainter{','\nclass SpriteAtlas')}
   ${source('class GLRenderer{','\nclass ParticleField')}
   ${source('class Game{','\nlet game=null')}
-  ({Room,StaticPainter,GLRenderer,Game});
+  ({Room,HDArtSheet,StaticPainter,GLRenderer,Game});
 `,sandbox);
 
 function fakeGL(){
@@ -76,6 +84,7 @@ function fixture(){
   const g=Object.create(production.Game.prototype),spec={key:'fixture',pattern:'fixture',objects:[]},maps={rooms:{fixture:{walls:[],water:[],path_cells:[],floor_microtile:4}}};
   Object.assign(g,{maps,room:new production.Room(0,spec,maps),state:{isDone:()=>false,roomComplete:()=>false},renderer:renderer(),uiCalls:0});g.room.border.clear();
   g.art={img:{src:'color.png',width:64,height:64},normalImg:{src:'normal.png',width:64,height:64},specImg:{src:'spec.png',width:64,height:64},regions:{},meta:{},roles:{},worldScale:.18,tintCache:new Map(),normalTransformCache:new Map(),normalTransformGeneration:0,trimTintCache(){}};
+  for(const name of ['region','regionMeta','worldSize'])g.art[name]=production.HDArtSheet.prototype[name];
   g.luts={data:{test:['#123456']},elementChannel:new Map([['ground','ground']]),signature:()=> 'unchanged-theme',hex:()=> '#123456'};
   g.painter=new production.StaticPainter(g.art,g.luts);g.updateUI=()=>{g.uiCalls++};
   return g;
@@ -110,6 +119,131 @@ function refresh(g){
 }
 function observeCommit(g,previous){let calls=0;g.renderer.gl.hook=()=>{assert.strictEqual(g.staticTerrainSnapshot,previous,'snapshot must commit only after every required upload succeeds');assert.strictEqual(g.renderer.backgroundReady,false,'an incomplete background update is never marked ready');calls++};return()=>{g.renderer.gl.hook=null;return calls}}
 let scenarios=0;
+
+function mountedFixture(width=997,height=563){
+  const g=fixture(),names=['orb_pillar','lamp_blue','lamp_orange'];
+  const manifest={world_scale:artManifest.world_scale,regions:{},region_meta:{},roles:{lamps:['lamp_blue','lamp_orange'],objective:{}}};
+  for(const name of names){manifest.regions[name]=[...artManifest.regions[name]];manifest.region_meta[name]={...artManifest.region_meta[name],tint_strength:0}}
+  g.art=new production.HDArtSheet({src:'atlas.png',width:4096,height:4096},manifest,null,{src:'spec.png',width:4096,height:4096},{src:'normal.png',width:4096,height:4096});
+  g.painter=new production.StaticPainter(g.art,g.luts);g.renderer.nativeW=width;g.renderer.nativeH=height;
+  g.room.decorLamps=[{tile:[10,8]}];
+  Object.assign(g,{x:301.25,y:142.5,vx:2,vy:-1,followers:{units:[{id:'pip',x:275,y:130,path:[[1,2],[3,4]]}]},miniGuides:{units:[{id:'mini',x:19,y:27}]},flock:{m:[{id:'moth',x:300,y:142}]}});
+  g.state.completed=new Set(['kept-completion']);g.state.robots=new Set(['kept-robot']);g.state.moths=new Set(['kept-moth']);
+  g.room.objects={'kept-object':[4,5]};g.room.objectFxHidden.add('kept-object');
+  return g;
+}
+function actorState(g){return JSON.stringify([g.x,g.y,g.vx,g.vy,g.followers,g.miniGuides,g.flock,[...g.state.completed],[...g.state.robots],[...g.state.moths],g.room.objects,[...g.room.objectFxHidden]])}
+function isolateFootprintWork(g,run){
+  // A sizing query may read metadata, but cannot touch source surfaces, tint or
+  // material caches, any Canvas drawing method, LUT lookup, or GL state.
+  const descriptors=[],deny=(object,name)=>{descriptors.push([object,name,Object.getOwnPropertyDescriptor(object,name)]);Object.defineProperty(object,name,{configurable:true,get(){throw Error('Footprint phase touched '+name)}})};
+  const first=allocations.length,allocationCalls=faults.allocationCalls,rasterCalls=faults.rasterCalls,actors=actorState(g),materialNormal=g.painter.materialNormalCtx,materialSpec=g.painter.materialSpecCtx,maps=g.painter.lastMaterialMaps;
+  for(const name of ['img','normalImg','specImg','bumpImg','tintCache','normalTransformCache','normalTransformGeneration','tintInfo','tintedRegion','trimTintCache','draw','drawSubrect','drawMap','drawMapSubrect','transformedNormal'])deny(g.art,name);
+  deny(g.luts,'hex');for(const [name,value] of Object.entries(g.renderer.gl))if(typeof value==='function')deny(g.renderer.gl,name);
+  try{return run()}finally{
+    for(const [object,name,descriptor] of descriptors.reverse())if(descriptor)Object.defineProperty(object,name,descriptor);else delete object[name];
+    assert.strictEqual(allocations.length,first,'footprints cannot allocate scratch or derived source canvases');assert.strictEqual(faults.allocationCalls,allocationCalls);assert.strictEqual(faults.rasterCalls,rasterCalls);
+    assert.strictEqual(actorState(g),actors,'footprint detection cannot change live actors or progression');
+    assert.strictEqual(g.painter.materialNormalCtx,materialNormal);assert.strictEqual(g.painter.materialSpecCtx,materialSpec);assert.strictEqual(g.painter.lastMaterialMaps,maps,'dry recording cannot claim or detach the real painter material maps');
+  }
+}
+function observedMountedDraws(g){
+  // This oracle measures actual HDArtSheet destination corners. It does not
+  // call the footprint helper or reconstruct the mounted-placement formulas.
+  const canvas=new FakeCanvas(g.renderer.nativeW,g.renderer.nativeH),ctx=canvas.context;
+  ctx.scale(g.renderer.nativeW/640,g.renderer.nativeH/360);g.painter.drawDecor(ctx,g.room);
+  const out=ctx.images.map(draw=>{
+    const xs=draw.corners.map(p=>p[0]),ys=draw.corners.map(p=>p[1]),x=Math.floor(Math.min(...xs)),y=Math.floor(Math.min(...ys)),right=Math.ceil(Math.max(...xs)),bottom=Math.ceil(Math.max(...ys));
+    return{draw,core:{x,y,width:right-x,height:bottom-y},guard:{x:x-2,y:y-2,width:right-x+4,height:bottom-y+4}};
+  });canvas.width=canvas.height=1;return out;
+}
+const overlaps=(a,b)=>a.x<b.x+b.width&&b.x<a.x+a.width&&a.y<b.y+b.height&&b.y<a.y+a.height;
+
+function mountedFootprintsFollowActualDrawing(){
+  for(const mode of ['default','objective-substitution','custom-metadata','rotated-subrect']){
+    const g=mountedFixture();
+    if(mode==='objective-substitution'){g.art.roles.objective.lamp='lamp_blue';g.room.spec.objects=[{object_id:'fixture-objective',kind:'lamp'}]}
+    if(mode==='custom-metadata'){g.art.worldScale=.27;g.art.meta.lamp_blue.world_scale=.65;g.art.meta.orb_pillar.world_scale=1.25}
+    if(mode==='rotated-subrect'){
+      const drawDecor=g.painter.drawDecor;
+      g.painter.drawDecor=function(ctx,room){drawDecor.call(this,ctx,room);return this.spriteSubrect(ctx,'lamp_blue',0,70,82,70,215.25,126.5,9.7416,8.316,{anchor:'center',rot:.37,flip:true,alpha:.8})};
+    }
+    const rendered=observedMountedDraws(g),before=actorState(g),normalMarker={},specMarker={},mapsMarker={normal:{},spec:{}};
+    g.painter.materialNormalCtx=normalMarker;g.painter.materialSpecCtx=specMarker;g.painter.lastMaterialMaps=mapsMarker;
+    const footprints=isolateFootprintWork(g,()=>g.painter.mountedSpriteFootprints(g.room,g.renderer.nativeW,g.renderer.nativeH));
+    assert.deepStrictEqual(Array.from(footprints,r=>({...r})),rendered.map(r=>r.guard),'footprints follow real atlas rectangles, anchors, substitutions, scales and transforms');
+    assert.strictEqual(footprints.length,mode==='rotated-subrect'?3:2,'glow and post drawing do not add sprite footprints');
+    assert.deepStrictEqual(rendered[1].draw.source,artManifest.regions[mode==='objective-substitution'?'lamp_orange':'lamp_blue'],'objective substitutions must select the real rendered source');
+    if(mode==='default'){
+      assert.deepStrictEqual(rendered[1].core,{x:254,y:158,width:16,height:27});assert.deepStrictEqual({...footprints[1]},{x:252,y:156,width:20,height:31});
+      assert(Math.abs(rendered[1].draw.destination[2]-9.7416)<1e-12&&Math.abs(rendered[1].draw.destination[3]-16.632)<1e-12,'real lamp metadata and draw scale remain the placement authority');
+    }
+    assert.strictEqual(actorState(g),before);g.painter.materialNormalCtx=g.painter.materialSpecCtx=g.painter.lastMaterialMaps=null;scenarios++;
+  }
+  // Integral scales return before even inspecting mounted data or the atlas.
+  for(const [width,height] of [[640,360],[1280,720]]){
+    const painter=Object.create(production.StaticPainter.prototype);Object.defineProperty(painter,'art',{get(){throw Error('integer query touched art')}});Object.defineProperty(painter,'drawDecor',{get(){throw Error('integer query touched mounted placement')}});
+    assert.deepStrictEqual(Array.from(painter.mountedSpriteFootprints(null,width,height)),[]);scenarios++;
+  }
+  const g=mountedFixture();
+  for(const dimensions of [[0,563],[997,NaN],[997.5,563],[Number.MAX_SAFE_INTEGER+1,563]])assert.throws(()=>g.painter.mountedSpriteFootprints(g.room,...dimensions),/Invalid mounted sprite footprint/);
+  for(const bad of [NaN,Infinity,-1,0]){g.art.meta.lamp_blue.world_scale=bad;assert.throws(()=>isolateFootprintWork(g,()=>g.painter.mountedSpriteFootprints(g.room,997,563)),/Invalid mounted sprite footprint/)}
+  scenarios++;
+}
+
+function fractionalMountedFallbacks(){
+  const cases=[
+    {label:'both-fractional',width:997,height:563,cell:'10,7',mode:'full'},
+    {label:'fractional-x',width:997,height:360,cell:'10,7',mode:'full'},
+    {label:'fractional-y',width:640,height:563,cell:'10,7',mode:'full'},
+    {label:'native-integer',width:640,height:360,cell:'10,7',mode:'patch'},
+    {label:'double-integer',width:1280,height:720,cell:'10,7',mode:'patch'},
+    {label:'head-filter-halo',width:997,height:563,cell:'9,7',mode:'full'},
+    {label:'touching-halo-edge',width:997,height:563,cell:'9,7',mode:'patch',lampScale:.75},
+    {label:'glow-only',width:997,height:563,cell:'8,6',mode:'patch'},
+    {label:'distant',width:997,height:563,cell:'30,14',mode:'patch'}
+  ];
+  for(const test of cases){
+    const g=mountedFixture(test.width,test.height);if(test.lampScale)g.art.meta.lamp_blue.world_scale=test.lampScale;
+    const rendered=observedMountedDraws(g);refresh(g);const before=g.staticTerrainSnapshot,actors=actorState(g),first=allocations.length,uploads=g.renderer.gl.uploads.length,phaseStart=phases.length;
+    const helper=g.painter.mountedSpriteFootprints,build=g.painter.build;let queries=0;
+    g.painter.mountedSpriteFootprints=function(...args){queries++;return isolateFootprintWork(g,()=>helper.apply(this,args))};
+    g.room.water.add(test.cell);
+    const ordinaryPlan=terrain.plan(before,terrain.capture(g.room,g.staticTerrainContext()));assert.strictEqual(ordinaryPlan.kind,'patch','the new fallback must be the only reason this terrain edit is full');
+    const output=ordinaryPlan.regions[0];
+    if(test.label==='head-filter-halo'){
+      assert.strictEqual(output.x+output.width,rendered[1].core.x,'output only touches the unpadded sprite boundary');
+      assert(!rendered.some(r=>overlaps(output,r.core)));assert(overlaps(output,rendered[1].guard),'two native filtering pixels must protect this otherwise disjoint output');
+    }
+    if(test.label==='touching-halo-edge'){assert.strictEqual(output.x+output.width,rendered[1].guard.x);assert(!rendered.some(r=>overlaps(output,r.guard)),'half-open footprint edges do not overlap')}
+    if(test.label==='glow-only'){
+      assert(!rendered.some(r=>overlaps(output,r.guard)));const x=(output.x+output.width-.5)/(test.width/640),y=(output.y+output.height/2)/(test.height/360);
+      assert(Math.hypot(x-168,y-107)<30,'the chosen output intersects the actual mounted glow while missing both sprites');
+    }
+    if(test.mode==='full'){
+      g.painter.buildPatch=()=>{throw Error('mounted fallback must precede every patch attempt')};
+      g.painter.build=function(...args){assert.strictEqual(allocations.length,first,'no guarded scratch may precede a planned full fallback');assert.strictEqual(g.renderer.gl.uploads.length,uploads,'no partial upload may precede the fallback');return build.apply(this,args)};
+    }
+    const stats=refresh(g);assert.strictEqual(stats.mode,test.mode,test.label);assert.strictEqual(queries,1);assert.strictEqual(actorState(g),actors);
+    assert.deepStrictEqual(g.staticTerrainSnapshot.dependencies,before.dependencies,'render fallback cannot alter static material authority');assert.deepStrictEqual(g.staticTerrainSnapshot.references,before.references);
+    assert.strictEqual(g.staticTerrainSnapshot.cellTypes[7*40+10],test.cell==='10,7'?terrain.CELL_TYPES.water:before.cellTypes[7*40+10]);
+    if(test.mode==='full'){
+      assert.strictEqual(stats.reason,'fractional-mounted-sprite');assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(allocations.length-first,3);assert.strictEqual(stats.rasterCells,760);assert.strictEqual(stats.regions.length,0);
+      assert(!phases.slice(phaseStart).some(name=>name.startsWith('static.patch.')),'selection happens before any patch work');
+    }else assert.strictEqual(stats.uploadCalls,1);
+    const count=allocations.length,afterUploads=g.renderer.gl.uploads.length;assert.strictEqual(refresh(g).mode,'noop');assert.strictEqual(queries,1,'unchanged static state needs no footprint query');assert.strictEqual(allocations.length,count);assert.strictEqual(g.renderer.gl.uploads.length,afterUploads);assert.strictEqual(actorState(g),actors);scenarios+=2;
+  }
+  // An invalid sizing result is caught while planning; the actual full builder
+  // then runs with valid input. The helper itself is never stubbed or bypassed.
+  {
+    const g=mountedFixture();refresh(g);const first=allocations.length,uploads=g.renderer.gl.uploads.length,actors=actorState(g),worldSize=g.art.worldSize,helper=g.painter.mountedSpriteFootprints,build=g.painter.build;let invalid=true,queries=0;
+    g.art.worldSize=function(name,...args){if(name==='lamp_blue'&&invalid){invalid=false;return[NaN,20]}return worldSize.call(this,name,...args)};
+    g.painter.mountedSpriteFootprints=function(...args){queries++;return isolateFootprintWork(g,()=>helper.apply(this,args))};
+    g.painter.buildPatch=()=>{throw Error('malformed footprint must not start a patch')};
+    g.painter.build=function(...args){assert(!invalid,'the real footprint collector must have rejected the malformed size');assert.strictEqual(allocations.length,first);assert.strictEqual(g.renderer.gl.uploads.length,uploads);return build.apply(this,args)};
+    g.room.water.add('10,7');const stats=refresh(g);assert.strictEqual(queries,1);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'invalid-context');assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(stats.regions.length,0);assert.strictEqual(stats.rasterCells,760);assert.strictEqual(allocations.length-first,3);assert.strictEqual(actorState(g),actors);scenarios++;
+  }
+}
 
 function fullPatchNoopAndHistory(){
   const g=fixture(),r=g.renderer,gl=r.gl;
@@ -333,8 +467,9 @@ function rejectInvalidPatches(){
   c.width=c.height=1;scenarios++;
 }
 
-fullPatchNoopAndHistory();staticIdentityAndStaleness();materialPreservationAndDependencies();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();guardedEdgeRasterMetrics();croppedUploadRestoresUnpackState();rejectInvalidPatches();
+fullPatchNoopAndHistory();staticIdentityAndStaleness();materialPreservationAndDependencies();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();guardedEdgeRasterMetrics();croppedUploadRestoresUnpackState();rejectInvalidPatches();mountedFootprintsFollowActualDrawing();fractionalMountedFallbacks();
 console.log('STATIC TERRAIN RUNTIME REGRESSION PERF-004 PASS');
 console.log('  production Game / StaticPainter / GLRenderer scenarios:',scenarios);
 console.log('  color-only guarded-raster uploads, preserved material handles/bytes, full material-dependency refreshes, asymmetric flipped crops and exact scratch/raster accounting');
 console.log('  coherent snapshot/revision commits, unpack restoration, upload / GL error / context-loss repair, failed repair invalidation, allocation/raster cleanup, zero retained scratch');
+console.log('  real mounted-sprite footprints, objective substitutions/scales, filtering-edge overlap, fractional full fallback, integer/glow-only patches and zero-work footprint planning');
