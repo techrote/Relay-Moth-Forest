@@ -275,6 +275,100 @@
     }
   }
 
+  // Failure-only full-frame controls distinguish nonlocal command-stream
+  // changes from reference/source-cache instability. Never mutate authority or
+  // cache policy, and retain only weak source identities and numeric metadata.
+  function fullFrameTerrainDiagnostics(actual,expected,before,uploads,priorSnapshot,failurePixels){
+    const width=actual.width,height=actual.height,art=game.art,currentRoom=game.room;
+    const report={diagnosticOnly:true,native:[width,height],channels:['color'],pixelCoordinates:'WebGL bottom-left',controls:[],comparisons:[]};
+    if(!priorSnapshot?.valid){report.skipped='prior authoritative snapshot unavailable';return report}
+    const current=RelayStaticTerrain.capture(currentRoom,game.staticTerrainContext()),types=RelayStaticTerrain.CELL_TYPES;
+    check(current.valid&&priorSnapshot.geometry.renderWidth===width&&priorSnapshot.geometry.renderHeight===height&&
+      JSON.stringify(priorSnapshot.geometry)===JSON.stringify(current.geometry),'full-frame diagnostic snapshot geometry differs');
+    check(priorSnapshot.dependencies.length===current.dependencies.length&&priorSnapshot.dependencies.every((entry,i)=>entry[0]===current.dependencies[i][0]&&entry[1]===current.dependencies[i][1])&&
+      priorSnapshot.lutSignature===current.lutSignature&&priorSnapshot.resourceSignature===current.resourceSignature&&priorSnapshot.references.every((ref,i)=>ref===current.references[i]),'full-frame diagnostic static dependencies changed');
+    const geometry=current.geometry,dependencies=new Map(priorSnapshot.dependencies),oldRoom=Object.create(currentRoom);
+    oldRoom.walls=new Set(JSON.parse(dependencies.get('walls')));oldRoom.border=new Set(JSON.parse(dependencies.get('border')));
+    oldRoom.water=new Set();oldRoom.paths=new Set();oldRoom.floorMicrotile=priorSnapshot.microtile;
+    report.priorSnapshotFrozen=Object.isFrozen(priorSnapshot)&&Object.isFrozen(priorSnapshot.cellTypes);
+    report.changedCells=[];
+    for(let i=0;i<priorSnapshot.cellTypes.length;i++){
+      const x=i%geometry.columns,y=Math.floor(i/geometry.columns),key=x+','+y,type=priorSnapshot.cellTypes[i];
+      if(type===types.water)oldRoom.water.add(key);else if(type===types.path)oldRoom.paths.add(key);
+      check((oldRoom.walls.has(key)||oldRoom.border.has(key))===(type===types.blocker),'old effective blocker classification cannot be reconstructed');
+      if(type!==current.cellTypes[i])report.changedCells.push({x,y,before:type,after:current.cellTypes[i]});
+    }
+    const rects=uploads.filter(u=>u.channel==='color'),covered=(x,y)=>rects.some(r=>x>=r.x&&x<r.x+r.width&&y>=r.y&&y<r.y+r.height);
+    const probes=failurePixels.map(p=>({x:p.x,y:p.y,canvasY:height-1-p.y,insideOutput:covered(p.x,p.y)}));
+    report.probes=probes.map(p=>{const i=(p.y*width+p.x)*4;return{...p,actual:Array.from(actual.maps[0].subarray(i,i+4)),expected:Array.from(expected[0].subarray(i,i+4)),before:before?Array.from(before.maps[0].subarray(i,i+4)):null}});
+    const identities=new WeakMap();let nextIdentity=1,activeControl=null;
+    const identity=canvas=>{if(!canvas)return null;if(!identities.has(canvas))identities.set(canvas,nextIdentity++);return identities.get(canvas)};
+    const source=canvas=>canvas?{id:identity(canvas),width:canvas.width,height:canvas.height}:null;
+    const inventory=()=>[...art.tintCache].map(([key,canvas])=>({key,...source(canvas)}));
+    const tintOwn=Object.prototype.hasOwnProperty.call(art,'tintedRegion'),tintedRegion=art.tintedRegion,cache=art.tintCache,frames=new Map();
+    const compareBytes=(left,right)=>{
+      const whole=differences(left,right,width),exterior={bytes:0,pixels:0,max:0,examples:[]};
+      for(let i=0;i<left.length;i+=4){
+        const x=(i/4)%width,y=Math.floor(i/4/width);if(covered(x,y))continue;
+        let changed=false;
+        for(let k=0;k<4;k++){const delta=Math.abs(left[i+k]-right[i+k]);if(delta){changed=true;exterior.bytes++;exterior.max=Math.max(exterior.max,delta)}}
+        if(changed){exterior.pixels++;if(exterior.examples.length<6)exterior.examples.push({x,y,canvasY:height-1-y,left:Array.from(left.subarray(i,i+4)),right:Array.from(right.subarray(i,i+4))})}
+      }
+      return{whole,exterior,probes:probes.map(p=>{const i=(p.y*width+p.x)*4;return{...p,left:Array.from(left.subarray(i,i+4)),right:Array.from(right.subarray(i,i+4))}})};
+    };
+    const compare=(left,right)=>{
+      if(frames.has(left)&&frames.has(right))report.comparisons.push({left,right,...compareBytes(frames.get(left),frames.get(right))});
+      else report.comparisons.push({left,right,skipped:'control render failed'});
+    };
+    art.tintedRegion=function(name,colour,strength){
+      const key=name+'|'+colour+'|'+strength.toFixed(3),hit=this.tintCache.has(key),prior=source(this.tintCache.get(key));
+      const canvas=tintedRegion.call(this,name,colour,strength);
+      if(activeControl){activeControl.tint[hit?'hits':'misses']++;activeControl.tint.calls.push({key,hit,before:prior,returned:source(canvas),cacheSize:this.tintCache.size})}
+      return canvas;
+    };
+    const render=(name,room,snapshot,floorOnly)=>{
+      const painter=new StaticPainter(art,game.luts),entry={name,floorOnly,footerRetained:true,floorCalls:0,
+        tint:{hits:0,misses:0,calls:[],before:inventory()},normalGenerationBefore:art.normalTransformGeneration};
+      let color=null,maps=null;activeControl=entry;
+      try{
+        if(floorOnly)for(const method of ['patternDecor','drawBlockerSprites','drawVegetationInterstitials','drawDecor'])painter[method]=()=>{};
+        const baseTile=painter.baseTile;
+        painter.baseTile=function(ctx,tx,ty,seed,type){
+          entry.floorCalls++;check(types[type]===snapshot.cellTypes[ty*geometry.columns+tx],'full-frame replay changed an effective floor classification');
+          return baseTile.call(this,ctx,tx,ty,seed,type);
+        };
+        color=painter.build(room,game.state,width,height);maps=painter.lastMaterialMaps;
+        check(entry.floorCalls===geometry.columns*geometry.rows,'full-frame control did not replay the complete floor list');
+        entry.canvasSize=[color.width,color.height];entry.colorAttributes=color.getContext('2d').getContextAttributes();
+        const bytes=uploadReference(game.renderer.gl,color,width,height);frames.set(name,bytes);
+        entry.probes=probes.map(p=>{const i=(p.y*width+p.x)*4;return{...p,rgba:Array.from(bytes.subarray(i,i+4))}});
+        entry.glError=game.renderer.gl.getError();check(entry.glError===game.renderer.gl.NO_ERROR,'full-frame control WebGL error');
+      }catch(error){entry.error=String(error);entry.stack=error?.stack}
+      finally{
+        activeControl=null;release(color);release(maps?.normal);release(maps?.spec);
+        entry.tint.after=inventory();entry.tint.cacheObjectUnchanged=art.tintCache===cache;
+        const beforeKeys=new Map(entry.tint.before.map(s=>[s.key,s.id])),afterKeys=new Map(entry.tint.after.map(s=>[s.key,s.id]));
+        entry.tint.removed=entry.tint.before.filter(s=>!afterKeys.has(s.key));entry.tint.added=entry.tint.after.filter(s=>!beforeKeys.has(s.key));
+        entry.tint.replaced=entry.tint.after.filter(s=>beforeKeys.has(s.key)&&beforeKeys.get(s.key)!==s.id);
+        entry.normalGenerationAfter=art.normalTransformGeneration;report.controls.push(entry);
+      }
+    };
+    try{
+      frames.set('actual',actual.maps[0]);frames.set('initial-reference',expected[0]);if(before)frames.set('prior-gpu',before.maps[0]);
+      for(const [stage,floorOnly] of [['floor-only',true],['full-composition',false]]){
+        for(const [label,room,snapshot] of [['old-1',oldRoom,priorSnapshot],['old-2',oldRoom,priorSnapshot],['new-1',currentRoom,current],['new-2',currentRoom,current],['old-after-new',oldRoom,priorSnapshot]])render(stage+'/'+label,room,snapshot,floorOnly);
+        for(const [left,right] of [['old-1','old-2'],['new-1','new-2'],['old-2','new-1'],['old-1','old-after-new']])compare(stage+'/'+left,stage+'/'+right);
+      }
+      if(before)compare('prior-gpu','full-composition/old-1');
+      compare('actual','full-composition/new-1');compare('initial-reference','full-composition/new-1');
+      compare('floor-only/old-2','full-composition/old-2');compare('floor-only/new-1','full-composition/new-1');
+      const after=RelayStaticTerrain.capture(currentRoom,game.staticTerrainContext());
+      report.authorityUnchanged=game.room===currentRoom&&after.valid&&after.cellTypes.every((type,i)=>type===current.cellTypes[i])&&
+        after.dependencies.every((entry,i)=>entry[0]===current.dependencies[i][0]&&entry[1]===current.dependencies[i][1]);
+      return report;
+    }finally{if(tintOwn)art.tintedRegion=tintedRegion;else delete art.tintedRegion;frames.clear()}
+  }
+
   function patchRasterDiagnostics(actual,expected,uploads){
     const width=actual.width,height=actual.height,sx=width/640,sy=height/360;
     const upload=uploads.find(item=>item.channel==='color');if(!upload)return[];
@@ -549,7 +643,7 @@
     return results;
   }
 
-  function parity(label,before=null,uploads=[]){
+  function parity(label,before=null,uploads=[],beforeSnapshot=null){
     const actual=capture(),expected=reference(),result={};let firstFailure=null;
     for(let c=0;c<channels.length;c++){
       const diff=differences(actual.maps[c],expected[c],actual.width);result[channels[c]]=diff;
@@ -594,6 +688,7 @@
       root.__staticRasterDiagnostics={kind:uploads.length?'patch-vs-full':before?'unchanged-vs-full':'full-vs-full',label,room:game.room.key,
         native:[actual.width,actual.height],beforeNative:before?[before.width,before.height]:null,maps:result,glError,
         pixelCoordinates:'WebGL bottom-left',uploadCoordinates:'WebGL bottom-left',subUploads:uploads.map(rect=>({...rect})),staticRefreshStats:JSON.parse(JSON.stringify(game.staticRefreshStats||{}))};
+      if(uploads.length||beforeSnapshot)try{root.__staticRasterDiagnostics.fullFrameTerrain=fullFrameTerrainDiagnostics(actual,expected,before,uploads,beforeSnapshot,result.color.examples)}catch(error){root.__staticRasterDiagnostics.fullFrameTerrainError=String(error)}
       if(uploads.length)try{root.__staticRasterDiagnostics.patchVariants=patchRasterDiagnostics(actual,expected,uploads)}catch(error){root.__staticRasterDiagnostics.patchVariantError=String(error)}
       if(uploads.length)try{root.__staticRasterDiagnostics.compositionStages=compositionStageDiagnostics(actual,uploads,result.color.examples)}catch(error){root.__staticRasterDiagnostics.compositionStageError=String(error)}
       check(false,(firstFailure||label+' WebGL error '+glError)+'\nPERF-004 raster diagnostics '+JSON.stringify(root.__staticRasterDiagnostics));
@@ -707,7 +802,7 @@
 
   function measured(label,action,mode='patch',options={}){
     if(mode==='patch'||mode==='noop')assertNormalSources(label+' before action');
-    const before=mode==='patch'||mode==='noop'?capture():null,work=instrument(action),r=game.renderer,area=r.nativeW*r.nativeH;
+    const beforeSnapshot=game.staticTerrainSnapshot,before=mode==='patch'||mode==='noop'?capture():null,work=instrument(action),r=game.renderer,area=r.nativeW*r.nativeH;
     if(mode==='patch'||mode==='noop')assertNormalSources(label+' after action');
     check(work.diagnostics.mode===mode,label+' expected '+mode+' diagnostics: '+JSON.stringify(work.diagnostics));
     if(options.actors!==false)check(work.actorsUnchanged,label+' reset or moved unrelated actors');
@@ -781,7 +876,7 @@
     }else if(mode==='noop')check(work.fullBuilds===0&&work.patchBuilds===0&&work.fullUploads.length===0&&work.subUploads.length===0,label+' unchanged authority did rendering work');
     else check(work.fullBuilds>=1&&channels.every(c=>work.fullUploads.some(u=>u.channel===c)),label+' full fallback did not repair all maps');
     if(options.authority!==false)authority(label);
-    const textures=parity(label,before,work.subUploads);
+    const textures=parity(label,before,work.subUploads,beforeSnapshot);
     if(mode==='patch'){check(textures.normal.changedOutside===0&&textures.specular.changedOutside===0,label+' modified material texture bytes');work.materialContentsUnchanged=true}
     if(mode==='patch'||mode==='noop')work.normalSources=assertNormalSources(label+' after full reference');
     // Coverage is defined by actual subuploads. A qualified full fallback has
