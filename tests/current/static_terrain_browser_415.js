@@ -334,20 +334,21 @@
       if(activeControl){activeControl.tint[hit?'hits':'misses']++;activeControl.tint.calls.push({key,hit,before:prior,returned:source(canvas),cacheSize:this.tintCache.size})}
       return canvas;
     };
-    const withColorReadHint=(entry,targetWidth,targetHeight,build)=>{
+    const withColorContextOptions=(entry,targetWidth,targetHeight,colorOptions,build)=>{
       const prototype=OffscreenCanvas.prototype,getContext=prototype.getContext;entry.colorContextOverrides=0;
       // A diagnostic optimization hint, not a standardized backend guarantee.
       // Override only the first native color context; source and material
       // canvases keep their original options and cache policy.
       prototype.getContext=function(type,options){
         if(!entry.colorContextOverrides&&type==='2d'&&options?.alpha===false&&this.width===targetWidth&&this.height===targetHeight){
-          entry.colorContextOverrides++;return getContext.call(this,type,{...options,willReadFrequently:true});
+          entry.colorContextOverrides++;entry.requestedColorContext={...options,...colorOptions};return getContext.call(this,type,entry.requestedColorContext);
         }
         return getContext.call(this,type,options);
       };
       try{return build()}
       finally{prototype.getContext=getContext}
     };
+    const withColorReadHint=(entry,targetWidth,targetHeight,build)=>withColorContextOptions(entry,targetWidth,targetHeight,{willReadFrequently:true},build);
     const finishControl=entry=>{
       entry.tint.after=inventory();entry.tint.cacheObjectUnchanged=art.tintCache===cache;
       const beforeKeys=new Map(entry.tint.before.map(s=>[s.key,s.id])),afterKeys=new Map(entry.tint.after.map(s=>[s.key,s.id]));
@@ -424,6 +425,81 @@
       }else report.cpuPatchReconstructionError='CPU old frame or production patch regions unavailable';
       render('default-after-cpu/full-composition/new',currentRoom,current,false);
       compare('full-composition/new-1','default-after-cpu/full-composition/new');
+      // Failure-only batching controls. Explicit false is intentionally distinct
+      // from the production request's omitted read-frequency hint. No backend
+      // is inferred from attributes. Flush reads synchronize only; their pixels
+      // never contribute to a rendered surface or comparison reference.
+      const contextVariants=[
+        {name:'explicit-false-opaque',options:{alpha:false,willReadFrequently:false}},
+        {name:'explicit-false-alpha',options:{alpha:true,willReadFrequently:false}},
+        {name:'explicit-false-desynchronized',options:{alpha:false,willReadFrequently:false,desynchronized:true}},
+        {name:'explicit-false-row-flush',options:{alpha:false,willReadFrequently:false},flush:'row'},
+        {name:'explicit-false-four-cell-flush',options:{alpha:false,willReadFrequently:false},flush:'global-four'}
+      ];
+      const batchStart=performance.now(),batchDeadline=batchStart+180000;
+      report.batchContextDiagnostics={budgetMs:180000,readbackUse:'one pixel, synchronization only; returned pixels discarded',variants:[]};
+      const renderContextVariant=(variant,authority,room,snapshot,region=null)=>{
+        const painter=new StaticPainter(art,game.luts),name='batch-context/'+variant.name+'/'+authority,range=region||{tx0:0,ty0:0,tx1:geometry.columns,ty1:geometry.rows};
+        const entry={name,region,contextVariant:variant.name,flush:variant.flush||null,floorCalls:0,colorReadbackAttempts:0,colorReadbacks:0,colorReadbackPixels:0,colorReadbackMs:0,flushPositions:[],
+          tint:{hits:0,misses:0,calls:[],before:inventory()},normalGenerationBefore:art.normalTransformGeneration},start=performance.now();
+        const due=(tx,ty)=>variant.flush==='row'?tx===range.tx1-1:variant.flush==='global-four'?(ty*geometry.columns+tx+1)%4===0:false;
+        let expectedReads=0;for(let ty=range.ty0;ty<range.ty1;ty++)for(let tx=range.tx0;tx<range.tx1;tx++)if(due(tx,ty))expectedReads++;
+        entry.expectedColorReadbacks=expectedReads;
+        let color=null,maps=null;activeControl=entry;
+        try{
+          check(performance.now()<=batchDeadline,'batch-context diagnostic time budget exhausted');
+          const baseTile=painter.baseTile;
+          painter.baseTile=function(ctx,tx,ty,seed,type){
+            entry.floorCalls++;check(types[type]===snapshot.cellTypes[ty*geometry.columns+tx],'batch-context control changed a floor classification');
+            const result=baseTile.call(this,ctx,tx,ty,seed,type);
+            if(due(tx,ty)){
+              check(performance.now()<=batchDeadline,'batch-context diagnostic time budget exhausted');
+              entry.colorReadbackAttempts++;const readStart=performance.now();
+              ctx.getImageData(0,0,1,1);
+              entry.colorReadbackMs+=performance.now()-readStart;entry.colorReadbacks++;entry.colorReadbackPixels++;
+              entry.flushPositions.push({tx,ty,globalCell:ty*geometry.columns+tx});
+            }
+            return result;
+          };
+          const cw=region?(region.canvasWidth??region.rasterWidth??region.width):width,ch=region?(region.canvasHeight??region.rasterHeight??region.height):height;
+          color=withColorContextOptions(entry,cw,ch,variant.options,()=>region?painter.buildPatch(room,game.state,width,height,region):painter.build(room,game.state,width,height));maps=painter.lastMaterialMaps;
+          check(entry.floorCalls===(range.tx1-range.tx0)*(range.ty1-range.ty0)&&entry.colorReadbacks===expectedReads,'batch-context control changed its floor/flush sequence');
+          entry.canvasSize=[color.width,color.height];entry.colorAttributes=color.getContext('2d').getContextAttributes();
+          check(entry.colorContextOverrides===1&&entry.colorAttributes.willReadFrequently===false&&entry.colorAttributes.alpha===variant.options.alpha,'batch-context color options were not accepted');
+          if(region)check(!maps,'batch-context patch allocated material maps');
+          else{
+            entry.materialContextAttributes={normal:maps.normal.getContext('2d').getContextAttributes(),specular:maps.spec.getContext('2d').getContextAttributes()};
+            check(entry.materialContextAttributes.normal.willReadFrequently===false&&entry.materialContextAttributes.specular.willReadFrequently===false,'batch-context control changed material options');
+          }
+          const bytes=region?uploadCroppedReference(game.renderer.gl,color,region):uploadReference(game.renderer.gl,color,width,height);
+          if(!region){frames.set(name,bytes);entry.probes=probes.map(p=>{const i=(p.y*width+p.x)*4;return{...p,rgba:Array.from(bytes.subarray(i,i+4))}})}
+          entry.glError=game.renderer.gl.getError();check(entry.glError===game.renderer.gl.NO_ERROR,'batch-context control WebGL error');
+          return{name,bytes};
+        }catch(error){entry.error=String(error);entry.stack=error?.stack;return{name,bytes:null}}
+        finally{activeControl=null;release(color);release(maps?.normal);release(maps?.spec);entry.elapsedMs=performance.now()-start;finishControl(entry)}
+      };
+      for(const variant of contextVariants){
+        if(performance.now()>batchDeadline){report.batchContextDiagnostics.skippedFrom=variant.name;break}
+        const entry={name:variant.name,options:variant.options,flush:variant.flush||null};report.batchContextDiagnostics.variants.push(entry);
+        const old=renderContextVariant(variant,'old',oldRoom,priorSnapshot),next=renderContextVariant(variant,'new',currentRoom,current),repeat=renderContextVariant(variant,'new-repeat',currentRoom,current);
+        compare(old.name,next.name);compare(next.name,repeat.name);
+        compare('full-composition/old-1',old.name,true);compare('full-composition/new-1',next.name,true);
+        if(old.bytes&&next.bytes&&regions.length){
+          const composed=old.bytes.slice();let complete=true;
+          for(let index=0;index<regions.length;index++){
+            const region=regions[index];
+            if(!rects.some(r=>r.x===region.x&&r.y===height-region.y-region.height&&r.width===region.width&&r.height===region.height)){entry.reconstructionError='production region differs from executed uploads';complete=false;break}
+            const patch=renderContextVariant(variant,'production-patch-'+index,currentRoom,current,region);if(!patch.bytes){complete=false;continue}
+            const bottom=height-region.y-region.height;
+            for(let y=0;y<region.height;y++)composed.set(patch.bytes.subarray(y*region.width*4,(y+1)*region.width*4),((bottom+y)*width+region.x)*4);
+          }
+          if(complete){const name='batch-context/'+variant.name+'/reconstructed-patches';frames.set(name,composed);compare(name,next.name);compare(old.name,name);entry.reconstructionComplete=true}
+          else entry.reconstructionError=entry.reconstructionError||'one or more patch controls failed';
+        }else entry.reconstructionError='old/new frame or production regions unavailable';
+      }
+      report.batchContextDiagnostics.elapsedMs=performance.now()-batchStart;
+      render('default-after-batch/full-composition/new',currentRoom,current,false);
+      compare('full-composition/new-1','default-after-batch/full-composition/new');
       const after=RelayStaticTerrain.capture(currentRoom,game.staticTerrainContext());
       report.authorityUnchanged=game.room===currentRoom&&after.valid&&after.cellTypes.every((type,i)=>type===current.cellTypes[i])&&
         after.dependencies.every((entry,i)=>entry[0]===current.dependencies[i][0]&&entry[1]===current.dependencies[i][1]);
