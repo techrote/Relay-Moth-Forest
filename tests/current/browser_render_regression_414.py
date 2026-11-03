@@ -193,7 +193,7 @@ def main():
             name=meta[key];page.locator('#auditAsset').set_input_files(str(ROOT/name))
             page.evaluate('(name)=>{window.__assets[name]=URL.createObjectURL(document.querySelector("#auditAsset").files[0])}',name)
         page.add_script_tag(content=SETUP)
-        for name in ('surfacefx.js','sprite_material.js','foliagefx.js','procedural_decor.js','editor_identity.js','editor_validation.js','editor.js','game.js'):
+        for name in ('surfacefx.js','sprite_material.js','foliagefx.js','procedural_decor.js','static_terrain.js','editor_identity.js','editor_validation.js','editor.js','game.js'):
             source=(ROOT/name).read_text()
             if name=='game.js':source=source.replace('img.src=url','img.src=window.__assets[url]||url')
             page.add_script_tag(content=source)
@@ -321,6 +321,9 @@ def main():
             result['waterfield_quality_matrix'].append(page.evaluate(WATER_QUALITY_CASE,quality))
         result['waterfield_fallbacks']=page.evaluate(WATER_FALLBACK_CASE)
         result['waterfield_optional_effect_faults']=page.evaluate(WATER_FAULT_CASE)
+        page.add_script_tag(content=(ROOT/'tests/current/static_terrain_browser_415.js').read_text())
+        print('NATIVE WEBGL bounded static color/material textures',flush=True)
+        result['static_terrain']=page.evaluate('()=>auditStaticTerrain.run()')
         result['runtime_errors']=logs;assert not logs,logs
         if args.out:(args.out/'browser_results.json').write_text(json.dumps(result,indent=2))
         print('NATIVE BROWSER WEBGL2 PASS: nine rooms, material/quality toggles, same-count invalidation, v4.15 right-click/inspector/cycle/recovery/dirty interactions, ghost geometry, UI input and q1-q4 bounded-water GPU/collision/history/fallback parity; '+result['driver']['renderer'],flush=True)

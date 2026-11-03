@@ -13,6 +13,7 @@ import json
 import math
 import shutil
 import statistics
+import subprocess
 import sys
 import threading
 from contextlib import contextmanager
@@ -30,6 +31,7 @@ SCENARIOS = [
     "editor-objective",
     "editor-grass",
     "editor-water",
+    "editor-path",
     "control-wildlife",
 ]
 
@@ -45,7 +47,7 @@ async (name) => {
   let waterBefore=null;
   const decorate=r=>{
     const after=waterCounters();
-    return {...r,waterDiagnostics:game.renderer.surfaceFX?.diagnostics?.().water||null,
+    return {...r,staticDiagnostics:game.staticRefreshStats||null,waterDiagnostics:game.renderer.surfaceFX?.diagnostics?.().water||null,
       legacyWater:game.renderer.lastWaterMaskUpdate||null,
       waterSourceReadFrequently:game.waterMaskCanvas?.getContext('2d').getContextAttributes?.().willReadFrequently??null,
       waterWorkDelta:Object.fromEntries(Object.keys(after).map(k=>[k,after[k]-(waterBefore?.[k]??after[k])]))};
@@ -150,8 +152,34 @@ async (name) => {
   if(name==='editor-water'){
     await reset('tin_stream',[],true);
     const raw=rmfEditor.rawRoom();if(!raw.water?.length)throw Error('Water fixture missing');
+    // The first authored water cell sits under a wall. Move visible water into
+    // open ground so this measures real color/material work on both sources.
+    let move=null;
+    for(let i=0;i<raw.water.length&&!move;i++){
+      const [x,y]=raw.water[i],key=x+','+y;
+      if(game.room.walls.has(key)||game.room.border.has(key))continue;
+      for(const [nx,ny] of [[x-1,y],[x+1,y],[x,y-1],[x,y+1]]){
+        const next=nx+','+ny;
+        if(nx>0&&nx<39&&ny>0&&ny<18&&!game.room.walls.has(next)&&!game.room.water.has(next)&&!game.room.border.has(next)){move={index:i,tile:[nx,ny]};break}
+      }
+    }
+    if(!move)throw Error('Visible same-count water move fixture missing');
     return manual('editor-water',{room:game.room.key,mutation:'water-tile'},()=>{
-      const [x,y]=raw.water[0];raw.water[0]=[Math.max(1,x-1),y];
+      raw.water[move.index]=move.tile;
+      rmfEditor.queueInvalidation(RelayEditorInvalidation.TERRAIN,{sync:true});
+    });
+  }
+  if(name==='editor-path'){
+    await reset('quiet_nest',[],true);
+    const raw=rmfEditor.rawRoom();raw.path_cells=raw.path_cells||[];
+    let tile=null;
+    for(let y=2;y<17&&!tile;y++)for(let x=2;x<38;x++){
+      const key=x+','+y;
+      if(!game.room.walls.has(key)&&!game.room.water.has(key)&&!game.room.paths.has(key)){tile=[x,y];break}
+    }
+    if(!tile)throw Error('Open path fixture missing');
+    return manual('editor-path',{room:game.room.key,mutation:'ground-to-path'},()=>{
+      raw.path_cells.push(tile);
       rmfEditor.queueInvalidation(RelayEditorInvalidation.TERRAIN,{sync:true});
     });
   }
@@ -181,8 +209,8 @@ class QuietHandler(SimpleHTTPRequestHandler):
 
 
 @contextmanager
-def local_server():
-    handler = partial(QuietHandler, directory=str(ROOT))
+def local_server(root=ROOT):
+    handler = partial(QuietHandler, directory=str(root))
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -244,6 +272,7 @@ def parse_args():
     ap.add_argument("--out", type=Path, help="Write compact JSON evidence here.")
     ap.add_argument("--chromium", help="Explicit Chromium/Chrome executable.")
     ap.add_argument("--samples", type=int, default=3)
+    ap.add_argument("--baseline-root", type=Path, help="First measure an accepted source checkout on this same host; candidate bounded-work assertions remain mandatory.")
     ap.add_argument(
         "--cpu-throttle",
         type=float,
@@ -256,8 +285,7 @@ def parse_args():
     return ap.parse_args()
 
 
-def main():
-    args = parse_args()
+def measure_source(args, root, validate_static=True):
     if args.samples < 1:
         raise SystemExit("--samples must be >= 1")
     throttles = args.throttles or [1.0]
@@ -268,9 +296,13 @@ def main():
         "note": "Diagnostic relative evidence; absolute CI milliseconds are not a universal performance target.",
         "samplesPerScenario": args.samples,
         "runs": [],
+        "source": {
+            "commit": subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip(),
+            "tree": subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD^{tree}"], text=True).strip(),
+        },
     }
 
-    with local_server() as base, sync_playwright() as p:
+    with local_server(root) as base, sync_playwright() as p:
         executable = args.chromium or shutil.which("chromium")
         flags = ["--no-sandbox", "--disable-dev-shm-usage", "--ignore-gpu-blocklist"]
         if sys.platform.startswith("linux"):
@@ -334,6 +366,15 @@ def main():
                         assert 0 < water.get("acquirePixels", 10**12) < field[0] * field[1], (scenario, "unbounded mask acquisition", water)
                         assert 0 < legacy.get("uploadBytes", 10**12) < 640 * 360 * 4, (scenario, "unbounded legacy upload", legacy)
                         assert record.get("waterSourceReadFrequently") is True, (scenario, "CPU mask backing was not selected at context creation")
+                if validate_static and scenario in {"editor-water", "editor-path"}:
+                    for record in records:
+                        static = record.get("staticDiagnostics") or {}
+                        assert static.get("mode") == "patch", (scenario, "static backing did not use a bounded patch", static)
+                        assert record.get("phaseCalls", {}).get("static.build", 0) == 0, (scenario, "small terrain edit invoked full painter")
+                        assert 0 < static.get("rasterCells", 10**12) < 40 * 19, (scenario, "unbounded floor raster", static)
+                        assert 0 < static.get("uploadBytes", 10**12) < env["native"][0] * env["native"][1] * 12, (scenario, "full static upload", static)
+                        assert static.get("uploadCalls") == len(static.get("regions", [])) * 3, (scenario, "incomplete material upload", static)
+                        assert static.get("scratchPixels", 10**12) <= 262144 and static.get("retainedScratchPixels") == 0, (scenario, "unbounded or retained scratch", static)
                 run["scenarios"][scenario] = {
                     "summary": summarize(records),
                     "records": records,
@@ -355,6 +396,21 @@ def main():
 
     if errors:
         raise AssertionError("Browser runtime errors during performance harness: " + "; ".join(errors))
+    return result
+
+
+def main():
+    args = parse_args()
+    baseline = measure_source(args, args.baseline_root.resolve(), validate_static=False) if args.baseline_root else None
+    result = measure_source(args, ROOT)
+    if baseline:
+        result["baseline"] = baseline
+        result["comparison"] = []
+        for before, after in zip(baseline["runs"], result["runs"]):
+            for scenario in SCENARIOS:
+                old = before["scenarios"][scenario]["summary"]["syncMs"]["median"]
+                new = after["scenarios"][scenario]["summary"]["syncMs"]["median"]
+                result["comparison"].append({"cpuThrottle": after["cpuThrottle"], "scenario": scenario, "beforeMedianMs": old, "afterMedianMs": new, "ratio": new / old if old else None})
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

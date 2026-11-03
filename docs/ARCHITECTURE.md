@@ -104,6 +104,8 @@ Editor invalidation uses STATIC, TERRAIN, FOLIAGE, CREATURES, MINI_ROBOTS, OBJEC
 
 `Game.refreshEditorStatic`, `refreshEditorWater` and `refreshEditorFoliage` bridge rendering scopes to runtime subsystems. Creature and mini-robot scopes invoke `game.creatures.init(room)` and `game.miniGuides.init(room, state)` respectively. Geometry-sensitive descriptor keys preserve same-count invalidation. See [Editor](EDITOR.md) for transaction, recovery and persistence behavior.
 
+`static_terrain.js` captures immutable rendered authority and plans bounded native regions for small ground/path/water changes. Static dependencies and source/renderer/material identities must match; large, fragmented, stale or structural changes use the full painter. Game commits the snapshot only after coherent color/normal/specular uploads, then releases the scratch canvases. The same synchronous editor flush commits collision, water and foliage before gameplay resumes. See [PERF-004](validation/performance/PERF-004.md) for bounds, fallbacks and failure recovery.
+
 Gameplay world movement remains keyboard/gamepad-driven. Editor pointer input is deliberately separate from gameplay input.
 
 ## Data flow

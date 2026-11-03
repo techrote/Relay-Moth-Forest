@@ -17,7 +17,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       PYTHONUNBUFFERED: '1'
       PYTHONDONTWRITEBYTECODE: '1'
@@ -100,16 +100,31 @@ jobs:
         timeout-minutes: 5
         run: python self_test.py 2>&1 | tee "$VALIDATION_OUT/self-test.log"
 
-      - name: Native Chromium, editor and bounded water textures
-        timeout-minutes: 5
+      - name: Native Chromium, editor and bounded water/static textures
+        timeout-minutes: 8
         run: python tests/current/browser_render_regression_414.py --out "$VALIDATION_OUT/browser" 2>&1 | tee "$VALIDATION_OUT/browser.log"
 
+      - name: Check out accepted base for same-host performance comparison
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .validation-baseline
+          persist-credentials: false
+
       - name: Bounded state-change performance evidence
-        timeout-minutes: 6
+        timeout-minutes: 12
+        env:
+          BASELINE_ROOT: ${{ github.event_name == 'pull_request' && '.validation-baseline' || '' }}
         run: |
+          baseline_args=()
+          if [[ -n "$BASELINE_ROOT" ]]; then
+            baseline_args=(--baseline-root "$BASELINE_ROOT")
+          fi
           python tests/current/state_change_performance_415.py \
             --out "$VALIDATION_OUT/performance.json" \
             --samples 3 --cpu-throttle 1 --cpu-throttle 4 \
+            "${baseline_args[@]}" \
             2>&1 | tee "$VALIDATION_OUT/performance.log"
 
       - name: Verify tests did not change shipped source

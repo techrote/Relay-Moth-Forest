@@ -42,6 +42,7 @@ surfacefx.js                 water/fine-grass subsystem
 foliagefx.js                 physical foliage subsystem
 sprite_material.js           shared sprite material
 procedural_decor.js          shared generated-decor/reserved-surface policy
+static_terrain.js            static authority snapshots + bounded native regions
 editor_identity.js           persistent identity scan/allocation
 editor_validation.js         shared semantic diagnostics and dirty snapshots
 editor.js                    WYSIWYG editor

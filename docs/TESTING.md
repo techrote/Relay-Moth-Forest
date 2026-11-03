@@ -71,6 +71,10 @@ Do not use one absolute CI millisecond value as a universal pass/fail target. Th
 
 PERF-003 adds complete-field bounded-vs-full comparisons to the ordinary self-test. The native browser suite checks the uploaded water textures against full-rebuild references. The timing harness requires bounded SurfaceFX and legacy-mask paths for the representative rivet/editor-water scenarios and a field upload smaller than the full texture. Its diagnostic timings must still be inspected for remaining synchronous stalls; passing the bounded-work assertions alone does not certify smooth hardware frame times.
 
+PERF-004 adds authoritative static-terrain planning and runtime failure tests to the self-test. The browser fixture compares every color, normal and specular texture byte with a clean full build at integer and fractional native scales. It also compares the refactored full builder against the accepted pre-change composition, checks untouched exterior pixels, exercises editor history/final flushes and verifies all dependency/failure fallbacks. The representative water/path scenarios must use bounded scratch and three-map subuploads without invoking the full painter. See [PERF-004 implementation and validation](validation/performance/PERF-004.md).
+
+Use `--baseline-root /path/to/accepted/checkout` with the timing harness to measure the accepted source and candidate sequentially on the same host with identical scenarios, viewport, graphics and throttling. The candidate's bounded-work assertions stay mandatory; the older source is measured without imposing an optimization it does not yet implement. Raw records include both source commit/tree identities and per-scenario median comparisons.
+
 ## Continuous integration
 
 [Validate source and runtime](../.github/workflows/validate.yml) uses one GitHub-hosted Ubuntu 24.04 job with Python 3.12 and Node 22. It runs for PRs targeting `main`, main pushes and manual dispatch. It checks the exact PR head, records the actual tested commit/tree separately from the event SHA and cancels stale runs for the same PR/ref. There is no parallel test matrix or duplicate feature-branch push run.
@@ -80,7 +84,7 @@ The job runs these gates once in order:
 1. Complete tracked-source manifest check.
 2. Required surfaceless GLES3 context, followed by `python self_test.py`, including genuine production shader/pixel tests. Missing GLES support fails CI instead of being accepted as rendered coverage.
 3. `browser_render_regression_414.py` against real Chromium/WebGL2, including editor interactions and bounded texture parity.
-4. `state_change_performance_415.py --samples 3 --cpu-throttle 1 --cpu-throttle 4`, preserving measurements and enforcing the bounded-work assertions.
+4. `state_change_performance_415.py --samples 3 --cpu-throttle 1 --cpu-throttle 4`, preserving measurements and enforcing the bounded-work assertions. PR runs also check out their accepted base and run the same scenarios on that source for a same-host comparison; main pushes measure the merged candidate.
 5. A second manifest check to detect any shipped-source changes made by tests.
 
 The artifact `relay-moth-validation-<run-id>-<attempt>` is uploaded even after a test failure and retained for 30 days. It contains source identity, installed Python package versions, stage logs, browser JSON/screenshots and raw performance JSON for stages that ran. A missing result indicates that its stage did not complete; it is not a passing result. Preserve release/acceptance evidence beyond the artifact retention window when required.
