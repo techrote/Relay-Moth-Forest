@@ -362,6 +362,7 @@ def measure_source(args, root, validate_static=True):
                     }})()
                 })"""
             )
+            env["browserVersion"] = browser.version
             run = {"cpuThrottle": rate, "environment": env, "scenarios": {}}
             for scenario in SCENARIOS:
                 records = []

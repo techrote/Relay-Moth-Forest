@@ -102,6 +102,9 @@ retain bounded color-only work and match all three complete GPU textures exactly
 The stage records its results alongside the ordinary browser evidence and saves
 its own diagnostics on failure, including private-cache ownership evidence on a
 failed terrain comparison. Either native gate failing remains fatal.
+Both native contexts record the running browser version, user agent and WebGL
+vendor/renderer. Performance environment records include the running browser
+version as well, so installer logs are not the only browser provenance.
 
 ## Continuous integration
 

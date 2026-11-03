@@ -258,7 +258,7 @@ These failed candidates informed the design; none is successful qualification.
 | [Origin plus mounted fallback](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41576567695) | The genuine foliage-overlap edit exposed two required floor bytes even with identical global origin. |
 | [Native target with fixed guard](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41579124347) | Floor pixels matched, but clipping the nest swirl introduced two required color bytes. |
 
-In the last case, tile `(8,6)` changed ground to path at 997×563. Output
+In the origin-plus-mounted-fallback case, tile `(8,6)` changed ground to path at 997×563. Output
 `(199,150,30,29)` came from a 272×224 prefix. Canvas pixels `(209,168)` and
 `(210,168)` had green 87 instead of 86; both changed in the reference. Material
 and exterior bytes matched. Their five contributors were identical: sky, an
@@ -319,6 +319,52 @@ can fold a clip into a textured quad and recompute local texture coordinates.
 This source and the discriminating controls support the clipping explanation;
 they are not a captured trace of this Chromium draw. The complete native
 matrix, including a new unchanged 1280×720 matrix, remains the production gate.
+
+### A distant edit can change the default full renderer
+
+Candidate 19 passed the clipped-sprite case, then failed the disjoint edit at
+997×563 in [run 41581460412](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41581460412).
+Edits at cells `(34,3)` and `(3,13)` produced exact local crops, but a fresh full
+render changed three color bytes in two untouched ground pixels: native
+top-origin `(133,139)` and `(443,139)`. Both lay outside the two output regions.
+Their local draw commands and contributing geometry were unchanged. The actual
+bounded update preserved every exterior byte; normal and specular were exact.
+
+[Diagnostic 20](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41582840848)
+reconstructed the previous terrain from its immutable snapshot and compared
+complete old/new/repeated frames. Both floor-only and complete compositions
+reproduced the same three exterior differences. Repeated old and new frames,
+including old after new, were exact. Every control reused the same 52 observed
+tint sources with zero cache misses, replacement or generation change. This
+separates a reproducible nonlocal full-floor effect from source-cache churn or
+omitted local contributors; it does not identify a captured GPU mechanism.
+
+[Diagnostic 21](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41584129614)
+requested `willReadFrequently:true` only for each color destination. Material
+and source contexts retained their original options. The hinted old frame plus
+both actual production patch crops equaled the hinted new full frame exactly,
+including its exterior. However, the hinted full renderer changed the image
+substantially compared with the unchanged default full renderer:
+
+| New-terrain comparison | Different bytes | Different pixels | Maximum channel difference |
+| --- | ---: | ---: | ---: |
+| Floor-only default versus hinted color | 978,857 | 367,262 / 65.43% | 28 |
+| Complete default versus hinted color | 1,040,772 | 396,170 / 70.58% | 46 |
+
+For complete composition, RGBA maxima were `[30,46,34,0]`. Repeated hinted
+frames were stable, all tint identities remained unchanged, and a final default
+render matched its original control exactly. The hint is an API optimization
+request, not a portable backend guarantee. These are comparisons with the
+current default full painter, not a newly executed frozen-legacy comparison.
+The color-hint experiment is **rejected as a production solution** because of
+its visual compatibility cost; it is not a passing PERF-004 qualification.
+
+Diagnostic 21 tested commit `54d3a79edeeaec3888542c62afd5d470198cf201`, tree
+`1758fada3034c0ef229dcc16906d306985bb8ff4`. Artifact `13207556395` has verified
+SHA-256 `a9d7fee5dcc3279727be8d7eeef0321cd44d8b1ab7b2c0ca1512097c280e734d`.
+No production context setting, original coordinates, exact-zero tolerance or
+performance gate changed in these diagnostics. Native correctness and the
+same-host performance comparison remain outstanding.
 
 ## Stable transformed-normal sources
 

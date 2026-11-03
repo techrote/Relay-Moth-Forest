@@ -258,8 +258,9 @@ def main():
         page.on('pageerror',lambda e:logs.append(str(e)))
         page.on('console',lambda m:logs.append(m.type+': '+m.text) if m.type=='error' else None)
         boot_offline_runtime(page,html)
-        result={'rooms':[],'native_webgl':True,'asset_transport':'offline injected, normal renderer'}
-        result['driver']=page.evaluate("(()=>{const g=game.renderer.gl,d=g.getExtension('WEBGL_debug_renderer_info');return {version:g.getParameter(g.VERSION),renderer:d?g.getParameter(d.UNMASKED_RENDERER_WEBGL):g.getParameter(g.RENDERER)}})()")
+        result={'rooms':[],'native_webgl':True,'asset_transport':'offline injected, normal renderer',
+            'browserVersion':browser.version,'userAgent':page.evaluate('navigator.userAgent')}
+        result['driver']=page.evaluate("(()=>{const g=game.renderer.gl,d=g.getExtension('WEBGL_debug_renderer_info');return {version:g.getParameter(g.VERSION),vendor:d?g.getParameter(d.UNMASKED_VENDOR_WEBGL):g.getParameter(g.VENDOR),renderer:d?g.getParameter(d.UNMASKED_RENDERER_WEBGL):g.getParameter(g.RENDERER)}})()")
         # Rendering/readback happen in the same browser task before the drawing buffer is discarded.
         page.evaluate('''()=>{window.auditFrame=(time=1000,capture=false)=>{game.renderer.foliageFX.update(.016,game.foliageInteractionSources(),game.graphics,time/1000);game.render(time);const g=game.renderer.gl;g.finish();const error=g.getError();if(error)throw Error('WebGL error '+error);if(game.renderer.foliageFX.error)throw Error(game.renderer.foliageFX.error);if(game.renderer.surfaceFX.errors.length)throw Error(game.renderer.surfaceFX.errors.join(';'));return {png:capture?game.canvas.toDataURL():null,foliage:game.renderer.foliageFX.diagnostics(),surface:game.renderer.surfaceFX.diagnostics()}}}'''.replace('game.canvas.toDataURL()','document.querySelector("#game").toDataURL()'))
         for i in range(9):
@@ -394,7 +395,8 @@ def main():
                 export_page.on('console',lambda m:logs.append('export runtime '+m.type+': '+m.text) if m.type=='error' else None)
                 boot_offline_runtime(export_page,html)
                 export_page.add_script_tag(content=(ROOT/'tests/current/static_terrain_browser_415.js').read_text())
-                result['raster_export_runtime']=export_page.evaluate("(()=>{const g=game.renderer.gl,d=g.getExtension('WEBGL_debug_renderer_info');return {isolatedContext:true,initialRoom:game.room.key,native:[game.renderer.nativeW,game.renderer.nativeH],driver:{version:g.getParameter(g.VERSION),renderer:d?g.getParameter(d.UNMASKED_RENDERER_WEBGL):g.getParameter(g.RENDERER)}}})()")
+                result['raster_export_runtime']=export_page.evaluate("(()=>{const g=game.renderer.gl,d=g.getExtension('WEBGL_debug_renderer_info');return {isolatedContext:true,initialRoom:game.room.key,native:[game.renderer.nativeW,game.renderer.nativeH],userAgent:navigator.userAgent,driver:{version:g.getParameter(g.VERSION),vendor:d?g.getParameter(d.UNMASKED_VENDOR_WEBGL):g.getParameter(g.VENDOR),renderer:d?g.getParameter(d.UNMASKED_RENDERER_WEBGL):g.getParameter(g.RENDERER)}}})()")
+                result['raster_export_runtime']['browserVersion']=browser.version
                 yield export_page
             finally:
                 context.close()
