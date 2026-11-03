@@ -307,17 +307,25 @@
     const inventory=()=>[...art.tintCache].map(([key,canvas])=>({key,...source(canvas)}));
     const tintOwn=Object.prototype.hasOwnProperty.call(art,'tintedRegion'),tintedRegion=art.tintedRegion,cache=art.tintCache,frames=new Map();
     const compareBytes=(left,right)=>{
-      const whole=differences(left,right,width),exterior={bytes:0,pixels:0,max:0,examples:[]};
+      const whole=differences(left,right,width),exterior={bytes:0,pixels:0,max:0,examples:[]},inside={bytes:0,pixels:0,max:0,examples:[]};
       for(let i=0;i<left.length;i+=4){
-        const x=(i/4)%width,y=Math.floor(i/4/width);if(covered(x,y))continue;
+        const x=(i/4)%width,y=Math.floor(i/4/width),area=covered(x,y)?inside:exterior;
         let changed=false;
-        for(let k=0;k<4;k++){const delta=Math.abs(left[i+k]-right[i+k]);if(delta){changed=true;exterior.bytes++;exterior.max=Math.max(exterior.max,delta)}}
-        if(changed){exterior.pixels++;if(exterior.examples.length<6)exterior.examples.push({x,y,canvasY:height-1-y,left:Array.from(left.subarray(i,i+4)),right:Array.from(right.subarray(i,i+4))})}
+        for(let k=0;k<4;k++){const delta=Math.abs(left[i+k]-right[i+k]);if(delta){changed=true;area.bytes++;area.max=Math.max(area.max,delta)}}
+        if(changed){area.pixels++;if(area.examples.length<6)area.examples.push({x,y,canvasY:height-1-y,left:Array.from(left.subarray(i,i+4)),right:Array.from(right.subarray(i,i+4))})}
       }
-      return{whole,exterior,probes:probes.map(p=>{const i=(p.y*width+p.x)*4;return{...p,left:Array.from(left.subarray(i,i+4)),right:Array.from(right.subarray(i,i+4))}})};
+      return{whole,exterior,inside,probes:probes.map(p=>{const i=(p.y*width+p.x)*4;return{...p,left:Array.from(left.subarray(i,i+4)),right:Array.from(right.subarray(i,i+4))}})};
     };
-    const compare=(left,right)=>{
-      if(frames.has(left)&&frames.has(right))report.comparisons.push({left,right,...compareBytes(frames.get(left),frames.get(right))});
+    const compare=(left,right,compatibility=false)=>{
+      if(frames.has(left)&&frames.has(right)){
+        const a=frames.get(left),b=frames.get(right),entry={left,right,...compareBytes(a,b)};
+        if(compatibility){
+          const upper=[1,2,3,4,8,16,32,Infinity],histogram=Array(8).fill(0),channelBytes=[0,0,0,0],channelMax=[0,0,0,0];
+          for(let i=0;i<a.length;i++){const delta=Math.abs(a[i]-b[i]);if(!delta)continue;const k=i%4;channelBytes[k]++;channelMax[k]=Math.max(channelMax[k],delta);histogram[upper.findIndex(limit=>delta<=limit)]++}
+          entry.compatibility={channelOrder:['R','G','B','A'],channelBytes,channelMax,histogramBuckets:['1','2','3','4','5..8','9..16','17..32','>32'],histogram};
+        }
+        report.comparisons.push(entry);
+      }
       else report.comparisons.push({left,right,skipped:'control render failed'});
     };
     art.tintedRegion=function(name,colour,strength){
@@ -326,8 +334,29 @@
       if(activeControl){activeControl.tint[hit?'hits':'misses']++;activeControl.tint.calls.push({key,hit,before:prior,returned:source(canvas),cacheSize:this.tintCache.size})}
       return canvas;
     };
-    const render=(name,room,snapshot,floorOnly)=>{
-      const painter=new StaticPainter(art,game.luts),entry={name,floorOnly,footerRetained:true,floorCalls:0,
+    const withColorReadHint=(entry,targetWidth,targetHeight,build)=>{
+      const prototype=OffscreenCanvas.prototype,getContext=prototype.getContext;entry.colorContextOverrides=0;
+      // A diagnostic optimization hint, not a standardized backend guarantee.
+      // Override only the first native color context; source and material
+      // canvases keep their original options and cache policy.
+      prototype.getContext=function(type,options){
+        if(!entry.colorContextOverrides&&type==='2d'&&options?.alpha===false&&this.width===targetWidth&&this.height===targetHeight){
+          entry.colorContextOverrides++;return getContext.call(this,type,{...options,willReadFrequently:true});
+        }
+        return getContext.call(this,type,options);
+      };
+      try{return build()}
+      finally{prototype.getContext=getContext}
+    };
+    const finishControl=entry=>{
+      entry.tint.after=inventory();entry.tint.cacheObjectUnchanged=art.tintCache===cache;
+      const beforeKeys=new Map(entry.tint.before.map(s=>[s.key,s.id])),afterKeys=new Map(entry.tint.after.map(s=>[s.key,s.id]));
+      entry.tint.removed=entry.tint.before.filter(s=>!afterKeys.has(s.key));entry.tint.added=entry.tint.after.filter(s=>!beforeKeys.has(s.key));
+      entry.tint.replaced=entry.tint.after.filter(s=>beforeKeys.has(s.key)&&beforeKeys.get(s.key)!==s.id);
+      entry.normalGenerationAfter=art.normalTransformGeneration;report.controls.push(entry);
+    };
+    const render=(name,room,snapshot,floorOnly,readFrequently=false)=>{
+      const painter=new StaticPainter(art,game.luts),entry={name,floorOnly,readFrequentlyRequested:readFrequently,footerRetained:true,floorCalls:0,
         tint:{hits:0,misses:0,calls:[],before:inventory()},normalGenerationBefore:art.normalTransformGeneration};
       let color=null,maps=null;activeControl=entry;
       try{
@@ -337,20 +366,19 @@
           entry.floorCalls++;check(types[type]===snapshot.cellTypes[ty*geometry.columns+tx],'full-frame replay changed an effective floor classification');
           return baseTile.call(this,ctx,tx,ty,seed,type);
         };
-        color=painter.build(room,game.state,width,height);maps=painter.lastMaterialMaps;
+        const build=()=>painter.build(room,game.state,width,height);
+        color=readFrequently?withColorReadHint(entry,width,height,build):build();maps=painter.lastMaterialMaps;
         check(entry.floorCalls===geometry.columns*geometry.rows,'full-frame control did not replay the complete floor list');
         entry.canvasSize=[color.width,color.height];entry.colorAttributes=color.getContext('2d').getContextAttributes();
+        entry.materialContextAttributes={normal:maps.normal.getContext('2d').getContextAttributes(),specular:maps.spec.getContext('2d').getContextAttributes()};
+        if(readFrequently)check(entry.colorContextOverrides===1&&entry.colorAttributes.willReadFrequently===true&&entry.materialContextAttributes.normal.willReadFrequently===false&&entry.materialContextAttributes.specular.willReadFrequently===false,'read-frequently diagnostic changed material context options or rejected the color hint');
         const bytes=uploadReference(game.renderer.gl,color,width,height);frames.set(name,bytes);
         entry.probes=probes.map(p=>{const i=(p.y*width+p.x)*4;return{...p,rgba:Array.from(bytes.subarray(i,i+4))}});
         entry.glError=game.renderer.gl.getError();check(entry.glError===game.renderer.gl.NO_ERROR,'full-frame control WebGL error');
       }catch(error){entry.error=String(error);entry.stack=error?.stack}
       finally{
         activeControl=null;release(color);release(maps?.normal);release(maps?.spec);
-        entry.tint.after=inventory();entry.tint.cacheObjectUnchanged=art.tintCache===cache;
-        const beforeKeys=new Map(entry.tint.before.map(s=>[s.key,s.id])),afterKeys=new Map(entry.tint.after.map(s=>[s.key,s.id]));
-        entry.tint.removed=entry.tint.before.filter(s=>!afterKeys.has(s.key));entry.tint.added=entry.tint.after.filter(s=>!beforeKeys.has(s.key));
-        entry.tint.replaced=entry.tint.after.filter(s=>beforeKeys.has(s.key)&&beforeKeys.get(s.key)!==s.id);
-        entry.normalGenerationAfter=art.normalTransformGeneration;report.controls.push(entry);
+        finishControl(entry);
       }
     };
     try{
@@ -362,6 +390,40 @@
       if(before)compare('prior-gpu','full-composition/old-1');
       compare('actual','full-composition/new-1');compare('initial-reference','full-composition/new-1');
       compare('floor-only/old-2','full-composition/old-2');compare('floor-only/new-1','full-composition/new-1');
+      report.readFrequentlyQualification='Only color requests willReadFrequently:true; accepted context attributes are reported. Canvas2D exposes an optimization hint, not a portable backend guarantee.';
+      for(const [stage,floorOnly] of [['floor-only',true],['full-composition',false]]){
+        for(const [label,room,snapshot] of [['old-1',oldRoom,priorSnapshot],['old-2',oldRoom,priorSnapshot],['new-1',currentRoom,current],['new-2',currentRoom,current],['old-after-new',oldRoom,priorSnapshot]])render('cpu-color/'+stage+'/'+label,room,snapshot,floorOnly,true);
+        for(const [left,right] of [['old-1','old-2'],['new-1','new-2'],['old-2','new-1'],['old-1','old-after-new']])compare('cpu-color/'+stage+'/'+left,'cpu-color/'+stage+'/'+right);
+        for(const authority of ['old-1','new-1'])compare(stage+'/'+authority,'cpu-color/'+stage+'/'+authority,true);
+      }
+      // Reconstruct a complete read-frequently color result using the actual
+      // production patch geometry, preserving untouched old bytes verbatim.
+      const cpuOld=frames.get('cpu-color/full-composition/old-1'),regions=game.staticRefreshStats?.regions||[];
+      if(cpuOld&&regions.length){
+        const composed=cpuOld.slice();let complete=true;
+        for(let index=0;index<regions.length;index++){
+          const region=regions[index],painter=new StaticPainter(art,game.luts),entry={name:'cpu-color/production-patch-'+index,region,readFrequentlyRequested:true,floorCalls:0,
+            tint:{hits:0,misses:0,calls:[],before:inventory()},normalGenerationBefore:art.normalTransformGeneration};
+          let color=null,maps=null;activeControl=entry;
+          try{
+            check(rects.some(r=>r.x===region.x&&r.y===height-region.y-region.height&&r.width===region.width&&r.height===region.height),'CPU reconstruction region does not match an executed upload');
+            const baseTile=painter.baseTile;painter.baseTile=function(ctx,tx,ty,seed,type){entry.floorCalls++;check(types[type]===current.cellTypes[ty*geometry.columns+tx],'CPU patch changed a floor classification');return baseTile.call(this,ctx,tx,ty,seed,type)};
+            const cw=region.canvasWidth??region.rasterWidth??region.width,ch=region.canvasHeight??region.rasterHeight??region.height;
+            color=withColorReadHint(entry,cw,ch,()=>painter.buildPatch(currentRoom,game.state,width,height,region));maps=painter.lastMaterialMaps;
+            check(!maps&&entry.floorCalls===(region.tx1-region.tx0)*(region.ty1-region.ty0),'CPU patch changed its material/floor work');
+            entry.canvasSize=[color.width,color.height];entry.colorAttributes=color.getContext('2d').getContextAttributes();
+            check(entry.colorContextOverrides===1&&entry.colorAttributes.willReadFrequently===true,'CPU patch color hint was not accepted');
+            const bytes=uploadCroppedReference(game.renderer.gl,color,region),bottom=height-region.y-region.height;
+            for(let y=0;y<region.height;y++)composed.set(bytes.subarray(y*region.width*4,(y+1)*region.width*4),((bottom+y)*width+region.x)*4);
+            entry.glError=game.renderer.gl.getError();check(entry.glError===game.renderer.gl.NO_ERROR,'CPU patch control WebGL error');
+          }catch(error){complete=false;entry.error=String(error);entry.stack=error?.stack}
+          finally{activeControl=null;release(color);release(maps?.normal);release(maps?.spec);finishControl(entry)}
+        }
+        if(complete){frames.set('cpu-color/reconstructed-patches',composed);compare('cpu-color/reconstructed-patches','cpu-color/full-composition/new-1');compare('cpu-color/full-composition/old-1','cpu-color/reconstructed-patches')}
+        else report.cpuPatchReconstructionError='one or more patch controls failed';
+      }else report.cpuPatchReconstructionError='CPU old frame or production patch regions unavailable';
+      render('default-after-cpu/full-composition/new',currentRoom,current,false);
+      compare('full-composition/new-1','default-after-cpu/full-composition/new');
       const after=RelayStaticTerrain.capture(currentRoom,game.staticTerrainContext());
       report.authorityUnchanged=game.room===currentRoom&&after.valid&&after.cellTypes.every((type,i)=>type===current.cellTypes[i])&&
         after.dependencies.every((entry,i)=>entry[0]===current.dependencies[i][0]&&entry[1]===current.dependencies[i][1]);
