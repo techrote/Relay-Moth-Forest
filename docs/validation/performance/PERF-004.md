@@ -65,6 +65,17 @@ pixels covers raster rounding/antialiasing. A separate conservative input range
 includes neighboring floor marks that can reach the output edge. Other microtile
 sizes retain the full renderer until independently qualified.
 
+Output bounds also expand to an eight-native-pixel grid before clipping to the
+canvas, merging regions and applying work budgets. Skia's gradient dither uses an
+[8x8 table at device coordinates](https://skia.googlesource.com/skia/+/5fdfc51ef3e8/src/gpu/ganesh/SkGr.cpp),
+and its [fragment coordinates use an upper-left origin](https://skia.googlesource.com/skia/+/89c0ddff982bf3383beeba6397d3236526fb4a76/src/sksl/README.md).
+Preserving that phase matters for overlapping lamp glows: the unaligned native
+rectangle `(170,90,28,28)` differed from the full color texture by one byte level
+in 209 pixels, while normal/specular maps and exterior pixels matched exactly
+([diagnostic run](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41563498272)).
+The expanded rectangle is `(168,88,32,32)`. The raster input range and all memory,
+pixel and work limits account for the expanded bounds.
+
 Default planning limits are 16 changed cells, eight merged regions, at most 20%
 of native pixels, 35% of logical floor raster work, and 262,144 pixels in the
 largest scratch map. Thus the three-map scratch capacity is at most 3 MiB on

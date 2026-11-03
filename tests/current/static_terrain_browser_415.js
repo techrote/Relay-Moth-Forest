@@ -193,6 +193,46 @@
     }
   }
 
+  function patchRasterDiagnostics(actual,expected,uploads){
+    const width=actual.width,height=actual.height,sx=width/640,sy=height/360;
+    const upload=uploads.find(item=>item.channel==='color');if(!upload)return[];
+    const original={x:upload.x,y:height-upload.y-upload.height,width:upload.width,height:upload.height};
+    const inputs=rect=>({...rect,
+      tx0:Math.max(0,Math.floor((rect.x/sx-4-2/sx)/16)),ty0:Math.max(0,Math.floor((rect.y/sy-4-2/sy)/16)),
+      tx1:Math.min(40,Math.ceil(((rect.x+rect.width)/sx+4+2/sx)/16)),ty1:Math.min(19,Math.ceil(((rect.y+rect.height)/sy+4+2/sy)/16))});
+    const aligned=(grid,bottomOrigin)=>{
+      const x0=Math.max(0,Math.floor(original.x/grid)*grid),x1=Math.min(width,Math.ceil((original.x+original.width)/grid)*grid);
+      const y0=bottomOrigin?Math.max(0,height-Math.ceil((height-original.y)/grid)*grid):Math.max(0,Math.floor(original.y/grid)*grid);
+      const y1=bottomOrigin?Math.min(height,height-Math.floor((height-original.y-original.height)/grid)*grid):Math.min(height,Math.ceil((original.y+original.height)/grid)*grid);
+      return{x:x0,y:y0,width:x1-x0,height:y1-y0};
+    };
+    const crop=(bytes,sourceWidth,x,y,w,h)=>{
+      const out=new Uint8Array(w*h*4);for(let row=0;row<h;row++)out.set(bytes.subarray(((y+row)*sourceWidth+x)*4,((y+row)*sourceWidth+x+w)*4),row*w*4);return out;
+    };
+    const originalExpected=expected.map(bytes=>crop(bytes,width,original.x,height-original.y-original.height,original.width,original.height));
+    const variants=[['original-1',original,false],['original-2',original,false],['aligned-8-top',aligned(8,false),false],['aligned-16-top',aligned(16,false),false],
+      ['aligned-8-bottom',aligned(8,true),false],['aligned-16-bottom',aligned(16,true),false],['original-cpu',original,true]];
+    const out=[];
+    for(const [name,rectangle,forceCPU] of variants){
+      const region=inputs(rectangle),painter=new StaticPainter(game.art,game.luts),prototype=OffscreenCanvas.prototype,getContext=prototype.getContext;
+      const generationBefore=game.art.normalTransformGeneration;let color=null,maps=null;
+      if(forceCPU)prototype.getContext=function(type,options){return getContext.call(this,type,type==='2d'&&this.width===region.width&&this.height===region.height?{...options,willReadFrequently:true}:options)};
+      try{
+        color=painter.buildPatch(game.room,game.state,width,height,region);maps=painter.lastMaterialMaps;
+        const sources=[color,maps.normal,maps.spec],entry={name,region,forceCPU,generationBefore,generationAfter:game.art.normalTransformGeneration,
+          colorAttributes:color.getContext('2d').getContextAttributes(),maps:{}};
+        for(let c=0;c<channels.length;c++){
+          const bytes=uploadReference(game.renderer.gl,sources[c],region.width,region.height);
+          const fullCrop=crop(expected[c],width,region.x,height-region.y-region.height,region.width,region.height);
+          const originalCrop=crop(bytes,region.width,original.x-region.x,region.y+region.height-original.y-original.height,original.width,original.height);
+          entry.maps[channels[c]]={wholeRegion:differences(bytes,fullCrop,region.width),originalCrop:differences(originalCrop,originalExpected[c],original.width)};
+        }
+        out.push(entry);
+      }finally{prototype.getContext=getContext;release(color);release(maps?.normal);release(maps?.spec)}
+    }
+    return out;
+  }
+
   function parity(label,before=null,uploads=[]){
     const actual=capture(),expected=reference(),result={};let firstFailure=null;
     for(let c=0;c<channels.length;c++){
@@ -216,6 +256,7 @@
       root.__staticRasterDiagnostics={kind:before?(uploads.length?'patch-vs-full':'unchanged-vs-full'):'full-vs-full',label,room:game.room.key,
         native:[actual.width,actual.height],beforeNative:before?[before.width,before.height]:null,maps:result,glError,
         uploadCoordinates:'WebGL bottom-left',subUploads:uploads.map(rect=>({...rect})),staticRefreshStats:JSON.parse(JSON.stringify(game.staticRefreshStats||{}))};
+      if(before&&uploads.length)try{root.__staticRasterDiagnostics.patchVariants=patchRasterDiagnostics(actual,expected,uploads)}catch(error){root.__staticRasterDiagnostics.patchVariantError=String(error)}
       check(false,(firstFailure||label+' WebGL error '+glError)+'\nPERF-004 raster diagnostics '+JSON.stringify(root.__staticRasterDiagnostics));
     }
     return result;

@@ -133,6 +133,11 @@ function geometryOracle(){
       assert.strictEqual(delta.kind,'patch');assert.strictEqual(delta.regions.length,1);const r=delta.regions[0],output={x0:r.x,y0:r.y,x1:r.x+r.width,y1:r.y+r.height};
       for(const value of Object.values(r))assert(Number.isSafeInteger(value));
       assert(r.x>=0&&r.y>=0&&output.x1<=width&&output.y1<=height);
+      assert.strictEqual(delta.nativeAlignment,8);
+      assert(r.x%8===0&&r.y%8===0,'scratch top-left origin must preserve the full canvas 8x8 gradient-dither phase');
+      assert(output.x1===width||output.x1%8===0,'right edge is aligned or clipped to native bounds');
+      assert(output.y1===height||output.y1%8===0,'bottom edge is aligned or clipped to native bounds');
+      if(output.y1!==height)assert.strictEqual((height-output.y1)%8,height%8,'fractional-height GL upload flip must not change top-origin alignment');
       assert(r.tx0<=x&&r.tx1>x&&r.ty0<=y&&r.ty1>y);
       assert(delta.rasterCellCount<=16&&delta.rasterCellCount<760);
       assert(delta.pixelCount===r.width*r.height&&delta.scratchPixels===delta.pixelCount);
@@ -152,6 +157,14 @@ function geometryOracle(){
   assert.strictEqual(adjacent.kind,'patch');assert.strictEqual(adjacent.regions.length,1,'adjacent outputs merge deterministically');
   const disjoint=plan(fixture(),r=>{r.water.add('3,3');r.paths.add('30,14')});assert.strictEqual(disjoint.regions.length,2);
   assert(disjoint.pixelCount<10000&&disjoint.rasterCellCount<30,'distant edits must not fill their bounding box');
+  const wet=fixture();wet.water.add('11,6');const dither=plan(wet,r=>r.water.delete('11,6')),r=dither.regions[0];
+  assert.deepStrictEqual([r.x,r.y,r.width,r.height],[168,88,32,32],'observed 170,90 28x28 failure must expand outward to the 8px phase grid');
+  assert.strictEqual(dither.pixelCount,1024);
+  assert.strictEqual(plan(wet,r=>r.water.delete('11,6'),{maxScratchPixels:784}).reason,'scratch-budget','alignment expansion must count against scratch capacity');
+  assert.strictEqual(plan(wet,r=>r.water.delete('11,6'),{maxPixelRatio:784/(640*360)}).reason,'pixel-budget','alignment expansion must count against upload work');
+  const edgeRoom=fixture(),edgeMeta=context({renderWidth:997,renderHeight:563,logicalHeight:304}),edgeBefore=capture(edgeRoom,edgeMeta);edgeRoom.water.add('39,18');
+  const edge=S.plan(edgeBefore,capture(edgeRoom,edgeMeta)).regions[0];
+  assert(edge.x%8===0&&edge.y%8===0);assert.strictEqual(edge.x+edge.width,997);assert.strictEqual(edge.y+edge.height,563,'nonmultiple native bounds must clip the outward-aligned output');
 }
 
 authorityAndNoops();dependencyFallbacks();budgetAndValidation();productionRoomAuthority();geometryOracle();
@@ -160,4 +173,4 @@ console.log('STATIC TERRAIN PLANNER REGRESSION PERF-004 PASS');
 console.log('  authoritative classifications / invalidation checks:',authorityCases);
 console.log('  native single-cell geometry cases:',geometryCases,'; production floor primitive footprints:',footprintCases);
 console.log('  exact same-count moves, undo/redo, live-state noops, all static dependencies, identities, budgets and malformed/stale authority');
-console.log('  1x / fractional / 2x / 4x output and source halos, supported microtiles, all grid edges and footer boundary');
+console.log('  1x / fractional / 2x / 4x halos, 8px top-origin dither alignment, clipped native edges, unchanged work budgets and footer boundary');

@@ -15,7 +15,7 @@
   const GEOMETRY_KEYS=['renderWidth','renderHeight','logicalWidth','logicalHeight','tileSize','columns','rows'];
   const REFERENCE_KEYS=['sourceRef','rendererRef','artRef','atlasRef','normalRef','specularRef'];
   const MAX_CELLS=65536,MAX_VALUE_NODES=65536,MAX_VALUE_DEPTH=32;
-  const LOGICAL_HALO=4,NATIVE_HALO=2;
+  const LOGICAL_HALO=4,NATIVE_HALO=2,NATIVE_ALIGNMENT=8;
   const snapshots=new WeakSet();
   const own=(object,key)=>Object.prototype.hasOwnProperty.call(object,key);
 
@@ -129,7 +129,7 @@
     const pixelCount=full?(geometry?geometry.renderWidth*geometry.renderHeight:0):regions.reduce((n,r)=>n+r.width*r.height,0);
     const rasterCellCount=full?(geometry?geometry.columns*geometry.rows:0):regions.reduce((n,r)=>n+(r.tx1-r.tx0)*(r.ty1-r.ty0),0);
     const scratchPixels=full?pixelCount:regions.reduce((n,r)=>Math.max(n,r.width*r.height),0);
-    return Object.freeze({kind,reason,changedCells:freezeArray(changedCells),changedCellCount:changedCells.length,regions:freezeArray(regions.map(Object.freeze)),pixelCount,rasterCellCount,scratchPixels,scratchBytes:scratchPixels*12,uploadCalls:full?3:regions.length*3,uploadBytes:pixelCount*12,logicalHalo:LOGICAL_HALO,nativeHalo:NATIVE_HALO});
+    return Object.freeze({kind,reason,changedCells:freezeArray(changedCells),changedCellCount:changedCells.length,regions:freezeArray(regions.map(Object.freeze)),pixelCount,rasterCellCount,scratchPixels,scratchBytes:scratchPixels*12,uploadCalls:full?3:regions.length*3,uploadBytes:pixelCount*12,logicalHalo:LOGICAL_HALO,nativeHalo:NATIVE_HALO,nativeAlignment:NATIVE_ALIGNMENT});
   }
 
   function limits(options){
@@ -181,12 +181,20 @@
     // microtiles keep the full painter as authority until separately qualified.
     if(![4,8,16].includes(next.microtile)||next.geometry.tileSize!==16)return full('unsupported-microtile',changes);
     const g=next.geometry,sx=g.renderWidth/g.logicalWidth,sy=g.renderHeight/g.logicalHeight;
-    const raw=changes.map(cell=>({
-      x0:Math.max(0,Math.floor((cell.x*g.tileSize-LOGICAL_HALO)*sx)-NATIVE_HALO),
-      y0:Math.max(0,Math.floor((cell.y*g.tileSize-LOGICAL_HALO)*sy)-NATIVE_HALO),
-      x1:Math.min(g.renderWidth,Math.ceil(((cell.x+1)*g.tileSize+LOGICAL_HALO)*sx)+NATIVE_HALO),
-      y1:Math.min(g.renderHeight,Math.ceil(((cell.y+1)*g.tileSize+LOGICAL_HALO)*sy)+NATIVE_HALO)
-    }));
+    const raw=changes.map(cell=>{
+      const x0=Math.floor((cell.x*g.tileSize-LOGICAL_HALO)*sx)-NATIVE_HALO,y0=Math.floor((cell.y*g.tileSize-LOGICAL_HALO)*sy)-NATIVE_HALO;
+      const x1=Math.ceil(((cell.x+1)*g.tileSize+LOGICAL_HALO)*sx)+NATIVE_HALO,y1=Math.ceil(((cell.y+1)*g.tileSize+LOGICAL_HALO)*sy)+NATIVE_HALO;
+      // Skia's gradient dither repeats in an 8x8 device-coordinate tile. Its
+      // sk_FragCoord origin is upper-left, independent of the later GL upload
+      // flip. Preserve that phase by moving scratch origins outward to this
+      // native grid. Recompute merging, raster inputs and all budgets afterward.
+      return{
+        x0:Math.max(0,Math.floor(x0/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT),
+        y0:Math.max(0,Math.floor(y0/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT),
+        x1:Math.min(g.renderWidth,Math.ceil(x1/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT),
+        y1:Math.min(g.renderHeight,Math.ceil(y1/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT)
+      };
+    });
     const merged=merge(raw);
     if(merged.length>budget.maxRegions)return full('fragmentation',changes);
     const regions=merged.map(rect=>({x:rect.x0,y:rect.y0,width:rect.x1-rect.x0,height:rect.y1-rect.y0,
