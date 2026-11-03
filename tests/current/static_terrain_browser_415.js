@@ -377,7 +377,7 @@
         };
       }
     };
-    const results=[];
+    const results=[];let floorReference=null;
     try{
       for(const stage of stages){
         const fullPainter=new StaticPainter(art,game.luts),patchPainter=new StaticPainter(art,game.luts),corrections=[];
@@ -387,6 +387,7 @@
           configure(fullPainter,stage,false,corrections);configure(patchPainter,stage,true,corrections);
           fullColor=fullPainter.build(game.room,game.state,width,height);fullMaps=fullPainter.lastMaterialMaps;
           const fullBytes=uploadReference(game.renderer.gl,fullColor,width,height),fullCrop=cropFull(fullBytes);
+          if(stage.name==='floor-only')floorReference={bytes:fullBytes,crop:fullCrop};
           patchColor=patchPainter.buildPatch(game.room,game.state,width,height,region);patchMaps=patchPainter.lastMaterialMaps;
           const patchBytes=uploadCroppedReference(game.renderer.gl,patchColor,region);
           entry.color=differences(patchBytes,fullCrop,upload.width);
@@ -398,6 +399,51 @@
           if(stage.quantizeSprites){entry.rasterOrigin=[region.rasterX,region.rasterY];entry.translationCorrections=corrections}
         }catch(error){entry.error=String(error);entry.stack=error?.stack}
         finally{release(fullColor);release(fullMaps?.normal);release(fullMaps?.spec);release(patchColor);release(patchMaps?.normal);release(patchMaps?.spec)}
+        results.push(entry);
+      }
+      // Failure-only target/clip/command-stream discrimination. Reuse the exact
+      // floor-only full readback above, the production builder and shared art.
+      // These four diagnostic surfaces never replace a production texture.
+      const fullTarget={...region,rasterX:0,rasterY:0,rasterWidth:width,rasterHeight:height};
+      const variants=[
+        {name:'floor-full-target-bounded-list',region:fullTarget},
+        {name:'floor-full-target-bounded-list-guard-clip',region:fullTarget,clip:{x:region.rasterX,y:region.rasterY,width:region.rasterWidth,height:region.rasterHeight}},
+        {name:'floor-full-target-bounded-list-output-clip',region:fullTarget,clip:{x:region.x,y:region.y,width:region.width,height:region.height}},
+        {name:'floor-small-target-full-list',region:{...region,tx0:0,ty0:0,tx1:40,ty1:19}}
+      ];
+      for(const variant of variants){
+        const painter=new StaticPainter(art,game.luts),prototype=OffscreenCanvas.prototype,getContext=prototype.getContext;
+        const entry={name:variant.name,diagnosticOnly:true,referenceStage:'floor-only',region:variant.region,nativeClip:variant.clip||null,
+          footerRetained:true,floorCalls:0,clipApplications:0,normalGenerationBefore:art.normalTransformGeneration};
+        let color=null,maps=null;
+        try{
+          check(floorReference,'target diagnostic has no floor-only full reference');
+          configure(painter,{prefix:0},true,[]);
+          const baseTile=painter.baseTile;
+          painter.baseTile=function(...args){entry.floorCalls++;return baseTile.apply(this,args)};
+          // Clip the new color context in native coordinates before the
+          // production save/scale sequence, without adding a translation.
+          if(variant.clip)prototype.getContext=function(type,options){
+            const ctx=getContext.call(this,type,options);
+            if(!entry.clipApplications&&type==='2d'&&options?.alpha===false&&this.width===width&&this.height===height){
+              const clip=variant.clip;ctx.beginPath();ctx.rect(clip.x,clip.y,clip.width,clip.height);ctx.clip();entry.clipApplications++;
+            }
+            return ctx;
+          };
+          try{color=painter.buildPatch(game.room,game.state,width,height,variant.region);maps=painter.lastMaterialMaps}
+          finally{prototype.getContext=getContext}
+          check(entry.floorCalls===(variant.region.tx1-variant.region.tx0)*(variant.region.ty1-variant.region.ty0),'target diagnostic floor list differs');
+          check(entry.clipApplications===(variant.clip?1:0),'target diagnostic clip was not applied');
+          entry.canvasSize=[color.width,color.height];entry.colorAttributes=color.getContext('2d').getContextAttributes();
+          const bytes=uploadCroppedReference(game.renderer.gl,color,variant.region);
+          entry.color=differences(bytes,floorReference.crop,upload.width);
+          entry.failurePixels=points.map(p=>{
+            const f=(p.y*width+p.x)*4,l=((p.y-upload.y)*upload.width+p.x-upload.x)*4;
+            return{x:p.x,y:p.y,canvasY:height-1-p.y,full:Array.from(floorReference.bytes.subarray(f,f+4)),patch:Array.from(bytes.subarray(l,l+4))};
+          });
+          entry.normalGenerationAfter=art.normalTransformGeneration;
+        }catch(error){entry.error=String(error);entry.stack=error?.stack}
+        finally{prototype.getContext=getContext;release(color);release(maps?.normal);release(maps?.spec)}
         results.push(entry);
       }
     }finally{
