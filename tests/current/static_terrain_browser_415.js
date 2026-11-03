@@ -665,12 +665,13 @@
 
   function eligibleCases(width,height,sourceMaps){
     const result={native:[width,height],initial:setup(width,height,sourceMaps),cases:[]},out=result.cases,e=rmfEditor;
-    // Native runs 41571669664 and 41572947659 expose translated fractional
-    // sprite and floor sampling differences. A fractional patch now preserves
-    // global origin, subject to the unchanged budgets. Independent 997x563
-    // prefix areas / floor counts (20% =112262.2 pixels; 35% =266 cells):
-    // water 75264/140; path 89600/170; lamp 76800/140; same-count 75264/140;
-    // microtile8/16 76800/140. These stay eligible, including mounted sprites.
+    // Native runs 41572947659 and 41574605048 expose fractional floor and
+    // mounted-sprite sampling differences. Preserve global origin and retain
+    // the independently demonstrated mounted-sprite fallback. Independent
+    // 997x563 prefix areas / floor counts (20% =112262.2px; 35% =266 cells):
+    // water 75264/140; path 89600/170; foliage 60928/120 remain patches.
+    // Lamp 76800/140, same-count 75264/140 and microtile8/16 76800/140 fit
+    // these budgets but overlap the known mounted sprite and must render full.
     // Pattern 174080/322; adjacent 193536/336; disjoint 188928/378;
     // bottom 285696/456; preview/cancel/save 172800/300; footer 294912/456.
     // These exceed raster-pixel-budget first. Explicit case expectations below
@@ -684,16 +685,36 @@
       }
       return entry;
     };
+    const mounted=(label,action,options={})=>{
+      const entry=measured(label,action,fractional?'full':'patch',options);
+      if(fractional){
+        check(entry.diagnostics.reason==='fractional-mounted-sprite',label+' used incidental fallback '+entry.diagnostics.reason);
+        check(entry.waterFullRebuilds===0&&entry.waterFullUploads===0,label+' mounted-sprite fallback regressed bounded water');
+      }
+      return entry;
+    };
     out.push(measured('water to ground',()=>transaction('PERF-004 clear water',()=>paint('clear',11,6))));
     out.push(measured('ground to water',()=>transaction('PERF-004 paint water',()=>paint('water',11,6))));
     out.push(measured('path to ground',()=>transaction('PERF-004 clear path',()=>paint('clear',13,6))));
-    out.push(measured('ground to path under lamp and glow',()=>transaction('PERF-004 lamp overlap',()=>paint('path',10,7)),'patch',{materials:true}));
+    // The unchanged row5 foliage sprite at8,5 has world bounds
+    // x127.7056..144.2944,y85.04..98, intersecting this dry cell below it.
+    // Output640 [128,96,19,18], raster [96,64,96,96],64 source cells;
+    // output997 [199,150,31,29], prefix272x224=60928px,120 source cells.
+    // Both material maps must have actual nonzero alpha in the upload footprint.
+    out.push(measured('ground to path beneath unchanged foliage row',()=>{
+      const raw=e.rawRoom(),walls=JSON.stringify(raw.walls),styles=JSON.stringify(raw.blocker_styles);
+      check(!game.room.blocked([8,6])&&!game.room.paths.has('8,6')&&!game.room.water.has('8,6')&&
+        game.room.walls.has('8,5')&&raw.blocker_styles['8,5']?.sprite==='foliage_v391_00','foliage overlap fixture moved or is not dry ground');
+      transaction('PERF-004 unchanged foliage overlap',()=>paint('path',8,6));
+      check(JSON.stringify(e.rawRoom().walls)===walls&&JSON.stringify(e.rawRoom().blocker_styles)===styles,'terrain edit changed the overlapping blocker dependency');
+    },'patch',{materials:true}));
+    out.push(mounted('ground to path under lamp and glow',()=>transaction('PERF-004 lamp overlap',()=>paint('path',10,7)),{materials:true}));
     out.push(prefixBudgeted('ground to water under pattern materials',()=>transaction('PERF-004 swirl overlap',()=>paint('water',19,10)),{materials:true}));
     out.push(prefixBudgeted('adjacent repeated edits and blocker footprint',()=>transaction('PERF-004 adjacent',()=>{paint('water',19,11);paint('path',20,11);paint('water',19,11)}),{materials:true}));
     out.push(prefixBudgeted('disjoint asymmetric changes',()=>transaction('PERF-004 disjoint',()=>{paint('path',3,13);paint('water',34,3)})));
     out.push(prefixBudgeted('bottom edge beneath border overlay',()=>transaction('PERF-004 bottom edge',()=>paint('path',20,17))));
     const beforeWater=JSON.stringify(e.rawRoom().water),counts=e.getInvalidationDiagnostics().counters;
-    out.push(measured('same-count move; 40 events; synchronous pointerup',()=>{
+    out.push(mounted('same-count move; 40 events; synchronous pointerup',()=>{
       e.beginTransaction('PERF-004 same-count water move');const raw=e.rawRoom(),i=raw.water.findIndex(p=>p[0]===11&&p[1]===6);
       check(i>=0,'same-count source missing');raw.water[i]=[10,6];
       for(let n=0;n<40;n++)e.queueInvalidation(RelayEditorInvalidation.TERRAIN);
@@ -704,8 +725,8 @@
       check(e.rawRoom().water.length===JSON.parse(beforeWater).length&&JSON.stringify(e.rawRoom().water)!==beforeWater,'same-count edit did not change identity');
     }));
     const afterWater=JSON.stringify(e.rawRoom().water);
-    out.push(measured('undo same-count move',()=>{check(e.undoOne(),'undo unavailable');check(JSON.stringify(e.rawRoom().water)===beforeWater,'undo changed source history')}));
-    out.push(measured('redo same-count move',()=>{check(e.redoOne(),'redo unavailable');check(JSON.stringify(e.rawRoom().water)===afterWater,'redo changed source history')}));
+    out.push(mounted('undo same-count move',()=>{check(e.undoOne(),'undo unavailable');check(JSON.stringify(e.rawRoom().water)===beforeWater,'undo changed source history')}));
+    out.push(mounted('redo same-count move',()=>{check(e.redoOne(),'redo unavailable');check(JSON.stringify(e.rawRoom().water)===afterWater,'redo changed source history')}));
     out.push(measured('unchanged terrain refresh',()=>invalidation(),'noop'));
     const beforeCancel=JSON.stringify(e.rawRoom());
     out.push(measured('cancel queued unrendered gesture',()=>{e.beginTransaction('PERF-004 cancel before frame');paint('path',26,7);e.cancelGesture();check(JSON.stringify(e.rawRoom())===beforeCancel,'queued cancellation lost source data')},'noop'));
@@ -715,8 +736,8 @@
     out.push(prefixBudgeted('save synchronously flushes pending transaction',()=>{e.beginTransaction('PERF-004 pending save');paint('path',26,7);e.flushForPersistence();check(!e.transaction&&!e.getInvalidationDiagnostics().pending,'save left pending authority')}));
     for(const microtile of [8,16]){
       e.rawRoom().floor_microtile=microtile;invalidation();
-      out.push(measured('microtile '+microtile+' path to water under materials',()=>transaction('PERF-004 supported microtile water',()=>paint('water',10,7)),'patch',{materials:true}));
-      out.push(measured('microtile '+microtile+' water to path under materials',()=>transaction('PERF-004 supported microtile path',()=>paint('path',10,7)),'patch',{materials:true}));
+      out.push(mounted('microtile '+microtile+' path to water under materials',()=>transaction('PERF-004 supported microtile water',()=>paint('water',10,7)),{materials:true}));
+      out.push(mounted('microtile '+microtile+' water to path under materials',()=>transaction('PERF-004 supported microtile path',()=>paint('path',10,7)),{materials:true}));
     }
     e.rawRoom().floor_microtile=4;invalidation();
     // An intentionally open last border tile makes the changed floor cross the

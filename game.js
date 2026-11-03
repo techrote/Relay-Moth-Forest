@@ -335,6 +335,44 @@ class StaticPainter{
     // Explicit mounted lamps: every luminous head has a believable post/root base.
     const mounts=room.decorLamps||[],safeLamps=(this.art.roles.lamps||['lamp_blue']).filter(n=>!objectiveSprites.has(n)&&n.startsWith('lamp_'));for(let mi=0;mi<mounts.length;mi++){const m=mounts[mi],[x,y]=room.center(m.tile),wanted=m.lamp||'lamp_blue',lamp=objectiveSprites.has(wanted)?(safeLamps[mi%Math.max(1,safeLamps.length)]||'lamp_blue'):wanted;this.sprite(ctx,'orb_pillar',x,y+11,{alpha:.96,element:'blockers',scale:.92});this.px(ctx,x-1,y-25,2,28,this.col('tree_shadow',145),.42);this.sprite(ctx,lamp,x,y-18,{alpha:.98,element:'tree_lights',scale:.66});this.glow(ctx,x,y-29,'tree_lights',215,30,.24)}
   }
+  mountedSpriteFootprints(room,renderW,renderH){
+    const invalid=()=>{throw new Error('Invalid mounted sprite footprint context')};
+    if(![renderW,renderH].every(n=>Number.isSafeInteger(n)&&n>0))invalid();
+    const sx=renderW/W,sy=renderH/H;
+    if(Number.isInteger(sx)&&Number.isInteger(sy))return[];
+    if(!room||!this.art?.regions||typeof this.art.worldSize!=='function')invalid();
+    const footprints=[],recorder=Object.create(this);
+    const record=(x,y,w,h,opts={})=>{
+      const rot=opts.rot??0,anchor=opts.anchor||'bottom',alpha=opts.alpha??1;
+      if(![x,y,w,h,rot,alpha].every(Number.isFinite)||w<=0||h<=0||alpha<0||alpha>1||typeof anchor!=='string')invalid();
+      const top=anchor==='bottom'?-h:anchor==='top'?0:-h/2,flip=opts.flip?-1:1,co=Math.cos(rot),si=Math.sin(rot);
+      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      for(const [u,v] of [[-w/2,top],[w/2,top],[-w/2,top+h],[w/2,top+h]]){
+        const px=(x+u*flip*co-v*si)*sx,py=(y+u*flip*si+v*co)*sy;
+        minX=Math.min(minX,px);minY=Math.min(minY,py);maxX=Math.max(maxX,px);maxY=Math.max(maxY,py);
+      }
+      const x0=Math.floor(minX)-2,y0=Math.floor(minY)-2,x1=Math.ceil(maxX)+2,y1=Math.ceil(maxY)+2;
+      if(![x0,y0,x1,y1,x1-x0,y1-y0].every(Number.isSafeInteger))invalid();
+      if(alpha>0)footprints.push({x:x0,y:y0,width:x1-x0,height:y1-y0});
+      return[w,h];
+    };
+    recorder.sprite=(_ctx,name,x,y,opts={})=>{
+      if(!name||!recorder.art.regions[name])return[0,0];
+      const scale=recorder.spriteScale(name,opts.scale??1);
+      if(!Number.isFinite(scale)||scale<=0)invalid();
+      const [w,h]=recorder.art.worldSize(name,scale);return record(x,y,w,h,opts);
+    };
+    recorder.spriteSubrect=(_ctx,name,sourceX,sourceY,sourceW,sourceH,x,y,w,h,opts={})=>{
+      if(!name||!recorder.art.regions[name])return[0,0];
+      if(![sourceX,sourceY,sourceW,sourceH].every(Number.isFinite)||sourceW<=0||sourceH<=0)invalid();
+      return record(x,y,w,h,opts);
+    };
+    // Replay the placement/substitution authority without tint, Canvas2D,
+    // material-source or cache work. Glows and posts remain patch eligible.
+    recorder.px=recorder.glow=()=>{};recorder.col=()=>'';
+    recorder.materialNormalCtx=null;recorder.materialSpecCtx=null;
+    recorder.drawDecor(null,room);return footprints;
+  }
   drawRobots(ctx,room,state){const entries=room.decorRobots||[];for(let i=0;i<entries.length;i++){const d=entries[i];if(d.id&&state?.hasRobot(d.id))continue;const [x,y]=room.center(d.tile),name=this.robotFrame(d.variant||'cream','idle');this.sprite(ctx,name,x,y+10,{alpha:.96,element:'robot_faces',tintIndex:175+((i*19)%45),scale:.84});const [ow,oh]=this.art.worldSize(name),w=ow*.84,h=oh*.84;this.glow(ctx,x,y+8-h*.5,'robot_faces',205+(i*17)%38,16,.10)}}
   drawEditorDecor(ctx,room){for(const d of room.editorDecor||[]){const name=d.sprite;if(!name||!this.art.regions[name])continue;const meta=this.art.regionMeta(name),element=d.element||meta.element||'far_forest',scale=clamp(Number(d.scale??1),.25,4),alpha=clamp(Number(d.alpha??1),0,1),x=Number(d.x)||0,y=Number(d.y)||0;this.sprite(ctx,name,x,y,{anchor:'bottom',element,scale,alpha,flip:!!d.flip,rot:Number(d.rot)||0,tintIndex:d.tint_index??156,tintStrength:d.tint_strength??meta.tint_strength??.07});const g=d.glow;if(g)this.glow(ctx,x+Number(g.dx||0),y+Number(g.dy||0),g.element||element,Number(g.index??180),Number(g.radius??18),Number(g.alpha??.18))}}
   drawGates(ctx,room,state){const draw=(side,f,open)=>{if(!side)return;const t=room.doorTile(side,f,1),[x,y]=room.center(t),[gw,gh]=this.art.worldSize('gate');if(open){this.glow(ctx,x,y,'tree_lights',238,44,.31);this.sprite(ctx,'gate',x,y+gh*.42,{alpha:1,element:'blockers',tintStrength:.055});}else{this.sprite(ctx,'gate',x,y+gh*.42,{alpha:.82,element:'tree_shadow',tintIndex:138,tintStrength:.34});this.glow(ctx,x,y,'blockers',86,20,.10);}};draw(room.spec.previous_side,room.spec.previous_fraction,true);draw(room.spec.next_side,room.spec.next_fraction,state.roomComplete(room.spec))}
@@ -884,6 +922,12 @@ class Game{
       catch(_err){plan={kind:'full',reason:'invalid-context'}}
       if(force)plan={...plan,kind:'full',reason:'forced'};
       else if(previous&&(!renderer.backgroundReady||this.staticBackgroundRevision!==renderer.backgroundRevision))plan={...plan,kind:'full',reason:'stale-background'};
+      else if(plan.kind==='patch'){
+        try{
+          const footprints=this.painter.mountedSpriteFootprints(this.room,renderer.nativeW,renderer.nativeH);
+          if(footprints.some(s=>plan.regions.some(r=>r.x<s.x+s.width&&s.x<r.x+r.width&&r.y<s.y+s.height&&s.y<r.y+r.height)))plan={...plan,kind:'full',reason:'fractional-mounted-sprite'};
+        }catch(_err){plan={...plan,kind:'full',reason:'invalid-context'}}
+      }
     });
     // Asset replacement on an existing HDArtSheet must also discard derived
     // tint/normal tiles; their historical keys identify sprite names, not images.

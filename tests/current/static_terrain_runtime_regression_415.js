@@ -135,6 +135,119 @@ function spriteFixture(width=997,height=563){
   return g;
 }
 function actorState(g){return JSON.stringify([g.x,g.y,g.vx,g.vy,g.followers,g.miniGuides,g.flock,[...g.state.completed],[...g.state.robots],[...g.state.moths],g.room.objects,[...g.room.objectFxHidden]])}
+function mountedFixture(width=997,height=563){const g=spriteFixture(width,height);g.room.decorLamps=[{tile:[10,8]}];return g}
+function isolateFootprintWork(g,run){
+  // A sizing query may read metadata, but cannot touch source surfaces, tint or
+  // material caches, any Canvas drawing method, LUT lookup, or GL state.
+  const descriptors=[],deny=(object,name)=>{descriptors.push([object,name,Object.getOwnPropertyDescriptor(object,name)]);Object.defineProperty(object,name,{configurable:true,get(){throw Error('Footprint phase touched '+name)}})};
+  const first=allocations.length,allocationCalls=faults.allocationCalls,rasterCalls=faults.rasterCalls,actors=actorState(g),materialNormal=g.painter.materialNormalCtx,materialSpec=g.painter.materialSpecCtx,maps=g.painter.lastMaterialMaps;
+  for(const name of ['img','normalImg','specImg','bumpImg','tintCache','normalTransformCache','normalTransformGeneration','tintInfo','tintedRegion','trimTintCache','draw','drawSubrect','drawMap','drawMapSubrect','transformedNormal'])deny(g.art,name);
+  deny(g.luts,'hex');for(const [name,value] of Object.entries(g.renderer.gl))if(typeof value==='function')deny(g.renderer.gl,name);
+  try{return run()}finally{
+    for(const [object,name,descriptor] of descriptors.reverse())if(descriptor)Object.defineProperty(object,name,descriptor);else delete object[name];
+    assert.strictEqual(allocations.length,first,'footprints cannot allocate scratch or derived source canvases');assert.strictEqual(faults.allocationCalls,allocationCalls);assert.strictEqual(faults.rasterCalls,rasterCalls);
+    assert.strictEqual(actorState(g),actors,'footprint detection cannot change live actors or progression');
+    assert.strictEqual(g.painter.materialNormalCtx,materialNormal);assert.strictEqual(g.painter.materialSpecCtx,materialSpec);assert.strictEqual(g.painter.lastMaterialMaps,maps,'dry recording cannot claim or detach the real painter material maps');
+  }
+}
+function observedMountedDraws(g){
+  // This oracle measures actual HDArtSheet destination corners. It does not
+  // call the footprint helper or reconstruct the mounted-placement formulas.
+  const canvas=new FakeCanvas(g.renderer.nativeW,g.renderer.nativeH),ctx=canvas.context;
+  ctx.scale(g.renderer.nativeW/640,g.renderer.nativeH/360);g.painter.drawDecor(ctx,g.room);
+  const out=ctx.images.map(draw=>{
+    const xs=draw.corners.map(p=>p[0]),ys=draw.corners.map(p=>p[1]),x=Math.floor(Math.min(...xs)),y=Math.floor(Math.min(...ys)),right=Math.ceil(Math.max(...xs)),bottom=Math.ceil(Math.max(...ys));
+    return{draw,core:{x,y,width:right-x,height:bottom-y},guard:{x:x-2,y:y-2,width:right-x+4,height:bottom-y+4}};
+  });canvas.width=canvas.height=1;return out;
+}
+const overlaps=(a,b)=>a.x<b.x+b.width&&b.x<a.x+a.width&&a.y<b.y+b.height&&b.y<a.y+a.height;
+
+function mountedFootprintsFollowActualDrawing(){
+  for(const mode of ['default','objective-substitution','custom-metadata','rotated-subrect']){
+    const g=mountedFixture();
+    if(mode==='objective-substitution'){g.art.roles.objective.lamp='lamp_blue';g.room.spec.objects=[{object_id:'fixture-objective',kind:'lamp'}]}
+    if(mode==='custom-metadata'){g.art.worldScale=.27;g.art.meta.lamp_blue.world_scale=.65;g.art.meta.orb_pillar.world_scale=1.25}
+    if(mode==='rotated-subrect'){
+      const drawDecor=g.painter.drawDecor;
+      g.painter.drawDecor=function(ctx,room){drawDecor.call(this,ctx,room);return this.spriteSubrect(ctx,'lamp_blue',0,70,82,70,215.25,126.5,9.7416,8.316,{anchor:'center',rot:.37,flip:true,alpha:.8})};
+    }
+    const rendered=observedMountedDraws(g),before=actorState(g),normalMarker={},specMarker={},mapsMarker={normal:{},spec:{}};
+    g.painter.materialNormalCtx=normalMarker;g.painter.materialSpecCtx=specMarker;g.painter.lastMaterialMaps=mapsMarker;
+    const footprints=isolateFootprintWork(g,()=>g.painter.mountedSpriteFootprints(g.room,g.renderer.nativeW,g.renderer.nativeH));
+    assert.deepStrictEqual(Array.from(footprints,r=>({...r})),rendered.map(r=>r.guard),'footprints follow real atlas rectangles, anchors, substitutions, scales and transforms');
+    assert.strictEqual(footprints.length,mode==='rotated-subrect'?3:2,'glow and post drawing do not add sprite footprints');
+    assert.deepStrictEqual(rendered[1].draw.source,artManifest.regions[mode==='objective-substitution'?'lamp_orange':'lamp_blue'],'objective substitutions must select the real rendered source');
+    if(mode==='default'){
+      assert.deepStrictEqual(rendered[1].core,{x:254,y:158,width:16,height:27});assert.deepStrictEqual({...footprints[1]},{x:252,y:156,width:20,height:31});
+      assert(Math.abs(rendered[1].draw.destination[2]-9.7416)<1e-12&&Math.abs(rendered[1].draw.destination[3]-16.632)<1e-12,'real lamp metadata and draw scale remain the placement authority');
+    }
+    assert.strictEqual(actorState(g),before);g.painter.materialNormalCtx=g.painter.materialSpecCtx=g.painter.lastMaterialMaps=null;scenarios++;
+  }
+  // Integral scales return before even inspecting mounted data or the atlas.
+  for(const [width,height] of [[640,360],[1280,720]]){
+    const painter=Object.create(production.StaticPainter.prototype);Object.defineProperty(painter,'art',{get(){throw Error('integer query touched art')}});Object.defineProperty(painter,'drawDecor',{get(){throw Error('integer query touched mounted placement')}});
+    assert.deepStrictEqual(Array.from(painter.mountedSpriteFootprints(null,width,height)),[]);scenarios++;
+  }
+  const g=mountedFixture();
+  for(const dimensions of [[0,563],[997,NaN],[997.5,563],[Number.MAX_SAFE_INTEGER+1,563]])assert.throws(()=>g.painter.mountedSpriteFootprints(g.room,...dimensions),/Invalid mounted sprite footprint/);
+  for(const bad of [NaN,Infinity,-1,0]){g.art.meta.lamp_blue.world_scale=bad;assert.throws(()=>isolateFootprintWork(g,()=>g.painter.mountedSpriteFootprints(g.room,997,563)),/Invalid mounted sprite footprint/)}
+  scenarios++;
+}
+
+function fractionalMountedFallbacks(){
+  const cases=[
+    {label:'both-fractional',width:997,height:563,cell:'10,7',mode:'full'},
+    {label:'fractional-x',width:997,height:360,cell:'10,7',mode:'full'},
+    {label:'fractional-y',width:640,height:563,cell:'10,7',mode:'full'},
+    {label:'native-integer',width:640,height:360,cell:'10,7',mode:'patch'},
+    {label:'double-integer',width:1280,height:720,cell:'10,7',mode:'patch'},
+    {label:'head-filter-halo',width:997,height:563,cell:'9,7',mode:'full'},
+    {label:'touching-halo-edge',width:997,height:563,cell:'9,7',mode:'patch',lampScale:.75},
+    {label:'glow-only',width:997,height:563,cell:'8,6',mode:'patch'},
+    {label:'nonoverlap',width:997,height:563,cell:'6,7',mode:'patch'}
+  ];
+  for(const test of cases){
+    const g=mountedFixture(test.width,test.height);if(test.lampScale)g.art.meta.lamp_blue.world_scale=test.lampScale;
+    const rendered=observedMountedDraws(g);refresh(g);const before=g.staticTerrainSnapshot,actors=actorState(g),first=allocations.length,uploads=g.renderer.gl.uploads.length,phaseStart=phases.length;
+    const helper=g.painter.mountedSpriteFootprints,build=g.painter.build;let queries=0;
+    g.painter.mountedSpriteFootprints=function(...args){queries++;return isolateFootprintWork(g,()=>helper.apply(this,args))};
+    g.room.water.add(test.cell);
+    const ordinaryPlan=terrain.plan(before,terrain.capture(g.room,g.staticTerrainContext()));assert.strictEqual(ordinaryPlan.kind,'patch','the new fallback must be the only reason this terrain edit is full');
+    const output=ordinaryPlan.regions[0];
+    if(test.label==='head-filter-halo'){
+      assert.strictEqual(output.x+output.width,rendered[1].core.x,'output only touches the unpadded sprite boundary');
+      assert(!rendered.some(r=>overlaps(output,r.core)));assert(overlaps(output,rendered[1].guard),'two native filtering pixels must protect this otherwise disjoint output');
+    }
+    if(test.label==='touching-halo-edge'){assert.strictEqual(output.x+output.width,rendered[1].guard.x);assert(!rendered.some(r=>overlaps(output,r.guard)),'half-open footprint edges do not overlap')}
+    if(test.label==='glow-only'){
+      assert(!rendered.some(r=>overlaps(output,r.guard)));const x=(output.x+output.width-.5)/(test.width/640),y=(output.y+output.height/2)/(test.height/360);
+      assert(Math.hypot(x-168,y-107)<30,'the chosen output intersects the actual mounted glow while missing both sprites');
+    }
+    if(test.mode==='full'){
+      g.painter.buildPatch=()=>{throw Error('mounted fallback must precede every patch attempt')};
+      g.painter.build=function(...args){assert.strictEqual(allocations.length,first,'no guarded scratch may precede a planned full fallback');assert.strictEqual(g.renderer.gl.uploads.length,uploads,'no partial upload may precede the fallback');return build.apply(this,args)};
+    }
+    const stats=refresh(g);assert.strictEqual(stats.mode,test.mode,test.label);assert.strictEqual(queries,1);assert.strictEqual(actorState(g),actors);
+    assert.deepStrictEqual(g.staticTerrainSnapshot.dependencies,before.dependencies,'render fallback cannot alter static material authority');assert.deepStrictEqual(g.staticTerrainSnapshot.references,before.references);
+    assert.strictEqual(g.staticTerrainSnapshot.cellTypes[7*40+10],test.cell==='10,7'?terrain.CELL_TYPES.water:before.cellTypes[7*40+10]);
+    if(test.mode==='full'){
+      assert.strictEqual(stats.reason,'fractional-mounted-sprite');assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(allocations.length-first,3);assert.strictEqual(stats.rasterCells,760);assert.strictEqual(stats.regions.length,0);
+      assert(!phases.slice(phaseStart).some(name=>name.startsWith('static.patch.')),'selection happens before any patch work');
+    }else assert.strictEqual(stats.uploadCalls,1);
+    const count=allocations.length,afterUploads=g.renderer.gl.uploads.length;assert.strictEqual(refresh(g).mode,'noop');assert.strictEqual(queries,1,'unchanged static state needs no footprint query');assert.strictEqual(allocations.length,count);assert.strictEqual(g.renderer.gl.uploads.length,afterUploads);assert.strictEqual(actorState(g),actors);scenarios+=2;
+  }
+  // An invalid sizing result is caught while planning; the actual full builder
+  // then runs with valid input. The helper itself is never stubbed or bypassed.
+  {
+    const g=mountedFixture();refresh(g);const first=allocations.length,uploads=g.renderer.gl.uploads.length,actors=actorState(g),worldSize=g.art.worldSize,helper=g.painter.mountedSpriteFootprints,build=g.painter.build;let invalid=true,queries=0;
+    g.art.worldSize=function(name,...args){if(name==='lamp_blue'&&invalid){invalid=false;return[NaN,20]}return worldSize.call(this,name,...args)};
+    g.painter.mountedSpriteFootprints=function(...args){queries++;return isolateFootprintWork(g,()=>helper.apply(this,args))};
+    g.painter.buildPatch=()=>{throw Error('malformed footprint must not start a patch')};
+    g.painter.build=function(...args){assert(!invalid,'the real footprint collector must have rejected the malformed size');assert.strictEqual(allocations.length,first);assert.strictEqual(g.renderer.gl.uploads.length,uploads);return build.apply(this,args)};
+    g.room.water.add('10,7');const stats=refresh(g);assert.strictEqual(queries,1);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'invalid-context');assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(stats.regions.length,0);assert.strictEqual(stats.rasterCells,760);assert.strictEqual(allocations.length-first,3);assert.strictEqual(actorState(g),actors);scenarios++;
+  }
+}
+
 function fractionalPrefixMatchesFullCommands(){
   const cases=[
     {label:'floor-only',width:997,height:563},
@@ -158,7 +271,10 @@ function fractionalPrefixMatchesFullCommands(){
     }
     const baseTile=g.painter.baseTile;
     g.painter.baseTile=function(ctx,tx,ty,...args){const prior=ctx.floorCell;ctx.floorCell=tx+','+ty;try{return baseTile.call(this,ctx,tx,ty,...args)}finally{ctx.floorCell=prior}};
-    refresh(g);const previous=g.staticTerrainSnapshot,actors=actorState(g),materials=materialSnapshot(g.renderer);g.room.water.add('4,4');
+    // This command-only fixture deliberately changes output above the mounted
+    // head. Static art is still replayed into the prefix; intersecting outputs
+    // are separately required to use the mounted-sprite full fallback.
+    refresh(g);const previous=g.staticTerrainSnapshot,actors=actorState(g),materials=materialSnapshot(g.renderer);g.room.water.add('3,2');
     traceCanvases=true;
     try{
       // Run the unchanged full painter as an independent command oracle for
@@ -170,6 +286,7 @@ function fractionalPrefixMatchesFullCommands(){
       assert.strictEqual(stats.mode,'patch',test.label);assert.strictEqual(created.length,1);assert.strictEqual(stats.regions.length,1);
       const region=stats.regions[0],ctx=created[0].context;
       assert.strictEqual(region.rasterX,0);assert.strictEqual(region.rasterY,0);assert.strictEqual(region.tx0,0);assert.strictEqual(region.ty0,0);
+      assert(!g.painter.mountedSpriteFootprints(g.room,test.width,test.height).some(rect=>overlaps(region,rect)),'trace fixture output must remain outside mounted sprites and their filtering halos');
       assert.strictEqual(region.rasterWidth,Math.min(test.width,Math.ceil((region.x+region.width+32)/16)*16));
       assert.strictEqual(region.rasterHeight,Math.min(test.height,Math.ceil((region.y+region.height+32)/16)*16));
       assert.deepStrictEqual(ctx.commands,fullCtx.commands,'prefix root, gradients, actual atlas transforms and footer commands must equal the full global command sequence');
@@ -208,7 +325,7 @@ function prefixWorkAndBudgetFallbacks(){
     {label:'prefix-peak-scratch',width:2000,height:1000,cells:['14,6'],reason:'scratch-budget'}
   ];
   for(const test of cases){
-    const g=spriteFixture(test.width,test.height);refresh(g);const previous=g.staticTerrainSnapshot,actors=actorState(g),first=allocations.length,uploads=g.renderer.gl.uploads.length,phaseStart=phases.length,build=g.painter.build;
+    const g=spriteFixture(test.width,test.height);refresh(g);const previous=g.staticTerrainSnapshot,actors=actorState(g),first=allocations.length,uploads=g.renderer.gl.uploads.length,phaseStart=phases.length,build=g.painter.build;let footprintQueries=0;
     if(test.label==='summed-overlapping-prefixes'){
       const isolated=[];
       for(const cell of test.cells){g.room.water=new Set([cell]);const plan=terrain.plan(previous,terrain.capture(g.room,g.staticTerrainContext()));assert.strictEqual(plan.kind,'patch');isolated.push(plan.regions[0])}
@@ -221,8 +338,10 @@ function prefixWorkAndBudgetFallbacks(){
       const probe=terrain.plan(previous,terrain.capture(g.room,g.staticTerrainContext()),{maxScratchPixels:300000});assert.strictEqual(probe.kind,'patch');assert.strictEqual(probe.scratchPixels,281600);assert(probe.rasterPixels<test.width*test.height*.20&&probe.rasterCellCount<760*.35,'the unchanged peak limit is the binding budget');
     }
     g.painter.buildPatch=()=>{throw Error('prefix budget must be decided before any partial build')};
+    g.painter.mountedSpriteFootprints=()=>{footprintQueries++;throw Error('oversized prefix must skip mounted footprint work')};
     g.painter.build=function(...args){assert.strictEqual(allocations.length,first,'budget fallback cannot allocate partial scratch');assert.strictEqual(g.renderer.gl.uploads.length,uploads,'budget fallback cannot upload a partial texture');return build.apply(this,args)};
     const stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,test.reason);assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(stats.regions.length,0);assert.strictEqual(stats.rasterCells,760);assert.strictEqual(allocations.length-first,3);assert(!phases.slice(phaseStart).some(name=>name.startsWith('static.patch.')));
+    assert.strictEqual(footprintQueries,0,'budget fallback takes precedence over the mounted-sprite policy');
     assert.deepStrictEqual(g.staticTerrainSnapshot.dependencies,previous.dependencies);assert.deepStrictEqual(g.staticTerrainSnapshot.references,previous.references);assert.strictEqual(actorState(g),actors);scenarios++;
   }
   // Integer transforms retain the localized-raster optimization away from the
@@ -461,9 +580,10 @@ function rejectInvalidPatches(){
   c.width=c.height=1;scenarios++;
 }
 
-fullPatchNoopAndHistory();staticIdentityAndStaleness();materialPreservationAndDependencies();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();guardedEdgeRasterMetrics();croppedUploadRestoresUnpackState();rejectInvalidPatches();fractionalPrefixMatchesFullCommands();prefixWorkAndBudgetFallbacks();
+fullPatchNoopAndHistory();staticIdentityAndStaleness();materialPreservationAndDependencies();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();guardedEdgeRasterMetrics();croppedUploadRestoresUnpackState();rejectInvalidPatches();fractionalPrefixMatchesFullCommands();prefixWorkAndBudgetFallbacks();mountedFootprintsFollowActualDrawing();fractionalMountedFallbacks();
 console.log('STATIC TERRAIN RUNTIME REGRESSION PERF-004 PASS');
 console.log('  production Game / StaticPainter / GLRenderer scenarios:',scenarios);
 console.log('  color-only guarded-raster uploads, preserved material handles/bytes, full material-dependency refreshes, asymmetric flipped crops and exact scratch/raster accounting');
 console.log('  coherent snapshot/revision commits, unpack restoration, upload / GL error / context-loss repair, failed repair invalidation, allocation/raster cleanup, zero retained scratch');
 console.log('  fractional global-origin prefixes match real full floor/atlas command traces; unchanged raster/scratch budgets, overlap accounting, integer locality and prefix failure repair');
+console.log('  budget fallback precedes mounted analysis; real sprite footprints select early full refreshes while integer/nonoverlapping/glow-only patches remain bounded');

@@ -281,7 +281,7 @@ function fractionalPrefixBudgets(){
   }
   const mounted=fixture();mounted.decorLamps.push({tile:[10,8],lamp:'lamp_blue'});
   const underLamp=plan(mounted,room=>room.water.add('10,7'),undefined,metadata);
-  assert.strictEqual(underLamp.kind,'patch','unchanged mounted sprites no longer introduce a special fractional eligibility exception');
+  assert.strictEqual(underLamp.kind,'patch','the data planner derives the prefix before the painter checks mounted-sprite sampling eligibility');
   assert.deepStrictEqual(underLamp.regions[0],{x:249,y:175,width:30,height:29,rasterX:0,rasterY:0,rasterWidth:320,rasterHeight:240,tx0:0,ty0:0,tx1:14,ty1:10});
   assert.strictEqual(underLamp.rasterPixels,76800);assert.strictEqual(underLamp.rasterCellCount,140);
   const far=plan(fixture(),room=>room.paths.add('19,10'),undefined,metadata);
