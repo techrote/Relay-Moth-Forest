@@ -126,6 +126,27 @@ Local Chromium launch is blocked by this execution environment's socket policy.
 Local deterministic/GLES results are distinct from the required hosted native
 browser qualification. A missing or failed native result is not a rendered pass.
 
+### Native oracle inputs
+
+The clean full reference uses the actual loaded `HDArtSheet` and its derived
+sprite surfaces, as a normal full refresh does. Independent cold-cache
+current-versus-legacy builds separately qualify the composition refactor across
+all nine rooms and both native sizes. Resource-change cases also require removal
+and release of the old derived surfaces.
+
+This distinction was established by a
+[hosted diagnostic run](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41560857705).
+At 640x360 in Quiet Nest, current and legacy full builders agreed in every
+color/normal/specular byte using shared loaded surfaces. Independent cold
+current/legacy builds also agreed, and all 49 shared transformed-normal cache
+entries had identical source RGBA bytes. Nevertheless, rendering the warm and
+recreated canvas objects into default Chromium destinations produced 3,897
+different normal-map bytes; isolated source sampling reproduced the discrepancy.
+CPU-backed destination comparisons agreed, while changing the entire renderer
+to CPU backing changed many other pixels. The production raster path therefore
+remains unchanged. Patch-versus-full acceptance still requires exact equality
+for every byte of all three textures, using the same loaded source surfaces.
+
 ## Practical limits
 
 Large strokes and edits to static overlay dependencies intentionally rebuild the

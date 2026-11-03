@@ -55,11 +55,15 @@
     return {width:r.nativeW,height:r.nativeH,maps:textureKeys.map(key=>readTexture(g,r[key],r.nativeW,r.nativeH))};
   }
 
-  function reference(builder=null){
+  function reference(builder=null,{freshCaches=false}={}){
     const r=game.renderer;
-    // Independent caches also expose stale tint/normal caches after an atlas or
-    // material source changes without changing a sprite name.
-    const art=Object.create(game.art);art.tintCache=new Map();art.normalTransformCache=new Map();
+    // A real full refresh reuses the loaded derived source canvases. Chromium
+    // can sample byte-identical cold and warm canvas objects differently, so
+    // recreating those sources changes the GPU input to the composition oracle.
+    // Cold independent builders are qualified separately below. Never release
+    // borrowed caches: their backing stores belong to the production art sheet.
+    const art=freshCaches?Object.create(game.art):game.art;
+    if(freshCaches){art.tintCache=new Map();art.normalTransformCache=new Map()}
     const painter=new StaticPainter(art,game.luts);
     let color=null,maps=null;
     try{
@@ -67,7 +71,7 @@
       return [color,maps.normal,maps.spec].map(source=>uploadReference(r.gl,source,r.nativeW,r.nativeH));
     }finally{
       release(color);release(maps?.normal);release(maps?.spec);
-      for(const cache of [art.tintCache,art.normalTransformCache]){for(const canvas of cache.values())release(canvas);cache.clear()}
+      if(freshCaches)for(const cache of [art.tintCache,art.normalTransformCache]){for(const canvas of cache.values())release(canvas);cache.clear()}
     }
   }
 
@@ -125,7 +129,7 @@
       }finally{release(canvas)}
     };
     try{
-      snapshots.set('runtime',actual.maps);snapshots.set('first-fresh-legacy',firstLegacy);
+      snapshots.set('runtime',actual.maps);snapshots.set('first-legacy-reference',firstLegacy);
       report.normalCaches.before=metadata(game.art);
       render('current-shared-1',null,game.art);render('legacy-shared-1',legacyFullBuild,game.art);
       render('current-shared-2',null,game.art);render('legacy-shared-2',legacyFullBuild,game.art);
@@ -138,7 +142,7 @@
       for(const pair of [
         ['runtime','current-shared-1'],['current-shared-1','legacy-shared-1'],['current-shared-1','current-shared-2'],['legacy-shared-1','legacy-shared-2'],
         ['current-cold-A','legacy-warm-A'],['legacy-cold-B','current-warm-B'],['current-cold-A','current-cold-C'],['legacy-cold-B','legacy-cold-D'],
-        ['first-fresh-legacy','legacy-cold-B'],['runtime','current-cold-A'],['current-cold-A','current-warm-B'],
+        ['first-legacy-reference','legacy-cold-B'],['runtime','current-cold-A'],['current-cold-A','current-warm-B'],
         ['current-shared-cpu','legacy-shared-cpu'],['legacy-cold-cpu','current-warm-cpu'],['current-shared-cpu','current-warm-cpu'],['current-shared-2','current-shared-cpu']
       ])compare(...pair);
       report.normalCaches.warm=metadata(game.art);report.normalCaches.fresh=metadata(a);
@@ -298,21 +302,27 @@
 
   function legacyCompatibility(sourceMaps){
     const out=[];
+    const qualify=(qualification,actual,expected)=>{
+      const textures={};
+      for(let c=0;c<channels.length;c++){
+        const diff=differences(actual.maps[c],expected[c],actual.width);textures[channels[c]]=diff;
+        if(diff.bytes){
+          try{root.__staticRasterDiagnostics={qualification,...rasterDiagnostics(actual,expected)}}catch(error){root.__staticRasterDiagnostics={qualification,diagnosticError:String(error),stack:error?.stack}}
+          check(false,qualification+' full builder changed accepted composition '+game.room.key+' '+actual.width+'x'+actual.height+' '+channels[c]+' '+JSON.stringify(diff)+'\nPERF-004 raster diagnostics '+JSON.stringify(root.__staticRasterDiagnostics));
+        }
+      }
+      return textures;
+    };
     rmfEditor.clearPendingInvalidation();game.maps=structuredClone(sourceMaps);game.state.completed=new Set(['pip']);
     game.rooms=game.storyData.rooms.map((spec,i)=>new Room(i,spec,game.maps));
     for(const [width,height] of [[640,360],[997,563]]){
       setNative(width,height);
       for(let index=0;index<game.rooms.length;index++){
         game.enterRoom(index,null);document.querySelector('#storyModal')?.classList.add('hidden');
-        const actual=capture(),expected=reference(legacyFullBuild),textures={};
-        for(let c=0;c<channels.length;c++){
-          const diff=differences(actual.maps[c],expected[c],width);textures[channels[c]]=diff;
-          if(diff.bytes){
-            try{root.__staticRasterDiagnostics=rasterDiagnostics(actual,expected)}catch(error){root.__staticRasterDiagnostics={diagnosticError:String(error),stack:error?.stack}}
-            check(false,'full builder changed accepted composition '+game.room.key+' '+width+'x'+height+' '+channels[c]+' '+JSON.stringify(diff)+'\nPERF-004 raster diagnostics '+JSON.stringify(root.__staticRasterDiagnostics));
-          }
-        }
-        out.push({room:game.room.key,native:[width,height],textures});
+        const actual=capture(),textures=qualify('warm shared sources',actual,reference(legacyFullBuild));
+        const coldCurrent=reference(null,{freshCaches:true}),coldLegacy=reference(legacyFullBuild,{freshCaches:true});
+        const coldIndependentTextures=qualify('cold independent sources',{width,height,maps:coldCurrent},coldLegacy);
+        out.push({room:game.room.key,native:[width,height],textures,coldIndependentTextures});
       }
     }
     return out;
@@ -377,9 +387,44 @@
     return result;
   }
 
+  function naturalCases(sourceMaps){
+    const out=[],e=rmfEditor;
+    for(const [width,height] of [[640,360],[997,563]])for(const roomKey of ['dawn_tree','fern_hollow']){
+      if(e.transaction)e.cancelTransaction();e.clearPendingInvalidation();e.resetPointerState();
+      game.maps=structuredClone(sourceMaps);game.state.completed=new Set(['pip']);game.graphics={...game.graphics,waterQuality:3};
+      game.rooms=game.storyData.rooms.map((spec,index)=>new Room(index,spec,game.maps));e.history=new Map();setNative(width,height);
+      const index=game.storyData.rooms.findIndex(spec=>spec.key===roomKey);check(index>=0,'natural room fixture missing '+roomKey);
+      game.enterRoom(index,null);document.querySelector('#storyModal')?.classList.add('hidden');e.toggle(true);
+      // Keep natural authored content and existing cache caps/order intact. A
+      // visible ground cell must have no other dependency that paintAt removes.
+      const candidates=[];
+      for(let y=2;y<17;y++)for(let x=2;x<38;x++){
+        const key=x+','+y,room=game.room;
+        if(room.border.has(key)||room.walls.has(key)||room.water.has(key)||room.paths.has(key)||room.bridgeCells.has(key)||room.blockerStyles[key]||room.decorExclusions.has(key))continue;
+        if(room.largeTrees.some(tree=>tree.tile?.[0]===x&&tree.tile?.[1]===y))continue;
+        candidates.push([x,y]);
+      }
+      candidates.sort((a,b)=>Math.hypot(a[0]-20,a[1]-9)-Math.hypot(b[0]-20,b[1]-9)||a[1]-b[1]||a[0]-b[0]);
+      check(candidates.length>=2,'natural room has fewer than two eligible dry ground cells '+roomKey);
+      const cases=[];
+      for(const [kind,tile] of [['path',candidates[0]],['water',candidates[1]]]){
+        const label=roomKey+' '+width+'x'+height+' natural ground to '+kind;
+        cases.push({tile,kind,...measured(label,()=>transaction('PERF-004 '+label,()=>paint(kind,tile[0],tile[1])))});
+      }
+      out.push({room:roomKey,native:[width,height],cases});
+    }
+    return out;
+  }
+
   function fallbackCases(sourceMaps){
     setup(640,360,sourceMaps);const e=rmfEditor,out=[];
     const full=(label,mutate,reason=null)=>{const entry=measured(label,()=>{mutate();invalidation()},'full');if(reason)check(entry.diagnostics.reason===reason,label+' used incidental fallback '+entry.diagnostics.reason);out.push(entry)};
+    const resourceFull=(label,mutate)=>{
+      const old=[...game.art.tintCache.values(),...game.art.normalTransformCache.values()];
+      full(label,mutate);const active=new Set([...game.art.tintCache.values(),...game.art.normalTransformCache.values()]);
+      const entry=out[out.length-1];entry.cacheInvalidation={canvasesBefore:old.length,released:old.filter(c=>c.width===1&&c.height===1).length,retained:old.filter(c=>active.has(c)).length};
+      check(old.length>0&&entry.cacheInvalidation.released===old.length&&entry.cacheInvalidation.retained===0,label+' retained stale derived source canvases');
+    };
     full('water brush removes blocker and material',()=>paint('water',20,10));
     full('vegetation overlap threshold four to three',()=>paint('water',9,5));
     full('vegetation overlap threshold three to four',()=>{e.placeTile({kind:'blocker',sprite:game.art.roles.foliage_v391[0]},9,5)});
@@ -403,14 +448,14 @@
     game.refreshEditorStatic();
     for(const field of ['normalImg','specImg']){
       const original=game.art[field];
-      try{full(field+' source removed',()=>{game.art[field]=null})}finally{game.art[field]=original}
-      out.push(measured(field+' source restored',()=>invalidation(),'full'));
+      try{resourceFull(field+' source removed',()=>{game.art[field]=null})}finally{game.art[field]=original}
+      resourceFull(field+' source restored',()=>{});
     }
     const image=game.art.img;
-    try{full('atlas image identity changes',()=>{game.art.img=game.art.specImg})}finally{game.art.img=image}
-    out.push(measured('atlas image identity restored',()=>invalidation(),'full'));
+    try{resourceFull('atlas image identity changes',()=>{game.art.img=game.art.specImg})}finally{game.art.img=image}
+    resourceFull('atlas image identity restored',()=>{});
     const scale=game.art.worldScale;
-    try{full('atlas metadata changes in place',()=>{game.art.worldScale=scale*1.01})}finally{game.art.worldScale=scale}
+    try{resourceFull('atlas metadata changes in place',()=>{game.art.worldScale=scale*1.01})}finally{game.art.worldScale=scale}
     game.refreshEditorStatic();
     full('source identity replacement with equal content',()=>{game.maps=structuredClone(game.maps)});
     full('missing rendered baseline',()=>{game.staticTerrainSnapshot=null});
@@ -475,8 +520,9 @@
       rectOwn:Object.prototype.hasOwnProperty.call(r.c,'getBoundingClientRect'),rect:r.c.getBoundingClientRect,choice:e.choice};
     const sourceMaps=structuredClone(root.__json?.['relay_moth_maps.json']||saved.maps);
     try{
-      const result={oracle:'clean full StaticPainter build; all color/normal/specular GPU bytes; exact equality',legacyCompatibility:legacyCompatibility(sourceMaps),negativeControls:negativeControls(sourceMaps),native:[],fallbacks:[],recovery:[],liveOwnership:[]};
+      const result={oracle:'clean full StaticPainter composition with production source canvases; all color/normal/specular GPU bytes; exact equality',legacyCompatibility:legacyCompatibility(sourceMaps),negativeControls:negativeControls(sourceMaps),native:[],naturalRooms:[],fallbacks:[],recovery:[],liveOwnership:[]};
       for(const [width,height] of [[640,360],[997,563]])result.native.push(eligibleCases(width,height,sourceMaps));
+      result.naturalRooms=naturalCases(sourceMaps);
       result.fallbacks=fallbackCases(sourceMaps);result.recovery=recoveryCases(sourceMaps);result.liveOwnership=ownershipCases(sourceMaps);
       return result;
     }finally{
@@ -487,5 +533,5 @@
     }
   }
 
-  root.auditStaticTerrain={run,legacyCompatibility,negativeControls,eligibleCases,fallbackCases,recoveryCases,ownershipCases,capture,parity,instrument};
+  root.auditStaticTerrain={run,legacyCompatibility,negativeControls,eligibleCases,naturalCases,fallbackCases,recoveryCases,ownershipCases,capture,parity,instrument};
 })(globalThis);
