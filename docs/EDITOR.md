@@ -74,7 +74,7 @@ Mutations update the same in-memory map used by gameplay. Invalidation is coales
 
 Generated decor also renders through the mutable layer, so moving an objective immediately re-evaluates its reserved tile without a static bake. Pattern suppression and genuinely structural terrain can still require static reconstruction. Terrain changes refresh dependent static/water/foliage geometry; unrelated edits do not restart unrelated ambient simulations. Same-count water/grass edits still invalidate geometry-sensitive caches.
 
-Small ground, path and water changes use bounded static color/material updates when the other room dependencies remain unchanged. This also applies to undo/redo and final gesture/persistence flushes. Replacing a blocker/tree, changing scenery or making a large stroke can still rebuild the room. The final map data determines eligibility, so brush names alone do not imply a partial update.
+When the other room dependencies remain unchanged, small ground, path and water changes update bounded static color regions and preserve the existing normal/specular textures. This also applies to undo/redo and final gesture/persistence flushes. Replacing a blocker/tree, changing scenery or making a large stroke can still rebuild the room. The final map data determines eligibility, so brush names alone do not imply a partial update.
 
 ## Validation and dirty state
 

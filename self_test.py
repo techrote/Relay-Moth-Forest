@@ -204,6 +204,7 @@ def main():
     subprocess.run(['node',str(ROOT/'tests'/'current'/'static_terrain_runtime_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'floor_microtile_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'static_matrix_orchestration_415.js')],check=True)
+    subprocess.run(['python',str(ROOT/'tests'/'current'/'perf004_evidence_regression_415.py')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'normal_cache_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'foliagefx_regression_400.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'foliagefx_depth_regression_400.js')],check=True)

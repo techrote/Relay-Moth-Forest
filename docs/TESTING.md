@@ -85,6 +85,18 @@ Each candidate water/path timing record also includes `staticParity`: an exact c
 
 The appended `control-full-static` scenario measures a forced full static refresh in a warmed `quiet_nest` room on both sources, without changing the original ten scenarios or their order. Candidate validation requires one full build, three uploads/native canvases, 760 floor inputs, 19 successful row reads, no retained scratch and exact post-timing texture parity. Review its complete event/frame times and planning-plus-build-plus-upload cost before accepting the row policy; partial-path savings do not establish full-refresh performance. This control does not measure cold room loading.
 
+## Retained performance evidence
+
+The retained [PERF-004 paired study](validation/performance/PERF-004-qualified/performance-review.md)
+can be reproduced with `tools/summarize_perf004.py`; the
+[qualification record](validation/performance/PERF-004.md#retained-evidence-and-reproduction)
+gives the exact command and source commits. The parser rejects mismatched source
+or environments, missing full controls, invalid work/capacity geometry and
+nonzero texture differences. Its 13 positive and 119 negative synthetic controls
+run in `self_test.py`. Preserve the recorded full-refresh regression alongside
+the bounded-edit gains; frame timings are CPU render-loop markers rather than
+GPU-completion or display-scanout measurements.
+
 ## Raster snapshots and imported floor detail
 
 `raster_export_regression_415.js` exercises production F8 snapshot composition,

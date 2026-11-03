@@ -40,7 +40,7 @@ The archive is retained as evidence of how the project evolved. It is **not** th
 - gameplay grid: **40×19 at 16 px per tile**;
 - rooms: **9**;
 - staged traversal routes exercised by the suite: **27**;
-- primary runtime scripts: `surfacefx.js`, `sprite_material.js`, `foliagefx.js`, `procedural_decor.js`, `editor_identity.js`, `editor_validation.js`, `editor.js`, `game.js`.
+- primary runtime scripts: `surfacefx.js`, `sprite_material.js`, `foliagefx.js`, `procedural_decor.js`, `static_terrain.js`, `editor_identity.js`, `editor_validation.js`, `editor.js`, `game.js`.
 
 The project intentionally keeps gameplay authority separate from rendering subsystems. SurfaceFX, FoliageFX and sprite material code may consume visual descriptors and actor positions, but do not own story completion, collision or save progression.
 
