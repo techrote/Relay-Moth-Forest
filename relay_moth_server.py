@@ -1,10 +1,55 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, contextlib, http.server, os, socket, threading, webbrowser, json, datetime
+import argparse, contextlib, http.server, os, socket, threading, webbrowser, json, datetime, tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 _COPY_CHUNK = 32 * 1024
+_SAVE_LOCK = threading.Lock()
+
+def save_maps(data):
+    """Commit one complete map and preserve its exact predecessor.
+
+    File transfers remain concurrent, but editor saves share one transaction lock.
+    Unique, exclusively created names preserve backups even for rapid saves and
+    prevent separate requests from writing or replacing each other's temp file.
+    """
+    payload = json.dumps(data,indent=2,ensure_ascii=False)+'\n'
+    with _SAVE_LOCK:
+        target = ROOT / 'relay_moth_maps.json'
+        backups = ROOT / 'editor_backups'
+        backups.mkdir(exist_ok=True)
+        stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+        backup_name = None
+        if target.exists():
+            backup = None
+            try:
+                with tempfile.NamedTemporaryFile(mode='wb',dir=backups,
+                        prefix=f'relay_moth_maps-{stamp}-',suffix='.json',delete=False) as out:
+                    backup = Path(out.name)
+                    out.write(target.read_bytes())
+                    out.flush()
+                    os.fsync(out.fileno())
+                backup_name = backup.name
+            except BaseException:
+                if backup is not None:
+                    with contextlib.suppress(OSError):
+                        backup.unlink(missing_ok=True)
+                raise
+        tmp = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',dir=ROOT,
+                    prefix='.relay_moth_maps.editor-',suffix='.tmp',delete=False) as out:
+                tmp = Path(out.name)
+                out.write(payload)
+                out.flush()
+                os.fsync(out.fileno())
+            tmp.replace(target)
+        finally:
+            if tmp is not None:
+                with contextlib.suppress(OSError):
+                    tmp.unlink(missing_ok=True)
+        return backup_name
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self,*a,**k): super().__init__(*a,directory=str(ROOT),**k)
@@ -46,17 +91,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             data = json.loads(raw.decode('utf-8'))
             if not isinstance(data,dict) or not isinstance(data.get('rooms'),dict) or not str(data.get('schema','')).startswith('relay-moth-maps/'):
                 raise ValueError('Expected relay-moth maps JSON with rooms object')
-            target = ROOT / 'relay_moth_maps.json'
-            backups = ROOT / 'editor_backups'
-            backups.mkdir(exist_ok=True)
-            stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-            backup_name = f'relay_moth_maps-{stamp}.json'
-            backup = backups / backup_name
-            if target.exists():
-                backup.write_bytes(target.read_bytes())
-            tmp = ROOT / '.relay_moth_maps.editor.tmp'
-            tmp.write_text(json.dumps(data,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
-            tmp.replace(target)
+            backup_name = save_maps(data)
             body = json.dumps({'ok':True,'file':'relay_moth_maps.json','backup':backup_name}).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type','application/json; charset=utf-8')

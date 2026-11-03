@@ -143,5 +143,82 @@ function fixture(){
   assert.strictEqual(e.dirtyInfo().project,true);
 }
 
-console.log('EDITOR DIRTY/SAVE REGRESSION 4.15 PASS');
-console.log('  clean/dirty undo-redo baseline, beforeunload, shared validation gates and explicit overrides validated');
+async function asyncSaveRegression(){
+  const previousFetch=globalThis.fetch;
+  try{
+    // A slow save acknowledges exactly its serialized snapshot. Editing while
+    // the request is pending must retain dirty state and navigation protection.
+    {
+      const {e,maps,roomKey,toasts}=fixture();
+      maps.rooms[roomKey].foliage_density=.75;
+      let finish,calls=0,payload;
+      globalThis.fetch=(_url,options)=>{calls++;payload=options.body;return new Promise(resolve=>{finish=resolve})};
+      const saving=e.saveProject();
+      assert.strictEqual(calls,1);
+      assert.strictEqual(nodes['#editorSave'].disabled,true);
+      assert.strictEqual(nodes['#editorSave'].textContent,'SAVING…');
+      maps.rooms[roomKey].foliage_density=.9;
+      assert.strictEqual(await e.saveProject(),false,'a second save cannot overtake the pending request');
+      assert.strictEqual(calls,1,'only one request may be in flight per editor');
+      finish({ok:true,json:async()=>({ok:true,backup:'snapshot.json'})});
+      assert.strictEqual(await saving,true);
+      assert.strictEqual(JSON.parse(payload).rooms[roomKey].foliage_density,.75);
+      assert.deepStrictEqual(e.savedBaseline,Validation.snapshot(JSON.parse(payload)));
+      assert.strictEqual(e.dirtyInfo().project,true,'edits made during POST were not saved');
+      const unload={prevented:false,preventDefault(){this.prevented=true}};
+      assert.strictEqual(e.onBeforeUnload(unload),'');
+      assert.strictEqual(unload.prevented,true);
+      assert.strictEqual(nodes['#editorSave'].disabled,false);
+      assert.strictEqual(nodes['#editorSave'].textContent,'SAVE TO PROJECT');
+      assert(toasts.some(msg=>msg.includes('newer edits still need saving')));
+
+      maps.rooms[roomKey].foliage_density=.75;
+      assert.strictEqual(e.dirtyInfo().project,false,'returning to the acknowledged payload is clean');
+      maps.rooms[roomKey].foliage_density=.95;
+      globalThis.fetch=async()=>({ok:true,json:async()=>({ok:true,backup:'next.json'})});
+      assert.strictEqual(await e.saveProject(),true,'a completed save must allow the next save');
+      assert.strictEqual(e.dirtyInfo().project,false);
+    }
+
+    // Network, HTTP and negative application responses must not claim success,
+    // replace the baseline or leave the save button disabled.
+    for(const response of ['network','http','negative']){
+      const {e,maps,roomKey}=fixture();
+      const before=e.savedBaseline;
+      maps.rooms[roomKey].foliage_density=.81;
+      globalThis.fetch=async()=>{
+        if(response==='network')throw new Error('connection interrupted');
+        if(response==='http')return{ok:false,text:async()=> 'write failed'};
+        return{ok:true,json:async()=>({ok:false,error:'write not committed'})};
+      };
+      assert.strictEqual(await e.saveProject(),false,response);
+      assert.strictEqual(e.savedBaseline,before,response+' changed the saved baseline');
+      assert.strictEqual(e.dirtyInfo().project,true,response);
+      assert.strictEqual(nodes['#editorSave'].disabled,false,response);
+      assert.strictEqual(e.saveInFlight,false,response);
+    }
+
+    // Download remains available while a project request is pending. Its newer
+    // explicit baseline must not be replaced by the older POST acknowledgement.
+    {
+      const {e,maps,roomKey}=fixture();
+      maps.rooms[roomKey].foliage_density=.76;
+      let finish;
+      globalThis.fetch=()=>new Promise(resolve=>{finish=resolve});
+      const saving=e.saveProject();
+      maps.rooms[roomKey].foliage_density=.86;
+      e.markSavedBaseline('download');
+      const exported=e.savedBaseline;
+      finish({ok:true,json:async()=>({ok:true,backup:'older.json'})});
+      assert.strictEqual(await saving,true);
+      assert.strictEqual(e.savedBaseline,exported);
+      assert.strictEqual(e.lastSavedAt.kind,'download');
+      assert.strictEqual(e.dirtyInfo().project,false);
+    }
+  }finally{globalThis.fetch=previousFetch}
+}
+
+asyncSaveRegression().then(()=>{
+  console.log('EDITOR DIRTY/SAVE REGRESSION 4.15 PASS');
+  console.log('  clean/dirty undo-redo baseline, beforeunload, validation overrides, asynchronous snapshot saves and failures validated');
+}).catch(err=>{console.error(err);process.exitCode=1});
