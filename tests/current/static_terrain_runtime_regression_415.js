@@ -13,12 +13,20 @@ class FakeCanvas{
   getContext(kind){assert.strictEqual(kind,'2d');return this.context}
 }
 class FakeContext{
-  constructor(canvas){this.canvas=canvas;this.transforms=[]}
-  setTransform(...values){this.transforms.push(values)}
+  constructor(canvas){this.canvas=canvas;this.transforms=[];this.matrix=[1,0,0,1,0,0];this.stack=[]}
+  // Record the effective matrix at drawing/restoration boundaries, so the first
+  // entry remains the full native transform after translate followed by scale.
+  recordTransform(){const last=this.transforms.at(-1);if(!last||this.matrix.some((value,i)=>value!==last[i]))this.transforms.push([...this.matrix])}
+  setTransform(...values){assert(values.length===6&&values.every(Number.isFinite));this.matrix=[...values]}
+  translate(x,y){assert(Number.isFinite(x)&&Number.isFinite(y));const[a,b,c,d,e,f]=this.matrix;this.matrix=[a,b,c,d,e+a*x+c*y,f+b*x+d*y]}
+  scale(x,y){assert(Number.isFinite(x)&&Number.isFinite(y));const[a,b,c,d,e,f]=this.matrix;this.matrix=[a*x,b*x,c*y,d*y,e,f]}
+  rotate(angle){assert(Number.isFinite(angle));const[a,b,c,d,e,f]=this.matrix,co=Math.cos(angle),si=Math.sin(angle);this.matrix=[a*co+c*si,b*co+d*si,-a*si+c*co,-b*si+d*co,e,f]}
+  save(){this.stack.push([...this.matrix])}
+  restore(){this.recordTransform();if(this.stack.length)this.matrix=this.stack.pop()}
   createLinearGradient(){return{addColorStop(){}}}
   createRadialGradient(){return{addColorStop(){}}}
-  fillRect(){if(++faults.rasterCalls===faults.rasterAt)throw new Error('injected floor raster failure')}
-  clearRect(){} save(){} restore(){} beginPath(){} arc(){} fill(){} strokeRect(){}
+  fillRect(){this.recordTransform();if(++faults.rasterCalls===faults.rasterAt)throw new Error('injected floor raster failure')}
+  clearRect(){this.recordTransform()}beginPath(){}arc(){this.recordTransform()}fill(){this.recordTransform()}strokeRect(){this.recordTransform()}
 }
 const sandbox={OffscreenCanvas:FakeCanvas,RelayStaticTerrain:terrain,perfMeasure:(name,fn)=>{phases.push(name);return fn()}};
 const production=vm.runInNewContext(`

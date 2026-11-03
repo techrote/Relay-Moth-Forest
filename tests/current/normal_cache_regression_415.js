@@ -23,10 +23,18 @@ class Canvas{
 }
 class Context{
   constructor(canvas){this.canvas=canvas;this.reset()}
-  reset(){this.pixels=null;this.crop=null}
-  save(){}restore(){}translate(){}rotate(){}scale(){}setTransform(){}clearRect(){}fillRect(){}strokeRect(){}beginPath(){}arc(){}fill(){}
+  reset(){this.pixels=null;this.crop=null;this.matrix=[1,0,0,1,0,0];this.stack=[];this.transforms=[]}
+  recordTransform(){const last=this.transforms.at(-1);if(!last||this.matrix.some((value,i)=>value!==last[i]))this.transforms.push([...this.matrix])}
+  save(){this.stack.push([...this.matrix])}
+  restore(){this.recordTransform();if(this.stack.length)this.matrix=this.stack.pop()}
+  translate(x,y){assert(Number.isFinite(x)&&Number.isFinite(y));const[a,b,c,d,e,f]=this.matrix;this.matrix=[a,b,c,d,e+a*x+c*y,f+b*x+d*y]}
+  rotate(angle){assert(Number.isFinite(angle));const[a,b,c,d,e,f]=this.matrix,co=Math.cos(angle),si=Math.sin(angle);this.matrix=[a*co+c*si,b*co+d*si,-a*si+c*co,-b*si+d*co,e,f]}
+  scale(x,y){assert(Number.isFinite(x)&&Number.isFinite(y));const[a,b,c,d,e,f]=this.matrix;this.matrix=[a*x,b*x,c*y,d*y,e,f]}
+  setTransform(...values){assert(values.length===6&&values.every(Number.isFinite));this.matrix=[...values]}
+  clearRect(){this.recordTransform()}fillRect(){this.recordTransform()}strokeRect(){this.recordTransform()}beginPath(){}arc(){this.recordTransform()}fill(){this.recordTransform()}
   createLinearGradient(){return{addColorStop(){}}}createRadialGradient(){return{addColorStop(){}}}
   drawImage(image,sx,sy,sw,sh,dx,dy,dw,dh){
+    this.recordTransform();
     if(image?.sample&&dx===0&&dy===0&&sw===dw&&sh===dh)this.crop={image,sx,sy,sw,sh};
   }
   getImageData(x,y,width,height){

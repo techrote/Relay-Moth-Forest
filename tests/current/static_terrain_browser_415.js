@@ -194,10 +194,10 @@
   }
 
   function parity(label,before=null,uploads=[]){
-    const actual=capture(),expected=reference(),result={};
+    const actual=capture(),expected=reference(),result={};let firstFailure=null;
     for(let c=0;c<channels.length;c++){
       const diff=differences(actual.maps[c],expected[c],actual.width);result[channels[c]]=diff;
-      check(diff.bytes===0,label+' '+channels[c]+' full GPU texture differs: '+JSON.stringify(diff));
+      if(diff.bytes&&!firstFailure)firstFailure=label+' '+channels[c]+' full GPU texture differs: '+JSON.stringify(diff);
       if(before){
         check(before.width===actual.width&&before.height===actual.height,label+' exterior dimensions changed');
         const rects=uploads.filter(u=>u.channel===channels[c]);let changedOutside=0,coveredAlphaPixels=0;
@@ -206,12 +206,18 @@
           if(rects.some(u=>x>=u.x&&x<u.x+u.width&&y>=u.y&&y<u.y+u.height)){if(actual.maps[c][i+3])coveredAlphaPixels++;continue}
           for(let k=0;k<4;k++)if(before.maps[c][i+k]!==actual.maps[c][i+k])changedOutside++;
         }
-        check(changedOutside===0,label+' '+channels[c]+' changed bytes outside actual subuploads');
+        if(changedOutside&&!firstFailure)firstFailure=label+' '+channels[c]+' changed bytes outside actual subuploads';
         result[channels[c]].changedOutside=changedOutside;
         result[channels[c]].coveredAlphaPixels=coveredAlphaPixels;
       }
     }
-    check(game.renderer.gl.getError()===game.renderer.gl.NO_ERROR,label+' WebGL error');
+    const glError=game.renderer.gl.getError();
+    if(firstFailure||glError!==game.renderer.gl.NO_ERROR){
+      root.__staticRasterDiagnostics={kind:before?(uploads.length?'patch-vs-full':'unchanged-vs-full'):'full-vs-full',label,room:game.room.key,
+        native:[actual.width,actual.height],beforeNative:before?[before.width,before.height]:null,maps:result,glError,
+        uploadCoordinates:'WebGL bottom-left',subUploads:uploads.map(rect=>({...rect})),staticRefreshStats:JSON.parse(JSON.stringify(game.staticRefreshStats||{}))};
+      check(false,(firstFailure||label+' WebGL error '+glError)+'\nPERF-004 raster diagnostics '+JSON.stringify(root.__staticRasterDiagnostics));
+    }
     return result;
   }
 
@@ -368,6 +374,7 @@
       let caught=false;
       try{parity('intentional corruption')}catch(error){caught=String(error).includes(channels[channel]+' full GPU texture differs');if(!caught)throw error}
       check(caught,'whole-texture oracle accepted '+channels[channel]+' corruption');
+      delete root.__staticRasterDiagnostics;
       out.push({channel:channels[channel],corruptionRejected:caught});game.ensureBackground(true);
     }
     return out;

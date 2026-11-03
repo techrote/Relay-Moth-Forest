@@ -359,9 +359,12 @@ class StaticPainter{
     let c=null,normalCanvas=null,specCanvas=null,ctx,bctx,sctx;this.lastMaterialMaps=null;this.microtile=room.floorMicrotile||FLOOR_TILE;
     try{
       perfMeasure(phase+'.scratch',()=>{
-        c=new OffscreenCanvas(r.width,r.height);normalCanvas=new OffscreenCanvas(r.width,r.height);specCanvas=new OffscreenCanvas(r.width,r.height);
-        ctx=c.getContext('2d',{alpha:false});bctx=normalCanvas.getContext('2d',{alpha:true});sctx=specCanvas.getContext('2d',{alpha:true});
-        for(const x of [ctx,bctx,sctx]){x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.setTransform(renderW/W,0,0,renderH/H,-r.x,-r.y)}
+        c=new OffscreenCanvas(r.width,r.height);ctx=c.getContext('2d',{alpha:false});
+        normalCanvas=new OffscreenCanvas(r.width,r.height);specCanvas=new OffscreenCanvas(r.width,r.height);
+        bctx=normalCanvas.getContext('2d',{alpha:true});sctx=specCanvas.getContext('2d',{alpha:true});
+        // Preserve the accepted full renderer's save/scale/restore sequence at
+        // fractional native sizes; patches add only an integer native offset.
+        for(const x of [ctx,bctx,sctx]){x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.save();if(region)x.translate(-r.x,-r.y);x.scale(renderW/W,renderH/H)}
       });
       this.materialNormalCtx=bctx;this.materialSpecCtx=sctx;
       perfMeasure(phase+'.floor',()=>{
@@ -375,11 +378,11 @@ class StaticPainter{
       perfMeasure(phase+'.overlays-materials',()=>{this.patternDecor(ctx,room,state);this.drawBlockerSprites(ctx,room);this.drawVegetationInterstitials(ctx,room);this.drawDecor(ctx,room)});
       // editor_decor, recruitable robots, completed objectives, gates and bridge/progression presentation are live mutable content.
       // Footer sprites affect color only, including a patch crossing PLAY_H.
-      this.materialNormalCtx=null;this.materialSpecCtx=null;
+      this.materialNormalCtx=null;this.materialSpecCtx=null;bctx.restore();sctx.restore();
       perfMeasure(phase+'.footer',()=>{
         const ui=ctx.createLinearGradient(0,PLAY_H,0,H);ui.addColorStop(0,this.col('ui',14));ui.addColorStop(1,this.col('ui',4));ctx.fillStyle=ui;ctx.fillRect(0,PLAY_H,W,BOTTOM_H);this.px(ctx,0,PLAY_H,W,2,this.col('ui',105),.7);this.px(ctx,8,PLAY_H+7,W-16,BOTTOM_H-14,this.col('ui',24),.92);ctx.strokeStyle=this.col('ui',88);ctx.lineWidth=1.5;ctx.strokeRect(8.5,PLAY_H+7.5,W-17,BOTTOM_H-15);this.sprite(ctx,'gear',W-31,H-17,{anchor:'bottom',alpha:.42,element:'ui'});this.sprite(ctx,'orb_cyan',28,H-18,{anchor:'bottom',alpha:.38,element:'ui'});
       });
-      this.lastMaterialMaps={normal:normalCanvas,spec:specCanvas};return c;
+      ctx.restore();this.lastMaterialMaps={normal:normalCanvas,spec:specCanvas};return c;
     }catch(err){releaseCanvasBacking(c);releaseCanvasBacking(normalCanvas);releaseCanvasBacking(specCanvas);throw err}
     finally{this.materialNormalCtx=null;this.materialSpecCtx=null}
   }
