@@ -346,9 +346,28 @@
     }
     const glError=game.renderer.gl.getError();
     if(firstFailure||glError!==game.renderer.gl.NO_ERROR){
+      // Failure-only: distinguish replacement of unchanged pixels from an
+      // incorrect required edit, using the already captured pre-edit textures.
+      if(before)for(let c=0;c<channels.length;c++){
+        const diff=result[channels[c]],prior=before.maps[c],current=actual.maps[c],wanted=expected[c];
+        let mismatchReferenceUnchangedPixels=0,mismatchReferenceChangedPixels=0,referenceChangedPixels=0;
+        let x0=actual.width,y0=actual.height,x1=0,y1=0;
+        for(let i=0;i<current.length;i+=4){
+          const changed=prior[i]!==wanted[i]||prior[i+1]!==wanted[i+1]||prior[i+2]!==wanted[i+2]||prior[i+3]!==wanted[i+3];
+          const mismatch=current[i]!==wanted[i]||current[i+1]!==wanted[i+1]||current[i+2]!==wanted[i+2]||current[i+3]!==wanted[i+3];
+          if(changed){const x=(i/4)%actual.width,y=Math.floor(i/4/actual.width);referenceChangedPixels++;x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+1);y1=Math.max(y1,y+1)}
+          if(mismatch){if(changed)mismatchReferenceChangedPixels++;else mismatchReferenceUnchangedPixels++}
+        }
+        for(const sample of diff.examples){
+          const i=(sample.y*actual.width+sample.x)*4;sample.before=Array.from(prior.subarray(i,i+4));
+          sample.referenceChanged=sample.before.some((value,k)=>value!==sample.expected[k]);
+        }
+        Object.assign(diff,{mismatchReferenceUnchangedPixels,mismatchReferenceChangedPixels,referenceChangedPixels,
+          referenceChangedBounds:referenceChangedPixels?{x:x0,y:y0,width:x1-x0,height:y1-y0}:null});
+      }
       root.__staticRasterDiagnostics={kind:before?(uploads.length?'patch-vs-full':'unchanged-vs-full'):'full-vs-full',label,room:game.room.key,
         native:[actual.width,actual.height],beforeNative:before?[before.width,before.height]:null,maps:result,glError,
-        uploadCoordinates:'WebGL bottom-left',subUploads:uploads.map(rect=>({...rect})),staticRefreshStats:JSON.parse(JSON.stringify(game.staticRefreshStats||{}))};
+        pixelCoordinates:'WebGL bottom-left',uploadCoordinates:'WebGL bottom-left',subUploads:uploads.map(rect=>({...rect})),staticRefreshStats:JSON.parse(JSON.stringify(game.staticRefreshStats||{}))};
       if(before&&uploads.length)try{root.__staticRasterDiagnostics.patchVariants=patchRasterDiagnostics(actual,expected,uploads)}catch(error){root.__staticRasterDiagnostics.patchVariantError=String(error)}
       check(false,(firstFailure||label+' WebGL error '+glError)+'\nPERF-004 raster diagnostics '+JSON.stringify(root.__staticRasterDiagnostics));
     }

@@ -101,11 +101,21 @@ Output bounds follow the changed floor's actual drawing envelope. No accepted
 floor primitive extends left or above its owning tile. At microtile size 4, the
 union of ground/path/water marks extends at most three logical pixels right and
 two down; at sizes 8 and 16 it stays inside the tile. The native output minimum
-is `floor(logical minimum * native scale) - 2`, and its maximum is
-`ceil(logical maximum * native scale) + 2`, clipped to the surface. The two-native-
-pixel margin remains on every side for rounding and antialiasing. The production
-primitive regression checks this envelope across all 9,120 tile/type/microtile
-footprints, including the playable area's edges.
+is `floor(logical minimum * native scale)`, and its maximum is
+`ceil(logical maximum * native scale)`, clipped to the surface. Floor rectangles
+and circles are filled without strokes, shadows or filters. Outward floor/ceil
+rounding covers pixel squares intersecting their drawing footprint, including
+partially covered edge pixels; an additional native-pixel border would upload
+unrelated pixels. The production primitive regression checks this envelope
+across all 9,120 tile/type/microtile footprints, including the playable area's
+edges.
+
+The genuine logical overhang is retained. Later opaque neighboring microtiles
+do not justify reducing damage to the owning tile: at fractional scales a pixel
+can receive partial coverage from two separately drawn rectangles, leaving some
+earlier stroke contribution between them. Actual path primitives cross the tile
+bottom at these microtile seams. This implementation therefore removes only the
+extra native output padding, without relying on an opaque-union occlusion claim.
 
 Only these affected output rectangles are merged. Output coordinates need no
 alignment: they crop pixels from an independently aligned raster. That raster
@@ -144,17 +154,26 @@ guard differed in five, and the unguarded 48x48 surface matched. These results
 reject guard size as a general material correction. Retaining the already exact,
 unchanged material textures removes that resampling from eligible terrain edits.
 
-The color-only candidate passed the 640x360 matrix. At 997x563, its first
+The [color-only candidate](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41568094642)
+passed the 640x360 matrix. At 997x563, its first
 water-to-ground edit at cell `(11,6)` exposed two one-level color differences at
 native pixels `(289,187)` and `(266,178)`. Both are outside the changed floor's
 drawing envelope; the earlier aligned upload `(256,128,64,64)` unnecessarily
-replaced them. Tightening the upload preserves those original pixels while
-retaining the raster alignment, guard and complete input replay:
+replaced them. An initial tightening still retained two extra native pixels on
+each output side. A subsequent path-to-ground edit at cell `(13,6)` differed in
+one color byte at `(348,149)` across every aligned guard variant; the floor's
+native top is approximately `150.133`, so row 149 cannot contain its drawing.
+Removing that output padding preserves these original pixels while retaining
+the complete logical overhang, raster alignment, guard and input replay:
 
 | Native surface, cell `(11,6)` | Output `(x,y,width,height)` | Guarded raster `(x,y,width,height)` |
 | --- | --- | --- |
-| 640x360 | `(174,94,23,22)` | `(128,48,112,112)` |
-| 997x563 | `(272,148,34,33)` | `(240,112,112,112)` |
+| 640x360 | `(176,96,19,18)` | `(144,64,96,96)` |
+| 997x563 | `(274,150,30,29)` | `(240,112,96,112)` |
+
+At 997x563, cell `(13,6)` uses output `(324,150,30,29)` and raster
+`(288,112,112,112)`. The two-native-pixel margin remains solely in the conservative
+raster input range, not in the color upload.
 
 All memory, pixel and work limits still account for the guarded bounds. The
 complete all-three-texture native oracle and unchanged-exterior checks remain
@@ -209,6 +228,14 @@ The performance harness now includes editor path painting as well as editor
 water movement. Both must avoid `static.build`, raster fewer than 760 cells,
 upload bounded color data, preserve both material textures and retain no scratch.
 The existing PERF-003 rivet/editor-water assertions remain mandatory.
+
+After each candidate water/path timing record and its first post-event frame are
+complete, the harness disables the timing probe and separately compares all
+three GPU textures against a full reference at the actual responsive native
+resolution. It records that size and the exact pixel results in `staticParity`.
+This check does not contribute to the measured event or frame interval; the next
+sample follows the existing reset and settling sequence. A mismatch fails the
+run and preserves pixel/region diagnostics beside the performance output.
 
 PR CI checks out the accepted base and measures both source trees sequentially
 on one host with identical scenarios, three samples and 1x/4x CPU throttling.

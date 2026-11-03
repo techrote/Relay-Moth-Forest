@@ -179,14 +179,15 @@
     if(changes.length>budget.maxChangedCells)return full('changed-cell-budget',changes);
     // baseTile never reaches left/up of its tile. At microtile 4 its union of
     // floor types reaches +3 logical pixels right / +2 down; 8/16px microtiles
-    // remain within the tile. Keep two native AA pixels on every output side.
+    // remain within the tile. floor(min)..ceil(max) covers intersecting native
+    // pixel squares for these filled, unfiltered, unstroked primitives.
     // The separate guarded raster, not the upload, must retain dither alignment.
     // Unsupported microtiles keep the full painter until separately qualified.
     if(![4,8,16].includes(next.microtile)||next.geometry.tileSize!==16)return full('unsupported-microtile',changes);
     const g=next.geometry,sx=g.renderWidth/g.logicalWidth,sy=g.renderHeight/g.logicalHeight,overhangX=next.microtile===4?3:0,overhangY=next.microtile===4?2:0;
     const raw=changes.map(cell=>{
-      const x0=Math.floor(cell.x*g.tileSize*sx)-NATIVE_HALO,y0=Math.floor(cell.y*g.tileSize*sy)-NATIVE_HALO;
-      const x1=Math.ceil(((cell.x+1)*g.tileSize+overhangX)*sx)+NATIVE_HALO,y1=Math.ceil(((cell.y+1)*g.tileSize+overhangY)*sy)+NATIVE_HALO;
+      const x0=Math.floor(cell.x*g.tileSize*sx),y0=Math.floor(cell.y*g.tileSize*sy);
+      const x1=Math.ceil(((cell.x+1)*g.tileSize+overhangX)*sx),y1=Math.ceil(((cell.y+1)*g.tileSize+overhangY)*sy);
       // Upload only pixels the changed floor can affect. Replacing unrelated
       // overlay pixels can introduce sampling differences at fractional scales.
       return{

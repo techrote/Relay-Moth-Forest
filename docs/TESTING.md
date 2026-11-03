@@ -75,6 +75,8 @@ PERF-004 adds authoritative static-terrain planning and runtime failure tests to
 
 Use `--baseline-root /path/to/accepted/checkout` with the timing harness to measure the accepted source and candidate sequentially on the same host with identical scenarios, viewport, graphics and throttling. The candidate's bounded-work assertions stay mandatory; the older source is measured without imposing an optimization it does not yet implement. Raw records include both source commit/tree identities and per-scenario median comparisons.
 
+Each candidate water/path timing record also includes `staticParity`: an exact comparison of all three GPU textures at the benchmark's actual native resolution. This validation runs after the event and its first post-event frame, with timing disabled, so it does not enter the reported event or frame interval. A mismatch fails validation and writes a separate static-raster diagnostic JSON beside the requested performance report.
+
 ## Continuous integration
 
 [Validate source and runtime](../.github/workflows/validate.yml) uses one GitHub-hosted Ubuntu 24.04 job with Python 3.12 and Node 22. It runs for PRs targeting `main`, main pushes and manual dispatch. It checks the exact PR head, records the actual tested commit/tree separately from the event SHA and cancels stale runs for the same PR/ref. There is no parallel test matrix or duplicate feature-branch push run.

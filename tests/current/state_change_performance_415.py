@@ -337,6 +337,8 @@ def measure_source(args, root, validate_static=True):
         page.goto(base + "/index.html", wait_until="load", timeout=60000)
         page.wait_for_function("document.body.dataset.ready==='1'", timeout=60000)
         page.evaluate("window.__perfBaselineMaps=structuredClone(game.maps)")
+        if validate_static:
+            page.add_script_tag(content=(ROOT / "tests/current/static_terrain_browser_415.js").read_text(encoding="utf-8"))
         cdp = context.new_cdp_session(page)
 
         for rate in throttles:
@@ -363,8 +365,37 @@ def measure_source(args, root, validate_static=True):
             run = {"cpuThrottle": rate, "environment": env, "scenarios": {}}
             for scenario in SCENARIOS:
                 records = []
-                for _ in range(args.samples):
+                for sample in range(args.samples):
                     record = page.evaluate(SCENARIO_JS, scenario)
+                    if validate_static and scenario in {"editor-water", "editor-path"}:
+                        # The event and first post-event frame have finished. Verify
+                        # every GPU byte at the actual responsive native size with
+                        # the probe disabled; the next reset reenables measurement.
+                        try:
+                            record["staticParity"] = page.evaluate(
+                                """label => {
+                                    relayMothPerf.enable(false);
+                                    return {
+                                      native:[game.renderer.nativeW,game.renderer.nativeH],
+                                      maps:auditStaticTerrain.parity(label)
+                                    };
+                                }""",
+                                f"performance {rate:g}x {scenario} sample {sample + 1}",
+                            )
+                        except Exception:
+                            try:
+                                diagnostics = page.evaluate("() => window.__staticRasterDiagnostics || null")
+                            except Exception as diagnostic_error:
+                                diagnostics = {"diagnosticReadError": str(diagnostic_error)}
+                            evidence = {"scenario": scenario, "sample": sample + 1,
+                                        "cpuThrottle": rate, "diagnostics": diagnostics}
+                            print("PERF-004 PERFORMANCE STATIC RASTER DIAGNOSTICS " + json.dumps(evidence), flush=True)
+                            if args.out:
+                                diagnostic_path = args.out.with_name(args.out.stem + "-static-raster-diagnostics.json")
+                                diagnostic_path.parent.mkdir(parents=True, exist_ok=True)
+                                diagnostic_path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+                                print(f"WROTE {diagnostic_path}", flush=True)
+                            raise
                     records.append(record)
                 if scenario in {"objective-rivet", "editor-water"}:
                     for record in records:

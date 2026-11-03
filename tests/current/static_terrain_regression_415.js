@@ -132,7 +132,7 @@ function footprint(x,y,microtile){
   }
   footprintCache.set(key,bounds);return bounds;
 }
-function project(bounds,width,height){return{x0:Math.max(0,Math.floor(bounds.x0*width/640)-2),y0:Math.max(0,Math.floor(bounds.y0*height/360)-2),x1:Math.min(width,Math.ceil(bounds.x1*width/640)+2),y1:Math.min(height,Math.ceil(bounds.y1*height/360)+2)}}
+function project(bounds,width,height,halo=0){return{x0:Math.max(0,Math.floor(bounds.x0*width/640)-halo),y0:Math.max(0,Math.floor(bounds.y0*height/360)-halo),x1:Math.min(width,Math.ceil(bounds.x1*width/640)+halo),y1:Math.min(height,Math.ceil(bounds.y1*height/360)+halo)}}
 function intersects(a,b){return a.x0<b.x1&&b.x0<a.x1&&a.y0<b.y1&&b.y0<a.y1}
 function assertCrop(region,nativeHeight){
   const cropX=region.x-region.rasterX,cropY=region.y-region.rasterY;
@@ -162,7 +162,7 @@ function geometryOracle(){
       for(const value of Object.values(r))assert(Number.isSafeInteger(value));
       assert(r.x>=0&&r.y>=0&&output.x1<=width&&output.y1<=height);
       assert.strictEqual(delta.nativeAlignment,16);assert.strictEqual(delta.rasterGuard,32);
-      assert.deepStrictEqual(output,project({x0:x*16,y0:y*16,x1:(x+1)*16+(microtile===4?3:0),y1:(y+1)*16+(microtile===4?2:0)},width,height),'upload must contain only the floor type-union footprint plus two native AA pixels, without raster alignment expansion');
+      assert.deepStrictEqual(output,project({x0:x*16,y0:y*16,x1:(x+1)*16+(microtile===4?3:0),y1:(y+1)*16+(microtile===4?2:0)},width,height),'upload must cover the floor type-union pixel squares without an added native margin or raster alignment expansion');
       assert.deepStrictEqual(raster,{x0:Math.max(0,Math.floor((output.x0-32)/16)*16),y0:Math.max(0,Math.floor((output.y0-32)/16)*16),x1:Math.min(width,Math.ceil((output.x1+32)/16)*16),y1:Math.min(height,Math.ceil((output.y1+32)/16)*16)},'only guarded raster work expands outward to the 16px grid');
       assert(raster.x0%16===0&&raster.y0%16===0,'guarded scratch retains the top-origin raster grid and dither phase');
       assert(raster.x1===width||raster.x1%16===0);assert(raster.y1===height||raster.y1%16===0);
@@ -176,9 +176,9 @@ function geometryOracle(){
       if(i%31===0||x===39||y===18){
         // Examine every potential predecessor against actual primitive bounds,
         // independent of the planner's second halo/cell-range derivation.
-        for(let cy=0;cy<19;cy++)for(let cx=0;cx<40;cx++)if(intersects(raster,project(footprint(cx,cy,microtile),width,height)))assert(cx>=r.tx0&&cx<r.tx1&&cy>=r.ty0&&cy<r.ty1,'source range must replay every floor cell contributing to the guarded scratch');
+        for(let cy=0;cy<19;cy++)for(let cx=0;cx<40;cx++)if(intersects(raster,project(footprint(cx,cy,microtile),width,height,2)))assert(cx>=r.tx0&&cx<r.tx1&&cy>=r.ty0&&cy<r.ty1,'source range must retain its two-native-pixel margin around every floor cell contributing to the guarded scratch');
       }
-      if(y===18)assert(output.y1>Math.ceil(304*height/360),'last terrain row includes the footer boundary');
+      if(y===18)assert(output.y1>=Math.ceil(304*height/360),'last terrain row covers its shared footer boundary pixel without unrelated output padding');
       geometryCases++;
     }
   }
@@ -187,10 +187,10 @@ function geometryOracle(){
   const disjoint=plan(fixture(),r=>{r.water.add('3,3');r.paths.add('30,14')});assert.strictEqual(disjoint.regions.length,2);
   assert(disjoint.pixelCount<10000&&disjoint.rasterCellCount<=162,'two distant edits remain at most two bounded 81-cell guarded inputs');
   const wet=fixture();wet.water.add('11,6');const dither=plan(wet,r=>r.water.delete('11,6')),r=dither.regions[0];
-  assert.deepStrictEqual([r.x,r.y,r.width,r.height],[174,94,23,22],'color upload is independent of the scratch origin needed by the observed glow-dither case');
-  assert.deepStrictEqual([r.rasterX,r.rasterY,r.rasterWidth,r.rasterHeight],[128,48,112,112]);
-  assert.strictEqual(dither.pixelCount,506);assert.strictEqual(dither.rasterPixels,12544);assert.strictEqual(dither.scratchPixels,12544);assert.strictEqual(dither.rasterCellCount,81);
-  assert.deepStrictEqual(assertCrop(r,360),{cropX:46,cropY:46,skipRows:44});
+  assert.deepStrictEqual([r.x,r.y,r.width,r.height],[176,96,19,18],'color upload is independent of the scratch origin needed by the observed glow-dither case');
+  assert.deepStrictEqual([r.rasterX,r.rasterY,r.rasterWidth,r.rasterHeight],[144,64,96,96]);
+  assert.strictEqual(dither.pixelCount,342);assert.strictEqual(dither.rasterPixels,9216);assert.strictEqual(dither.scratchPixels,9216);assert.strictEqual(dither.rasterCellCount,64);
+  assert.deepStrictEqual(assertCrop(r,360),{cropX:32,cropY:32,skipRows:46});
   for(const oldPixels of [784,1024]){
     assert.strictEqual(plan(wet,r=>r.water.delete('11,6'),{maxScratchPixels:oldPixels}).reason,'scratch-budget','guarded raster must count against scratch capacity');
   }
@@ -199,26 +199,31 @@ function geometryOracle(){
   assert.strictEqual(plan(wet,r=>r.water.delete('11,6'),{maxPixelRatio:(dither.pixelCount+1)/(640*360)}).reason,'raster-pixel-budget','a fitting upload must still charge guarded raster pixels to the unchanged ratio limit');
   assert.strictEqual(plan(wet,r=>r.water.delete('11,6'),{maxRasterRatio:25/760}).reason,'raster-budget','guarded source input must count against the raster-work gate');
   const material=plan(fixture(),room=>room.paths.add('20,17')).regions[0];
-  assert.deepStrictEqual([material.x,material.y,material.width,material.height],[318,270,23,22],'the measured border-overlay case uploads only the changed floor envelope');
-  assert.deepStrictEqual([material.rasterX,material.rasterY,material.rasterWidth,material.rasterHeight],[272,224,112,112]);
+  assert.deepStrictEqual([material.x,material.y,material.width,material.height],[320,272,19,18],'the measured border-overlay case uploads only the changed floor envelope');
+  assert.deepStrictEqual([material.rasterX,material.rasterY,material.rasterWidth,material.rasterHeight],[288,240,96,96]);
   const normal=plan(fixture(),room=>{room.water.add('10,6');room.water.add('11,6')}).regions[0];
-  assert.deepStrictEqual([normal.x,normal.y,normal.width,normal.height],[158,94,39,22],'adjacent changed floor envelopes merge without adding upload alignment');
-  assert.deepStrictEqual([normal.rasterX,normal.rasterY,normal.rasterWidth,normal.rasterHeight],[112,48,128,112]);
-  assert.deepStrictEqual(assertCrop(normal,360),{cropX:46,cropY:46,skipRows:44});
+  assert.deepStrictEqual([normal.x,normal.y,normal.width,normal.height],[160,96,35,18],'adjacent changed floor envelopes merge without adding upload alignment');
+  assert.deepStrictEqual([normal.rasterX,normal.rasterY,normal.rasterWidth,normal.rasterHeight],[128,64,112,96]);
+  assert.deepStrictEqual(assertCrop(normal,360),{cropX:32,cropY:32,skipRows:46});
   const fractional=plan(wet,r=>r.water.delete('11,6'),undefined,context({renderWidth:997,renderHeight:563})).regions[0];
-  assert.deepStrictEqual([fractional.x,fractional.y,fractional.width,fractional.height],[272,148,34,33]);
-  assert.deepStrictEqual([fractional.rasterX,fractional.rasterY,fractional.rasterWidth,fractional.rasterHeight],[240,112,112,112]);
+  assert.deepStrictEqual([fractional.x,fractional.y,fractional.width,fractional.height],[274,150,30,29]);
+  assert.deepStrictEqual([fractional.rasterX,fractional.rasterY,fractional.rasterWidth,fractional.rasterHeight],[240,112,96,112]);
   for(const [x,y] of [[289,187],[266,178]])assert(!(x>=fractional.x&&x<fractional.x+fractional.width&&y>=fractional.y&&y<fractional.y+fractional.height),'observed fractional mismatch outside the changed floor must remain untouched');
-  assert.deepStrictEqual(assertCrop(fractional,563),{cropX:32,cropY:36,skipRows:43});
+  assert.deepStrictEqual(assertCrop(fractional,563),{cropX:34,cropY:38,skipRows:45});
+  const pathRoom=fixture();pathRoom.paths.add('13,6');
+  const pathErase=plan(pathRoom,r=>r.paths.delete('13,6'),undefined,context({renderWidth:997,renderHeight:563})).regions[0];
+  assert.deepStrictEqual([pathErase.x,pathErase.y,pathErase.width,pathErase.height],[324,150,30,29]);
+  assert.deepStrictEqual([pathErase.rasterX,pathErase.rasterY,pathErase.rasterWidth,pathErase.rasterHeight],[288,112,112,112]);
+  assert(149<pathErase.y,'observed top-edge mismatch at348,149 must remain untouched');
   const overlappingChange=room=>{room.paths.add('9,10');room.paths.add('13,10')},overlapping=plan(fixture(),overlappingChange);
   assert.strictEqual(overlapping.kind,'patch');assert.strictEqual(overlapping.regions.length,2,'overlapping raster guards must not merge disjoint upload rectangles');
   const [a,b]=overlapping.regions;
-  assert.deepStrictEqual(overlapping.regions.map(r=>[r.x,r.y,r.width,r.height]),[[142,158,23,22],[206,158,23,22]]);
+  assert.deepStrictEqual(overlapping.regions.map(r=>[r.x,r.y,r.width,r.height]),[[144,160,19,18],[208,160,19,18]]);
   assert(a.rasterX+a.rasterWidth>b.rasterX,'fixture must overlap guarded raster work');
-  assert.strictEqual(overlapping.pixelCount,1012);assert.strictEqual(overlapping.rasterPixels,25088);assert.strictEqual(overlapping.rasterCellCount,162);assert.strictEqual(overlapping.scratchPixels,12544);assert.strictEqual(overlapping.scratchBytes,12544*4);assert.strictEqual(overlapping.uploadBytes,1012*4);assert.strictEqual(overlapping.uploadCalls,2);
+  assert.strictEqual(overlapping.pixelCount,684);assert.strictEqual(overlapping.rasterPixels,18432);assert.strictEqual(overlapping.rasterCellCount,128);assert.strictEqual(overlapping.scratchPixels,9216);assert.strictEqual(overlapping.scratchBytes,9216*4);assert.strictEqual(overlapping.uploadBytes,684*4);assert.strictEqual(overlapping.uploadCalls,2);
   assert.strictEqual(plan(fixture(),overlappingChange,{maxPixelRatio:(overlapping.rasterPixels-1)/(640*360)}).reason,'raster-pixel-budget','overlapping guards are charged independently rather than as their geometric union');
-  const sparseGuard=plan(fixture(),room=>{for(const key of ['5,5','15,5','25,5','35,12'])room.water.add(key)});
-  assert.strictEqual(sparseGuard.reason,'raster-pixel-budget','four sparse small uploads can exceed the unchanged 20% guarded raster work gate');
+  const sparseGuard=plan(fixture(),room=>{for(const key of ['5,5','15,5','25,5','35,5','5,13','15,13'])room.water.add(key)});
+  assert.strictEqual(sparseGuard.reason,'raster-pixel-budget','six sparse small uploads can exceed the unchanged 20% guarded raster work gate');
   assert.deepStrictEqual(S.DEFAULT_LIMITS,{maxChangedCells:16,maxRegions:8,maxPixelRatio:.20,maxRasterRatio:.35,maxScratchPixels:262144},'native alignment and raster guards must not weaken default work budgets');
   const edgeRoom=fixture(),edgeMeta=context({renderWidth:997,renderHeight:563,logicalHeight:304}),edgeBefore=capture(edgeRoom,edgeMeta);edgeRoom.water.add('39,18');
   const edge=S.plan(edgeBefore,capture(edgeRoom,edgeMeta)).regions[0];
