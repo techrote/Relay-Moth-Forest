@@ -388,8 +388,11 @@ def measure_source(args, root, validate_static=True):
                         assert record.get("phaseCalls", {}).get("static.build", 0) == 0, (scenario, "small terrain edit invoked full painter")
                         assert 0 < static.get("rasterCells", 10**12) < 40 * 19, (scenario, "unbounded floor raster", static)
                         assert 0 < static.get("rasterPixels", 10**12) <= env["native"][0] * env["native"][1] * .20, (scenario, "unbounded guarded raster", static)
-                        assert 0 < static.get("uploadBytes", 10**12) < env["native"][0] * env["native"][1] * 12, (scenario, "full static upload", static)
-                        assert static.get("uploadCalls") == len(static.get("regions", [])) * 3, (scenario, "incomplete material upload", static)
+                        assert 0 < static.get("uploadBytes", 10**12) < env["native"][0] * env["native"][1] * 4, (scenario, "full static color upload", static)
+                        assert static.get("uploadCalls") == len(static.get("regions", [])), (scenario, "expected one color upload per region", static)
+                        assert static.get("uploadBytes") == static.get("pixels", -1) * 4, (scenario, "color upload byte accounting differs", static)
+                        assert static.get("scratchBytes") == static.get("scratchPixels", -1) * 4, (scenario, "expected one guarded color scratch canvas", static)
+                        assert record.get("phaseCalls", {}).get("static.patch.upload.normal", 0) == 0 and record.get("phaseCalls", {}).get("static.patch.upload.specular", 0) == 0, (scenario, "unchanged material textures were uploaded", static)
                         assert static.get("scratchPixels", 10**12) <= 262144 and static.get("retainedScratchPixels") == 0, (scenario, "unbounded or retained scratch", static)
                 run["scenarios"][scenario] = {
                     "summary": summarize(records),

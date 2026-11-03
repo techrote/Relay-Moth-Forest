@@ -1,6 +1,7 @@
 /* PERF-004: authoritative static-terrain deltas and bounded native raster work.
  * This module owns data only. A caller commits a captured snapshot only after
- * all three background textures have been updated successfully.
+ * the background is coherent: full builds replace all three maps, while terrain
+ * patches replace color and preserve their unchanged normal/specular authority.
  */
 (function(root,factory){
   'use strict';
@@ -130,7 +131,8 @@
     const rasterPixels=full?pixelCount:regions.reduce((n,r)=>n+r.rasterWidth*r.rasterHeight,0);
     const rasterCellCount=full?(geometry?geometry.columns*geometry.rows:0):regions.reduce((n,r)=>n+(r.tx1-r.tx0)*(r.ty1-r.ty0),0);
     const scratchPixels=full?pixelCount:regions.reduce((n,r)=>Math.max(n,r.rasterWidth*r.rasterHeight),0);
-    return Object.freeze({kind,reason,changedCells:freezeArray(changedCells),changedCellCount:changedCells.length,regions:freezeArray(regions.map(Object.freeze)),pixelCount,rasterPixels,rasterCellCount,scratchPixels,scratchBytes:scratchPixels*12,uploadCalls:full?3:regions.length*3,uploadBytes:pixelCount*12,logicalHalo:LOGICAL_HALO,nativeHalo:NATIVE_HALO,nativeAlignment:NATIVE_ALIGNMENT,rasterGuard:NATIVE_RASTER_GUARD});
+    const bytesPerPixel=full?12:4;
+    return Object.freeze({kind,reason,changedCells:freezeArray(changedCells),changedCellCount:changedCells.length,regions:freezeArray(regions.map(Object.freeze)),pixelCount,rasterPixels,rasterCellCount,scratchPixels,scratchBytes:scratchPixels*bytesPerPixel,uploadCalls:full?3:regions.length,uploadBytes:pixelCount*bytesPerPixel,logicalHalo:LOGICAL_HALO,nativeHalo:NATIVE_HALO,nativeAlignment:NATIVE_ALIGNMENT,rasterGuard:NATIVE_RASTER_GUARD});
   }
 
   function limits(options){
@@ -185,8 +187,8 @@
     const raw=changes.map(cell=>{
       const x0=Math.floor((cell.x*g.tileSize-LOGICAL_HALO)*sx)-NATIVE_HALO,y0=Math.floor((cell.y*g.tileSize-LOGICAL_HALO)*sy)-NATIVE_HALO;
       const x1=Math.ceil(((cell.x+1)*g.tileSize+LOGICAL_HALO)*sx)+NATIVE_HALO,y1=Math.ceil(((cell.y+1)*g.tileSize+LOGICAL_HALO)*sy)+NATIVE_HALO;
-      // The 16px native grid preserves Skia's 8x8 gradient-dither phase and
-      // the material edge sampling established by native pixel qualification.
+      // The 16px native grid preserves Skia's 8x8 gradient-dither phase.
+      // Material maps have no terrain dependency and are retained unchanged.
       // sk_FragCoord is upper-left, independent of the later GL upload flip.
       // Round outward, then recompute merging, raster inputs and all budgets.
       return{
@@ -199,8 +201,9 @@
     const merged=merge(raw);
     if(merged.length>budget.maxRegions)return full('fragmentation',changes);
     const regions=merged.map(rect=>{
-      // Keep the upload away from the scratch clip, where large atlas sprite
-      // sampling can differ from a full composition. Guard overlaps remain
+      // Keep the color upload away from the scratch clip. Exact native color
+      // qualification remains required; a guard alone cannot guarantee it.
+      // Guard overlaps remain
       // separate raster work; they must not enlarge or merge upload regions.
       const rasterX=Math.max(0,Math.floor((rect.x0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       const rasterY=Math.max(0,Math.floor((rect.y0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);

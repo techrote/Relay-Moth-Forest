@@ -95,7 +95,7 @@ for(let index=0;index<story.rooms.length;index++){
   const generation=art.normalTransformGeneration;
   const repeated=build(art,room);retained(art,active,repeated,room.key+' repeated full');assert.strictEqual(art.normalTransformGeneration,generation,room.key+' repeated full advanced source generation');
   const patch=build(art,room,true);retained(art,active,patch,room.key+' bounded patch');assert.strictEqual(art.normalTransformGeneration,generation,room.key+' bounded patch advanced source generation');
-  assert.deepStrictEqual(repeated.map(x=>x.key),first.map(x=>x.key),'full composition request order changed');assert.deepStrictEqual(patch.map(x=>x.key),first.map(x=>x.key),'patch must replay the same authored material sources');
+  assert.deepStrictEqual(repeated.map(x=>x.key),first.map(x=>x.key),'full composition request order changed');assert.strictEqual(patch.length,0,'terrain-only patch must preserve materials without requesting or recreating any normal source');
   counts.push({room:room.key,active:active.size,requests:first.length});requestCount+=first.length+repeated.length+patch.length;
 }
 assert(counts.some(row=>row.room==='dawn_tree'&&row.active>64),'negative-control room must actually exceed the previous 64-source cap');

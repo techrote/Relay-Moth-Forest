@@ -363,11 +363,15 @@ class StaticPainter{
     try{
       perfMeasure(phase+'.scratch',()=>{
         c=new OffscreenCanvas(r.width,r.height);ctx=c.getContext('2d',{alpha:false});
-        normalCanvas=new OffscreenCanvas(r.width,r.height);specCanvas=new OffscreenCanvas(r.width,r.height);
-        bctx=normalCanvas.getContext('2d',{alpha:true});sctx=specCanvas.getContext('2d',{alpha:true});
+        // Terrain-only deltas cannot change material pixels: baseTile, sky and
+        // footer paint color only, and the planner verifies every static sprite
+        // dependency. Keep the already qualified normal/specular GPU textures.
+        // Repainting unchanged atlas sprites on a translated canvas can change
+        // subpixel filtering, even when the source and logical transform agree.
+        if(!region){normalCanvas=new OffscreenCanvas(r.width,r.height);specCanvas=new OffscreenCanvas(r.width,r.height);bctx=normalCanvas.getContext('2d',{alpha:true});sctx=specCanvas.getContext('2d',{alpha:true})}
         // Preserve the accepted full renderer's save/scale/restore sequence at
         // fractional native sizes; patches add only an integer native offset.
-        for(const x of [ctx,bctx,sctx]){x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.save();if(region)x.translate(-r.x,-r.y);x.scale(renderW/W,renderH/H)}
+        for(const x of [ctx,bctx,sctx].filter(Boolean)){x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.save();if(region)x.translate(-r.x,-r.y);x.scale(renderW/W,renderH/H)}
       });
       this.materialNormalCtx=bctx;this.materialSpecCtx=sctx;
       perfMeasure(phase+'.floor',()=>{
@@ -377,15 +381,16 @@ class StaticPainter{
         for(let ty=r.ty0;ty<r.ty1;ty++)for(let tx=r.tx0;tx<r.tx1;tx++){const k=`${tx},${ty}`,seed=hash32(tx,ty,room.index+311),bridgeCell=room.bridgeCells.has(k);if(room.border.has(k)||room.walls.has(k))this.baseTile(ctx,tx,ty,seed,'blocker');else if(room.water.has(k)&&(bridgeCell||!room.bridgeOpen(k)))this.baseTile(ctx,tx,ty,seed,'water');else if(room.paths.has(k)||(!bridgeCell&&room.bridgeOpen(k)))this.baseTile(ctx,tx,ty,seed,'path');else this.baseTile(ctx,tx,ty,seed,'ground')}
       });
       // Static overlays may reach across many cells. Replaying all of them into
-      // the small clipped surface preserves sorting, glows and material alpha.
+      // the small clipped color surface preserves sorting and glows. Material
+      // contexts are present only for a full build, including every fallback.
       perfMeasure(phase+'.overlays-materials',()=>{this.patternDecor(ctx,room,state);this.drawBlockerSprites(ctx,room);this.drawVegetationInterstitials(ctx,room);this.drawDecor(ctx,room)});
       // editor_decor, recruitable robots, completed objectives, gates and bridge/progression presentation are live mutable content.
       // Footer sprites affect color only, including a patch crossing PLAY_H.
-      this.materialNormalCtx=null;this.materialSpecCtx=null;bctx.restore();sctx.restore();
+      this.materialNormalCtx=null;this.materialSpecCtx=null;bctx?.restore();sctx?.restore();
       perfMeasure(phase+'.footer',()=>{
         const ui=ctx.createLinearGradient(0,PLAY_H,0,H);ui.addColorStop(0,this.col('ui',14));ui.addColorStop(1,this.col('ui',4));ctx.fillStyle=ui;ctx.fillRect(0,PLAY_H,W,BOTTOM_H);this.px(ctx,0,PLAY_H,W,2,this.col('ui',105),.7);this.px(ctx,8,PLAY_H+7,W-16,BOTTOM_H-14,this.col('ui',24),.92);ctx.strokeStyle=this.col('ui',88);ctx.lineWidth=1.5;ctx.strokeRect(8.5,PLAY_H+7.5,W-17,BOTTOM_H-15);this.sprite(ctx,'gear',W-31,H-17,{anchor:'bottom',alpha:.42,element:'ui'});this.sprite(ctx,'orb_cyan',28,H-18,{anchor:'bottom',alpha:.38,element:'ui'});
       });
-      ctx.restore();this.lastMaterialMaps={normal:normalCanvas,spec:specCanvas};return c;
+      ctx.restore();this.lastMaterialMaps=region?null:{normal:normalCanvas,spec:specCanvas};return c;
     }catch(err){releaseCanvasBacking(c);releaseCanvasBacking(normalCanvas);releaseCanvasBacking(specCanvas);throw err}
     finally{this.materialNormalCtx=null;this.materialSpecCtx=null}
   }
@@ -543,12 +548,12 @@ class GLRenderer{
       this.backgroundSize=[canvas.width,canvas.height];this.backgroundReady=!!(maps?.normal&&maps?.spec);this.backgroundRevision=(this.backgroundRevision||0)+1;
     }finally{g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false)}
   }
-  patchBackground(region,canvas,maps){
+  patchBackground(region,canvas){
     const g=this.gl,{x,y,width,height}=region;
     if(!this.backgroundReady||this.backgroundSize?.[0]!==this.nativeW||this.backgroundSize?.[1]!==this.nativeH||![x,y,width,height].every(Number.isInteger)||x<0||y<0||width<=0||height<=0||x+width>this.nativeW||y+height>this.nativeH)throw new Error('Stale or invalid static background patch');
     const rasterX=region.rasterX??x,rasterY=region.rasterY??y,rasterWidth=region.rasterWidth??width,rasterHeight=region.rasterHeight??height;
     if(![rasterX,rasterY,rasterWidth,rasterHeight].every(Number.isInteger)||rasterX<0||rasterY<0||rasterWidth<=0||rasterHeight<=0||rasterX+rasterWidth>this.nativeW||rasterY+rasterHeight>this.nativeH||rasterX>x||rasterY>y||rasterX+rasterWidth<x+width||rasterY+rasterHeight<y+height)throw new Error('Stale or invalid static background patch crop');
-    if(![canvas,maps?.normal,maps?.spec].every(c=>c&&c.width===rasterWidth&&c.height===rasterHeight))throw new Error('Incomplete static material patch');
+    if(!canvas||canvas.width!==rasterWidth||canvas.height!==rasterHeight)throw new Error('Incomplete static color patch');
     const flip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels=g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows=g.getParameter(g.UNPACK_SKIP_ROWS);
     const upload=(tex,src,label)=>perfMeasure(label,()=>{g.bindTexture(g.TEXTURE_2D,tex);this.backgroundUploadCalls=(this.backgroundUploadCalls||0)+1;this.backgroundUploadBytes=(this.backgroundUploadBytes||0)+width*height*4;g.texSubImage2D(g.TEXTURE_2D,0,x,this.nativeH-y-height,width,height,g.RGBA,g.UNSIGNED_BYTE,src)});
     this.backgroundReady=false;
@@ -557,7 +562,9 @@ class GLRenderer{
       // directly from the guarded canvas; with flip enabled, skipped rows count
       // from its bottom. No intermediate crop canvas or readback is required.
       g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);g.pixelStorei(g.UNPACK_SKIP_PIXELS,x-rasterX);g.pixelStorei(g.UNPACK_SKIP_ROWS,rasterHeight-(y-rasterY)-height);
-      upload(this.bgTex,canvas,'static.patch.upload.color');upload(this.bgNormalTex,maps.normal,'static.patch.upload.normal');upload(this.bgSpecTex,maps.spec,'static.patch.upload.specular');
+      // Only a dependency-qualified terrain delta reaches this method. Both
+      // material textures remain byte-for-byte identical to the full baseline.
+      upload(this.bgTex,canvas,'static.patch.upload.color');
       if(g.isContextLost?.()||(g.getError&&g.getError()!==g.NO_ERROR))throw new Error('Static background subupload failed');
       this.backgroundReady=true;this.backgroundRevision=(this.backgroundRevision||0)+1;
     }finally{g.pixelStorei(g.UNPACK_SKIP_PIXELS,skipPixels);g.pixelStorei(g.UNPACK_SKIP_ROWS,skipRows);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,flip)}
@@ -870,14 +877,13 @@ class Game{
   }
   refreshEditorStatic({force=false}={}){
     this.syncEditorRenderStage();this.releaseCurrentStatic();this.art.trimTintCache?.(96);
-    const planner=globalThis.RelayStaticTerrain,previous=this.staticTerrainSnapshot,renderer=this.renderer,startCalls=renderer.backgroundUploadCalls||0,startBytes=renderer.backgroundUploadBytes||0,normalGeneration=this.art.normalTransformGeneration||0;
+    const planner=globalThis.RelayStaticTerrain,previous=this.staticTerrainSnapshot,renderer=this.renderer,startCalls=renderer.backgroundUploadCalls||0,startBytes=renderer.backgroundUploadBytes||0;
     let snapshot=null,plan;
     perfMeasure('static.plan',()=>{
       try{snapshot=planner?.capture(this.room,this.staticTerrainContext())||null;plan=planner?.plan(previous,snapshot)||{kind:'full',reason:'planner-unavailable'}}
       catch(_err){plan={kind:'full',reason:'invalid-context'}}
       if(force)plan={...plan,kind:'full',reason:'forced'};
       else if(previous&&(!renderer.backgroundReady||this.staticBackgroundRevision!==renderer.backgroundRevision))plan={...plan,kind:'full',reason:'stale-background'};
-      else if(plan.kind==='patch'&&this.staticNormalTransformGeneration!==normalGeneration)plan={...plan,kind:'full',reason:'normal-cache-pressure'};
     });
     // Asset replacement on an existing HDArtSheet must also discard derived
     // tint/normal tiles; their historical keys identify sprite names, not images.
@@ -887,7 +893,7 @@ class Game{
     const stats={mode:plan.kind,reason:plan.reason,changedCells:plan.changedCellCount||0,rasterCells:0,rasterPixels:0,pixels:0,uploadCalls:0,uploadBytes:0,scratchPixels:0,scratchBytes:0,readbackPixels:0,regions:[],retainedScratchPixels:0};
     this.staticRefreshStats=stats;
     const full=()=>{
-      stats.mode='full';stats.rasterCells+=GRID_W*GRID_H;stats.pixels+=renderer.nativeW*renderer.nativeH;stats.rasterPixels+=renderer.nativeW*renderer.nativeH;stats.scratchPixels=Math.max(stats.scratchPixels,renderer.nativeW*renderer.nativeH);
+      stats.mode='full';stats.rasterCells+=GRID_W*GRID_H;stats.pixels+=renderer.nativeW*renderer.nativeH;stats.rasterPixels+=renderer.nativeW*renderer.nativeH;stats.scratchPixels=Math.max(stats.scratchPixels,renderer.nativeW*renderer.nativeH);stats.scratchBytes=Math.max(stats.scratchBytes,renderer.nativeW*renderer.nativeH*12);
       const staticCanvas=perfMeasure('static.build',()=>this.painter.build(this.room,this.state,renderer.nativeW,renderer.nativeH)),materialMaps=this.painter.lastMaterialMaps;
       try{renderer.setBackground(staticCanvas,materialMaps)}finally{releaseCanvasBacking(staticCanvas);releaseCanvasBacking(materialMaps?.normal);releaseCanvasBacking(materialMaps?.spec);this.painter.lastMaterialMaps=null}
     };
@@ -899,24 +905,17 @@ class Game{
         try{
           for(const region of plan.regions){
             const rasterPixels=(region.rasterWidth??region.width)*(region.rasterHeight??region.height);
-            stats.rasterCells+=(region.tx1-region.tx0)*(region.ty1-region.ty0);stats.pixels+=region.width*region.height;stats.rasterPixels+=rasterPixels;stats.scratchPixels=Math.max(stats.scratchPixels,rasterPixels);stats.regions.push({...region});
-            const staticCanvas=perfMeasure('static.patch.build',()=>this.painter.buildPatch(this.room,this.state,renderer.nativeW,renderer.nativeH,region)),materialMaps=this.painter.lastMaterialMaps;
-            try{
-              // An authored room can exceed the bounded sprite cache. A newly
-              // created normal source cannot safely share a partially redrawn
-              // texture with the older source objects used by its baseline.
-              if((this.art.normalTransformGeneration||0)!==normalGeneration){const err=new Error('Static normal source cache changed during patch');err.code='STATIC_NORMAL_SOURCE_CHANGED';throw err}
-              renderer.patchBackground(region,staticCanvas,materialMaps);
-            }finally{releaseCanvasBacking(staticCanvas);releaseCanvasBacking(materialMaps?.normal);releaseCanvasBacking(materialMaps?.spec);this.painter.lastMaterialMaps=null}
+            stats.rasterCells+=(region.tx1-region.tx0)*(region.ty1-region.ty0);stats.pixels+=region.width*region.height;stats.rasterPixels+=rasterPixels;stats.scratchPixels=Math.max(stats.scratchPixels,rasterPixels);stats.scratchBytes=Math.max(stats.scratchBytes,rasterPixels*4);stats.regions.push({...region});
+            const staticCanvas=perfMeasure('static.patch.build',()=>this.painter.buildPatch(this.room,this.state,renderer.nativeW,renderer.nativeH,region));
+            try{renderer.patchBackground(region,staticCanvas)}finally{releaseCanvasBacking(staticCanvas);this.painter.lastMaterialMaps=null}
           }
-        }catch(err){stats.reason=err?.code==='STATIC_NORMAL_SOURCE_CHANGED'?'normal-cache-pressure':'patch-failed';stats.repairError=String(err?.message||err);full()}
+        }catch(err){stats.reason='patch-failed';stats.repairError=String(err?.message||err);full()}
       }else if(plan.kind!=='noop')full();
-      // The only retained authority is data. Commit after every color/material
-      // region succeeded, or after the complete synchronous repair succeeded.
+      // The only retained authority is data. Commit after all color regions and
+      // their unchanged material baseline are coherent, or full repair succeeds.
       this.staticTerrainSnapshot=snapshot;this.staticBackgroundRevision=renderer.backgroundRevision;this.bgKey=this.editorBackgroundKey();
-      if(stats.mode!=='noop')this.staticNormalTransformGeneration=this.art.normalTransformGeneration||0;
-    }catch(err){renderer.backgroundReady=false;this.staticTerrainSnapshot=null;this.staticBackgroundRevision=null;this.staticNormalTransformGeneration=null;this.bgKey='';stats.reason='refresh-failed';throw err}
-    finally{stats.uploadCalls=(renderer.backgroundUploadCalls||0)-startCalls;stats.uploadBytes=(renderer.backgroundUploadBytes||0)-startBytes;stats.scratchBytes=stats.scratchPixels*12}
+    }catch(err){renderer.backgroundReady=false;this.staticTerrainSnapshot=null;this.staticBackgroundRevision=null;this.bgKey='';stats.reason='refresh-failed';throw err}
+    finally{stats.uploadCalls=(renderer.backgroundUploadCalls||0)-startCalls;stats.uploadBytes=(renderer.backgroundUploadBytes||0)-startBytes}
     perfMeasure('ui.update',()=>this.updateUI());return stats;
   }
   effectiveWaterAuthority(){const out=new Uint8Array(GRID_W*GRID_H);for(const k of this.room.water){if(this.room.bridgeOpen(k))continue;const [tx,ty]=k.split(',').map(Number);if(tx>=0&&tx<GRID_W&&ty>=0&&ty<GRID_H)out[ty*GRID_W+tx]=1}return out}

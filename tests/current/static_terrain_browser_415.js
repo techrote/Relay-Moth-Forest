@@ -121,7 +121,7 @@
       const renderer=Object.create(game.renderer);Object.assign(renderer,{nativeW:width,nativeH:height,bgTex:textures[0],bgNormalTex:textures[1],bgSpecTex:textures[2],backgroundReady:true,backgroundSize:[width,height],backgroundRevision:0,backgroundUploadCalls:0,backgroundUploadBytes:0});
       for(let index=0;index<cases.length;index++){
         const [label,region]=cases[index],sources=[],sourcePixels=[];
-        for(let map=0;map<3;map++){
+        for(let map=0;map<1;map++){
           const canvas=new OffscreenCanvas(region.rasterWidth,region.rasterHeight),ctx=canvas.getContext('2d'),bytes=pattern(canvas.width,canvas.height,map,17+index*31),pixels=ctx.createImageData(canvas.width,canvas.height);
           // Opaque bytes make this a crop/addressing oracle; fractional-alpha
           // composition remains covered by the full production material suite.
@@ -132,14 +132,15 @@
         let fullUploads=0;const uploads=[];
         g.texImage2D=function(...args){if(textures.includes(g.getParameter(g.TEXTURE_BINDING_2D)))fullUploads++;return saved.image.apply(this,args)};
         g.texSubImage2D=function(...args){const map=textures.indexOf(g.getParameter(g.TEXTURE_BINDING_2D));if(map>=0)uploads.push({map,argumentCount:args.length,x:args[2],y:args[3],width:args[4],height:args[5],...unpack()});return saved.sub.apply(this,args)};
-        try{renderer.patchBackground(region,sources[0],{normal:sources[1],spec:sources[2]})}
+        try{renderer.patchBackground(region,sources[0])}
         catch(error){root.__staticRasterDiagnostics={kind:'native-asymmetric-crop',label,region,desiredState:desired,restoredState:unpack(),uploads,error:String(error)};throw error}
         finally{g.texImage2D=saved.image;g.texSubImage2D=saved.sub}
         check(JSON.stringify(unpack())===JSON.stringify(desired),'native '+label+' crop did not restore nondefault unpack state');
-        check(fullUploads===0&&uploads.length===3&&uploads.every(u=>u.argumentCount===9&&u.flip===true&&u.x===region.x&&u.y===height-region.y-region.height&&u.width===region.width&&u.height===region.height&&u.skipPixels===region.x-region.rasterX&&u.skipRows===region.rasterHeight-(region.y-region.rasterY)-region.height),'native '+label+' crop used incorrect upload bounds/state');
+        check(fullUploads===0&&uploads.length===1&&uploads.every(u=>u.map===0&&u.argumentCount===9&&u.flip===true&&u.x===region.x&&u.y===height-region.y-region.height&&u.width===region.width&&u.height===region.height&&u.skipPixels===region.x-region.rasterX&&u.skipRows===region.rasterHeight-(region.y-region.rasterY)-region.height),'native '+label+' crop used incorrect upload bounds/state');
+        check(renderer.bgNormalTex===textures[1]&&renderer.bgSpecTex===textures[2],'native '+label+' replaced preserved material texture handles');
         const maps={};
         for(let map=0;map<3;map++){
-          for(let y=0;y<region.height;y++)for(let x=0;x<region.width;x++){
+          if(map===0)for(let y=0;y<region.height;y++)for(let x=0;x<region.width;x++){
             const source=((region.y-region.rasterY+y)*region.rasterWidth+region.x-region.rasterX+x)*4;
             const target=((height-1-region.y-y)*width+region.x+x)*4;
             expected[map].set(sourcePixels[map].subarray(source,source+4),target);
@@ -147,7 +148,7 @@
           const diff=differences(readTexture(g,textures[map],width,height),expected[map],width);maps[channels[map]]=diff;
           check(diff.bytes===0,'native '+label+' '+channels[map]+' asymmetric crop differs '+JSON.stringify(diff));
         }
-        check(g.getError()===g.NO_ERROR,'native '+label+' crop WebGL error');out.push({label,region,unpackRestored:true,restoredState:unpack(),uploads,maps});
+        check(g.getError()===g.NO_ERROR,'native '+label+' crop WebGL error');out.push({label,region,unpackRestored:true,restoredState:unpack(),materialTexturesPreserved:true,uploads,maps});
         for(const canvas of sources)release(canvas);
       }
       return{native:[width,height],cases:out};
@@ -307,9 +308,10 @@
       if(forceCPU)prototype.getContext=function(type,options){return getContext.call(this,type,type==='2d'&&this.width===(region.rasterWidth??region.width)&&this.height===(region.rasterHeight??region.height)?{...options,willReadFrequently:true}:options)};
       try{
         color=painter.buildPatch(game.room,game.state,width,height,region);maps=painter.lastMaterialMaps;
-        const sources=[color,maps.normal,maps.spec],entry={name,region,forceCPU,generationBefore,generationAfter:game.art.normalTransformGeneration,
+        const sources=[color,maps?.normal,maps?.spec],entry={name,region,forceCPU,generationBefore,generationAfter:game.art.normalTransformGeneration,
           colorAttributes:color.getContext('2d').getContextAttributes(),maps:{}};
         for(let c=0;c<channels.length;c++){
+          if(!sources[c]){entry.maps[channels[c]]={preserved:true,fullTexture:differences(actual.maps[c],expected[c],width)};continue}
           const bytes=uploadCroppedReference(game.renderer.gl,sources[c],region);
           const fullCrop=crop(expected[c],width,region.x,height-region.y-region.height,region.width,region.height);
           const originalCrop=crop(bytes,region.width,original.x-region.x,region.y+region.height-original.y-original.height,original.width,original.height);
@@ -328,10 +330,13 @@
       if(diff.bytes&&!firstFailure)firstFailure=label+' '+channels[c]+' full GPU texture differs: '+JSON.stringify(diff);
       if(before){
         check(before.width===actual.width&&before.height===actual.height,label+' exterior dimensions changed');
-        const rects=uploads.filter(u=>u.channel===channels[c]);let changedOutside=0,coveredAlphaPixels=0;
+        const rects=uploads.filter(u=>u.channel===channels[c]),coverageRects=uploads.filter(u=>u.channel==='color');let changedOutside=0,coveredAlphaPixels=0;
         for(let y=0;y<actual.height;y++)for(let x=0;x<actual.width;x++){
           const i=(y*actual.width+x)*4;
-          if(rects.some(u=>x>=u.x&&x<u.x+u.width&&y>=u.y&&y<u.y+u.height)){if(actual.maps[c][i+3])coveredAlphaPixels++;continue}
+          // Material presence is measured under the color output; material
+          // textures themselves have no upload rectangles and must not change.
+          if(coverageRects.some(u=>x>=u.x&&x<u.x+u.width&&y>=u.y&&y<u.y+u.height)&&actual.maps[c][i+3])coveredAlphaPixels++;
+          if(rects.some(u=>x>=u.x&&x<u.x+u.width&&y>=u.y&&y<u.y+u.height))continue;
           for(let k=0;k<4;k++)if(before.maps[c][i+k]!==actual.maps[c][i+k])changedOutside++;
         }
         if(changedOutside&&!firstFailure)firstFailure=label+' '+channels[c]+' changed bytes outside actual subuploads';
@@ -352,11 +357,12 @@
 
   function instrument(action){
     const r=game.renderer,g=r.gl,painter=game.painter,canvasRefs=[];
-    const stats={fullBuilds:0,patchBuilds:0,floorCalls:0,fullUploads:[],subUploads:[],readbacks:[],patchCanvases:[],actorInitializations:0};
+    const stats={fullBuilds:0,patchBuilds:0,patchMaterialMaps:0,normalTransformRequests:0,floorCalls:0,fullUploads:[],subUploads:[],readbacks:[],patchCanvases:[],actorInitializations:0};
+    const materialHandles=[r.bgNormalTex,r.bgSpecTex],normalGeneration=game.art.normalTransformGeneration;
     const unpack=()=>({flipY:g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels:g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows:g.getParameter(g.UNPACK_SKIP_ROWS)});
     stats.unpackBefore=unpack();
     const original={build:painter.build,patch:painter.buildPatch,tile:painter.baseTile,image:g.texImage2D,sub:g.texSubImage2D,
-      creature:game.creatures.init,mini:game.miniGuides.init};
+      creature:game.creatures.init,mini:game.miniGuides.init,normal:game.art.transformedNormal,normalOwn:Object.prototype.hasOwnProperty.call(game.art,'transformedNormal')};
     const contextPrototype=Object.getPrototypeOf(new OffscreenCanvas(1,1).getContext('2d'));
     original.read=contextPrototype.getImageData;
     const actors={creatures:game.creatures.units,mini:game.miniGuides.units,creatureData:JSON.stringify(game.creatures.units),miniData:JSON.stringify(game.miniGuides.units)};
@@ -365,6 +371,7 @@
     painter.build=function(...args){stats.fullBuilds++;return original.build.apply(this,args)};
     if(original.patch)painter.buildPatch=function(...args){
       stats.patchBuilds++;const color=original.patch.apply(this,args),maps=this.lastMaterialMaps;
+      if(maps)stats.patchMaterialMaps++;
       for(const canvas of [color,maps?.normal,maps?.spec])if(canvas){canvasRefs.push(canvas);stats.patchCanvases.push({width:canvas.width,height:canvas.height})}
       return color;
     };
@@ -380,10 +387,12 @@
     contextPrototype.getImageData=function(...args){stats.readbacks.push({canvasWidth:this.canvas.width,canvasHeight:this.canvas.height,width:args[2],height:args[3]});return original.read.apply(this,args)};
     game.creatures.init=function(...args){stats.actorInitializations++;return original.creature.apply(this,args)};
     game.miniGuides.init=function(...args){stats.actorInitializations++;return original.mini.apply(this,args)};
+    game.art.transformedNormal=function(...args){stats.normalTransformRequests++;return original.normal.apply(this,args)};
     try{action()}finally{
       painter.build=original.build;if(original.patch)painter.buildPatch=original.patch;painter.baseTile=original.tile;
       g.texImage2D=original.image;g.texSubImage2D=original.sub;contextPrototype.getImageData=original.read;
       game.creatures.init=original.creature;game.miniGuides.init=original.mini;
+      if(original.normalOwn)game.art.transformedNormal=original.normal;else delete game.art.transformedNormal;
       stats.releasedPatchCanvases=canvasRefs.every(c=>c.width===1&&c.height===1);
       stats.unpackAfter=unpack();stats.unpackRestored=JSON.stringify(stats.unpackBefore)===JSON.stringify(stats.unpackAfter);
     }
@@ -391,6 +400,8 @@
       actors.creatureData===JSON.stringify(game.creatures.units)&&actors.miniData===JSON.stringify(game.miniGuides.units);
     stats.waterFullRebuilds=r.surfaceFX.water.rebuilds-water.field;
     stats.waterFullUploads=(r.waterMaskFullUploads||0)-water.legacy;
+    stats.materialHandlesUnchanged=materialHandles[0]===r.bgNormalTex&&materialHandles[1]===r.bgSpecTex;
+    stats.normalSourceGenerationUnchanged=normalGeneration===game.art.normalTransformGeneration;
     stats.diagnostics={...game.staticRefreshStats};
     return stats;
   }
@@ -418,15 +429,14 @@
       check(work.patchBuilds>0&&work.floorCalls>0&&work.floorCalls<760,label+' floor raster work is not bounded');
       check(work.releasedPatchCanvases,label+' retained static scratch backing');
       check(work.unpackRestored,label+' changed WebGL unpack state');
-      check(work.patchCanvases.length===work.patchBuilds*3&&work.patchCanvases.every(c=>c.width*c.height<area),label+' scratch map dimensions are not bounded');
+      check(work.patchMaterialMaps===0&&work.patchCanvases.length===work.patchBuilds&&work.patchCanvases.every(c=>c.width*c.height<area),label+' expected exactly one bounded color scratch per region');
       check(work.readbacks.every(c=>c.width*c.height<area),label+' full-size Canvas2D readback');
       check(!game.currentStatic&&!game.painter.lastMaterialMaps,label+' retained full static backing');
-      check(work.diagnostics.scratchPixels>0&&work.diagnostics.scratchPixels<area&&work.diagnostics.scratchBytes>0&&work.diagnostics.scratchBytes<area*12,label+' scratch diagnostics are not bounded');
-      const shape=channel=>work.subUploads.filter(u=>u.channel===channel).map(u=>[u.x,u.y,u.width,u.height]);
-      for(const name of channels){const uploads=work.subUploads.filter(u=>u.channel===name),pixels=uploads.reduce((n,u)=>n+u.width*u.height,0);
+      check(work.diagnostics.scratchPixels>0&&work.diagnostics.scratchPixels<area&&work.diagnostics.scratchBytes===work.diagnostics.scratchPixels*4&&work.diagnostics.scratchBytes<area*4,label+' color scratch diagnostics are not bounded');
+      check(work.materialHandlesUnchanged&&work.normalSourceGenerationUnchanged&&work.normalTransformRequests===0&&work.subUploads.every(u=>u.channel==='color'),label+' rerendered or replaced unchanged material resources');
+      for(const name of ['color']){const uploads=work.subUploads.filter(u=>u.channel===name),pixels=uploads.reduce((n,u)=>n+u.width*u.height,0);
         check(uploads.length>0&&pixels>0&&pixels<area,label+' '+name+' uploads are not bounded');
         check(uploads.every(u=>Number.isInteger(u.x)&&Number.isInteger(u.y)&&u.x>=0&&u.y>=0&&u.width>0&&u.height>0&&u.x+u.width<=r.nativeW&&u.y+u.height<=r.nativeH),label+' '+name+' invalid native upload rectangle');
-        check(JSON.stringify(shape(name))===JSON.stringify(shape('color')),label+' incoherent color/material output regions');
         for(const upload of uploads){
           const top=r.nativeH-upload.y-upload.height,region=work.diagnostics.regions.find(rect=>rect.x===upload.x&&rect.y===top&&rect.width===upload.width&&rect.height===upload.height);
           check(region&&upload.argumentCount===9&&upload.flipY===true,label+' did not use the explicit DOM-source crop overload');
@@ -438,7 +448,7 @@
       }
       check(work.diagnostics.rasterCells===work.floorCalls&&work.diagnostics.uploadCalls===work.subUploads.length&&
         work.diagnostics.uploadBytes===work.subUploads.reduce((n,u)=>n+u.width*u.height*4,0),label+' bounded-work diagnostics do not match executed work');
-      check(work.diagnostics.rasterPixels===work.patchCanvases.reduce((n,c)=>n+c.width*c.height,0)/3&&
+      check(work.diagnostics.rasterPixels===work.patchCanvases.reduce((n,c)=>n+c.width*c.height,0)&&
         work.diagnostics.scratchPixels===Math.max(...work.patchCanvases.map(c=>c.width*c.height))&&
         work.diagnostics.pixels===work.subUploads.filter(u=>u.channel==='color').reduce((n,u)=>n+u.width*u.height,0),label+' raster/output/scratch metrics conflate guarded source with uploaded pixels');
       check(work.diagnostics.retainedScratchPixels===0,label+' reports retained static scratch');
@@ -447,6 +457,7 @@
     else check(work.fullBuilds>=1&&channels.every(c=>work.fullUploads.some(u=>u.channel===c)),label+' full fallback did not repair all maps');
     if(options.authority!==false)authority(label);
     const textures=parity(label,before,work.subUploads);
+    if(mode==='patch'){check(textures.normal.changedOutside===0&&textures.specular.changedOutside===0,label+' modified material texture bytes');work.materialContentsUnchanged=true}
     if(mode==='patch'||mode==='noop')work.normalSources=assertNormalSources(label+' after full reference');
     if(options.materials)check(textures.normal.coveredAlphaPixels>0&&textures.specular.coveredAlphaPixels>0,label+' did not actually overlap material pixels');
     const water=options.water!==false&&root.auditWater?root.auditWater.parity(label):null;
@@ -653,17 +664,17 @@
 
   function recoveryCases(sourceMaps){
     setup(640,360,sourceMaps);const e=rmfEditor,g=game.renderer.gl,out=[];
-    out.push(measured('second subupload fails; synchronous full repair',()=>{
+    out.push(measured('second disjoint color subupload fails; synchronous full repair',()=>{
       const upload=g.texSubImage2D;let calls=0;
-      g.texSubImage2D=function(...args){const t=g.getParameter(g.TEXTURE_BINDING_2D);if(textureKeys.some(k=>game.renderer[k]===t)&&++calls===2)throw Error('PERF-004 injected second-map failure');return upload.apply(this,args)};
-      try{transaction('PERF-004 recover subupload',()=>paint('water',16,12))}finally{g.texSubImage2D=upload}
+      g.texSubImage2D=function(...args){const t=g.getParameter(g.TEXTURE_BINDING_2D);if(textureKeys.some(k=>game.renderer[k]===t)&&++calls===2)throw Error('PERF-004 injected second-region failure');return upload.apply(this,args)};
+      try{transaction('PERF-004 recover subupload',()=>{paint('water',16,12);paint('water',30,5)})}finally{g.texSubImage2D=upload}
       check(calls===2,'subupload fault fixture did not trigger');
     },'full'));
     const originalSub=g.texSubImage2D,originalImage=g.texImage2D;let calls=0,repairFailed=false;
     try{
       g.texSubImage2D=function(...args){const t=g.getParameter(g.TEXTURE_BINDING_2D);if(textureKeys.some(k=>game.renderer[k]===t)&&++calls===2)throw Error('PERF-004 injected subupload failure before repair failure');return originalSub.apply(this,args)};
       g.texImage2D=function(...args){const t=g.getParameter(g.TEXTURE_BINDING_2D);if(textureKeys.some(k=>game.renderer[k]===t))throw Error('PERF-004 injected full repair failure');return originalImage.apply(this,args)};
-      e.placeTile({kind:'path'},17,12);
+      e.placeTile({kind:'path'},17,12);e.placeTile({kind:'path'},31,5);
       try{invalidation()}catch(error){check(String(error).includes('PERF-004 injected'),'unexpected repair failure '+error);repairFailed=true}
     }finally{g.texSubImage2D=originalSub;g.texImage2D=originalImage}
     check(repairFailed&&game.staticTerrainSnapshot==null&&!game.bgKey,'failed repair retained a trusted rendered baseline');
