@@ -65,8 +65,12 @@ textures, sprite queues and rendered authority remain untouched by capture.
 
 Normal/specular export canvases are released immediately after composition.
 Only the color canvas remains while PNG encoding is pending; it is released on
-both success and failure. Export reuses the bounded atlas caches, whose normal
-eviction and backing-release rules still apply.
+both success and failure. Export shares the loaded atlas images and current
+metadata, but owns fresh, empty tint and transformed-normal caches. Each keeps
+the existing 96-entry limit and releases evicted backings. All remaining private
+backings are released before PNG encoding starts, including on composition
+failure. Runtime cache maps, entry order, source canvases and normal-generation
+state remain unchanged.
 
 ## Regression coverage
 
@@ -78,7 +82,9 @@ cleanup and editor keyboard routing.
 The native browser suite decodes the actual PNG, compares its pixels, checks
 filenames and metadata after delayed navigation, and rejects the former
 bottom-anchor rotation behavior with an independent position reference. It also
-pressures the shared tint cache with an export and immediately paints terrain,
-requiring bounded work and exact three-texture parity without an intervening
-reference rebuild. These native checks are mandatory in CI; a local syntax or
+pressures the export's private tint cache, checks eviction and cleanup while
+preserving every runtime cache entry, and immediately paints terrain, requiring
+bounded work and exact three-texture parity without an intervening reference
+rebuild. Terrain and export checks run independently so either failure retains
+its own evidence. These native checks are mandatory in CI; a local syntax or
 deterministic pass alone is not rendered qualification.

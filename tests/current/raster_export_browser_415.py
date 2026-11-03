@@ -15,14 +15,18 @@ RASTER_EXPORT_CASE = r'''async()=>{
     worldTheme:game.luts.themeForChannel('WORLD'),lutsUndo:game.luts.undo.slice(),editorActive:rmfEditor.active,
     flush:rmfEditor.flushForPersistence,mutable:game.renderMutablePresentation,mutableOwn:Object.hasOwn(game,'renderMutablePresentation')};
   const builds=[],issued=[],result={pixels:{},bridgeStages:[]};
-  let runtimeBuilds=0;
+  let runtimeBuilds=0,observePrivateBuild=null;
   StaticPainter.prototype.build=function(...args){
     if(this===game.painter)runtimeBuilds++;
+    observePrivateBuild?.(this);
     const canvas=original.build.apply(this,args);
     builds.push({painter:this,canvas,normal:this.lastMaterialMaps?.normal,spec:this.lastMaterialMaps?.spec});return canvas;
   };
   const released=c=>!c||(c.width===1&&c.height===1);
-  const assertReleased=label=>check(builds.every(b=>released(b.canvas)&&released(b.normal)&&released(b.spec)),label+' left a backing canvas');
+  const assertReleased=label=>{
+    check(builds.every(b=>released(b.canvas)&&released(b.normal)&&released(b.spec)),label+' left a backing canvas');
+    for(const b of builds)if(b.painter.art!==game.art)check(b.painter.art.tintCache.size===0&&b.painter.art.normalTransformCache.size===0,label+' retained private derived cache entries');
+  };
   const sourceFor=index=>{
     const source=Object.create(game);source.room=new Room(index,structuredClone(game.storyData.rooms[index]),structuredClone(game.maps));
     source.state=Object.create(game.state);source.state.completed=new Set();source.state.robots=new Set();return source;
@@ -95,6 +99,7 @@ RASTER_EXPORT_CASE = r'''async()=>{
     const pending=exportRaster(),count=builds.length;check(finishEncoding,'encoder did not start');check(issued.length===0,'download issued before PNG encoding');
     check(await exportRaster()===false&&builds.length===count,'concurrent export was not guarded');
     const pendingBuild=builds.at(-1);check(released(pendingBuild.normal)&&released(pendingBuild.spec),'material maps retained while encoding');
+    check(pendingBuild.painter.art!==game.art&&pendingBuild.painter.art.tintCache.size===0&&pendingBuild.painter.art.normalTransformCache.size===0,'private derived caches retained while encoding');
     game.room=game.rooms[(game.room.index+1)%game.rooms.length];game.state.completed=new Set();game.luts.cycleTheme('WORLD');
     finishEncoding();check(await pending===true,'delayed export failed');
     check(issued.length===2,'missing PNG/JSON pair');
@@ -133,16 +138,21 @@ RASTER_EXPORT_CASE = r'''async()=>{
     result.keyboard={editorExport:true,inputIsolation:true,repeatSuppressed:true};
     result.failures={encodeCleaned:true,compositionCleaned:true,retrySucceeded:true};
 
-    // Export-only mutable tints share the runtime HDArtSheet cache. Force real
-    // eviction through F8, then edit terrain before any reference build can
-    // warm those sources again. GPU reads alone inspect the unchanged baseline.
+    // Force real eviction within F8's private caches, then edit terrain before
+    // any reference can warm runtime sources. Every runtime cache entry, its
+    // order and backing, and all GPU textures must survive the export unchanged.
     const e=rmfEditor,r=game.renderer,art=game.art,audit=globalThis.auditStaticTerrain;
     check(audit?.capture&&audit?.instrument&&audit?.parity,'static GPU audit helpers unavailable');
     const saved={maps:game.maps,rooms:game.rooms,room:game.room,index:game.state.room,x:game.x,y:game.y,vx:game.vx,vy:game.vy,
       history:e.history,choice:e.choice,selection:e.selection,activeRoomKey:e.activeRoomKey,nextDecorId:e.nextDecorId,
       rectOwn:Object.hasOwn(r.c,'getBoundingClientRect'),rect:r.c.getBoundingClientRect,
-      tintOwn:Object.hasOwn(art,'tintedRegion'),tint:art.tintedRegion};
-    const restoreTint=()=>{if(saved.tintOwn)art.tintedRegion=saved.tint;else delete art.tintedRegion};
+      tintOwn:Object.hasOwn(art,'tintedRegion'),tint:art.tintedRegion,
+      normalOwn:Object.hasOwn(art,'transformedNormal'),normal:art.transformedNormal,encode:OffscreenCanvas.prototype.convertToBlob};
+    const restoreArt=()=>{
+      if(saved.tintOwn)art.tintedRegion=saved.tint;else delete art.tintedRegion;
+      if(saved.normalOwn)art.transformedNormal=saved.normal;else delete art.transformedNormal;
+      observePrivateBuild=null;OffscreenCanvas.prototype.convertToBlob=saved.encode;
+    };
     try{
       original.flush.call(e);e.clearPendingInvalidation();e.resetPointerState();
       const index=game.storyData.rooms.findIndex(spec=>spec.key==='quiet_nest'),sprite='lamp_blue';
@@ -166,18 +176,48 @@ RASTER_EXPORT_CASE = r'''async()=>{
       const before=audit.capture(),textureKeys=['bgTex','bgNormalTex','bgSpecTex'];
       const baseline={handles:textureKeys.map(key=>r[key]),revision:r.backgroundRevision,staticRevision:game.staticBackgroundRevision,
         snapshot:game.staticTerrainSnapshot,bgKey:game.bgKey,stats:game.staticRefreshStats,uploads:r.backgroundUploadCalls,bytes:r.backgroundUploadBytes,
-        normalGeneration:art.normalTransformGeneration,tints:new Set(art.tintCache.values()),runtimeBuilds,builds:builds.length,downloads:issued.length};
-      const seen=new Set(baseline.tints),requestedKeys=new Set();let peakTintSize=art.tintCache.size,peakNormalSize=art.normalTransformCache.size;
+        normalGeneration:art.normalTransformGeneration,runtimeBuilds,builds:builds.length,downloads:issued.length,
+        caches:['tintCache','normalTransformCache'].map(name=>({name,map:art[name],entries:[...art[name]].map(([key,canvas])=>({key,canvas,width:canvas.width,height:canvas.height}))}))};
+      const owners=new Set(),seenTints=new Set(),seenNormals=new Set(),evicted=new Set(),requestedKeys=new Set();
+      let peakTintSize=0,peakNormalSize=0,privateReleasedBeforeEncode=false;
+      const assertRuntimeCaches=()=>{
+        check(art.normalTransformGeneration===baseline.normalGeneration,'F8 changed runtime normal generation');
+        for(const cache of baseline.caches){
+          check(art[cache.name]===cache.map,'F8 replaced runtime '+cache.name);const current=[...cache.map];
+          check(current.length===cache.entries.length,'F8 changed runtime cache size');
+          cache.entries.forEach((entry,i)=>check(current[i][0]===entry.key&&current[i][1]===entry.canvas&&entry.canvas.width===entry.width&&entry.canvas.height===entry.height,'F8 changed a runtime cache entry, order, identity or backing'));
+        }
+      };
+      observePrivateBuild=painter=>{
+        const owner=painter.art;check(owner!==art,'F8 reused the runtime cache owner');owners.add(owner);
+        for(const name of ['tintCache','normalTransformCache'])check(Object.hasOwn(owner,name)&&owner[name]!==art[name]&&owner[name].size===0,'F8 copied borrowed cache entries');
+        check(Object.hasOwn(owner,'normalTransformGeneration')&&owner.normalTransformGeneration===0,'F8 did not start an independent normal generation');
+        for(const name of ['img','bumpImg','normalImg','specImg','regions','meta','roles','worldScale'])check(owner[name]===art[name],'F8 lost current shared atlas authority '+name);
+      };
+      const observeEviction=(owner,name,prior)=>{
+        const active=new Set(owner[name].values());for(const canvas of prior)if(!active.has(canvas)){check(released(canvas),'private cache eviction retained a backing');evicted.add(canvas)}
+        peakTintSize=Math.max(peakTintSize,owner.tintCache.size);peakNormalSize=Math.max(peakNormalSize,owner.normalTransformCache.size);
+      };
       art.tintedRegion=function(name,colour,strength){
-        const canvas=saved.tint.call(this,name,colour,strength);seen.add(canvas);
-        peakTintSize=Math.max(peakTintSize,this.tintCache.size);peakNormalSize=Math.max(peakNormalSize,this.normalTransformCache.size);
+        check(this!==art&&owners.has(this),'F8 requested a runtime tint source');
+        const prior=new Set(this.tintCache.values()),canvas=saved.tint.call(this,name,colour,strength);seenTints.add(canvas);observeEviction(this,'tintCache',prior);
         if(name===sprite&&strengths.has(strength.toFixed(3))){
           const entry=[...this.tintCache].find(([,value])=>value===canvas);check(entry,'returned tint is not cache-owned');requestedKeys.add(entry[0]);
         }
         return canvas;
       };
+      art.transformedNormal=function(...args){
+        check(this!==art&&owners.has(this),'F8 requested a runtime transformed normal');
+        const prior=new Set(this.normalTransformCache.values()),canvas=saved.normal.apply(this,args);if(canvas)seenNormals.add(canvas);observeEviction(this,'normalTransformCache',prior);return canvas;
+      };
+      const assertPrivateReleased=()=>{
+        check(owners.size===1&&seenTints.size>100&&seenNormals.size>0,'F8 did not exercise one independent color/material cache owner');
+        for(const owner of owners)check(owner.tintCache.size===0&&owner.normalTransformCache.size===0,'F8 retained private cache entries');
+        check([...seenTints,...seenNormals].every(released),'F8 retained a private derived canvas');assertRuntimeCaches();
+      };
+      OffscreenCanvas.prototype.convertToBlob=function(options){assertPrivateReleased();privateReleasedBeforeEncode=true;return saved.encode.call(this,options)};
       lastAttempt=null;window.dispatchEvent(new KeyboardEvent('keydown',{key:'F8',bubbles:true,cancelable:true}));
-      check(lastAttempt&&await lastAttempt===true,'cache-pressure F8 export failed');restoreTint();
+      check(lastAttempt&&await lastAttempt===true,'cache-pressure F8 export failed');restoreArt();
       check(builds.length===baseline.builds+1&&runtimeBuilds===baseline.runtimeBuilds,'F8 rebuilt the runtime static painter');
       check(issued.length===baseline.downloads+2,'cache-pressure F8 missed its PNG/sidecar');assertReleased('cache-pressure F8');
       const afterExport=audit.capture(),exportMismatch=afterExport.maps.map((bytes,i)=>difference(before.maps[i],bytes));
@@ -185,11 +225,14 @@ RASTER_EXPORT_CASE = r'''async()=>{
       check(textureKeys.every((key,i)=>r[key]===baseline.handles[i])&&r.backgroundReady&&r.backgroundRevision===baseline.revision&&game.staticBackgroundRevision===baseline.staticRevision,'F8 replaced textures or changed the background revision');
       check(game.staticTerrainSnapshot===baseline.snapshot&&game.bgKey===baseline.bgKey&&game.staticRefreshStats===baseline.stats,'F8 invalidated static authority');
       check(r.backgroundUploadCalls===baseline.uploads&&r.backgroundUploadBytes===baseline.bytes,'F8 uploaded a runtime background');
-      check(art.normalTransformGeneration===baseline.normalGeneration,'same-room export recreated warmed normal sources');
-      const active=new Set(art.tintCache.values()),evicted=[...seen].filter(c=>!active.has(c)),evictedBaseline=[...baseline.tints].filter(c=>!active.has(c));
+      assertPrivateReleased();check(privateReleasedBeforeEncode,'F8 retained derived surfaces into PNG encoding');
       check(requestedKeys.size===100,'F8 did not execute all 100 distinct authored tint requests');
-      check(evicted.length>0&&evictedBaseline.length>0&&evicted.every(released),'tint pressure did not release evicted sources');
+      check(evicted.size>0&&[...evicted].every(released),'private tint pressure did not release evicted sources');
       check(peakTintSize<=96&&peakNormalSize<=96&&art.tintCache.size<=96&&art.normalTransformCache.size<=96,'F8 exceeded an art-cache bound');
+      const pressureEvidence={authoredTintKeys:requestedKeys.size,privateArtOwners:owners.size,privateTintSources:seenTints.size,privateNormalSources:seenNormals.size,
+        evictedSources:evicted.size,evictedBaselineSources:0,peakTintCache:peakTintSize,peakNormalCache:peakNormalSize,
+        runtimeCachesUnchanged:true,runtimeCacheCounts:baseline.caches.map(c=>({name:c.name,entries:c.entries.length})),privateReleasedBeforeEncode,
+        exportTextureMismatch:exportMismatch,exportAuthorityUnchanged:true,normalGenerationBefore:baseline.normalGeneration,normalGenerationAfter:art.normalTransformGeneration};
 
       // No full reference, render or other cache-warming operation is permitted
       // between F8 above and this first real editor transaction.
@@ -209,12 +252,16 @@ RASTER_EXPORT_CASE = r'''async()=>{
       check(work.diagnostics.scratchMode==='native-clip'&&work.diagnostics.rasterPixels===96*96&&work.diagnostics.scratchPixels===capacity&&work.diagnostics.scratchBytes===capacity*4&&work.diagnostics.uploadBytes===31*29*4,'post-export capacity/redraw/upload accounting changed');
       check(work.diagnostics.scratchAllocationAttempts===1&&work.diagnostics.scratchAllocations===1&&work.diagnostics.scratchAllocationPixels===capacity&&work.diagnostics.scratchAllocationBytes===capacity*4,'post-export cumulative allocation accounting changed');
       check(!work.readbacks.some(read=>read.staticPatch),'post-export terrain introduced a static patch readback');
-      const textures=audit.parity('terrain immediately after F8 tint-cache pressure',before,work.subUploads);
-      result.exportThenTerrain={native:[997,563],authoredTintKeys:requestedKeys.size,evictedSources:evicted.length,evictedBaselineSources:evictedBaseline.length,
-        peakTintCache:peakTintSize,peakNormalCache:peakNormalSize,exportTextureMismatch:exportMismatch,exportAuthorityUnchanged:true,work,textures};
+      let textures;
+      try{textures=audit.parity('terrain immediately after F8 tint-cache pressure',before,work.subUploads,baseline.snapshot)}
+      catch(error){
+        if(window.__staticRasterDiagnostics)window.__staticRasterDiagnostics.exportPressure={...pressureEvidence,work};
+        throw error;
+      }
+      result.exportThenTerrain={native:[997,563],...pressureEvidence,work,textures};
       assertReleased('post-export terrain reference');
     }finally{
-      restoreTint();if(e.transaction)e.cancelTransaction(false);e.clearPendingInvalidation();e.resetPointerState();
+      restoreArt();if(e.transaction)e.cancelTransaction(false);e.clearPendingInvalidation();e.resetPointerState();
       game.maps=saved.maps;game.rooms=saved.rooms;game.room=saved.room;game.state.room=saved.index;
       game.x=saved.x;game.y=saved.y;game.vx=saved.vx;game.vy=saved.vy;
       e.history=saved.history;e.choice=saved.choice;e.selection=saved.selection;e.activeRoomKey=saved.activeRoomKey;e.nextDecorId=saved.nextDecorId;

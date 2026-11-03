@@ -151,12 +151,40 @@ both partially cover one fractional-scale pixel, leaving earlier marks visible.
 The production regression evaluates all 9,120 tile/type/microtile footprints,
 including playable-area edges.
 
-Each output receives a 32-native-pixel guard rounded outward to a 16-pixel grid
-and clipped to the frame. The existing four-logical-pixel plus two-native-pixel
-input halo selects neighboring floor marks reaching that area. Floor inputs
-replay in original row-major order. Alignment preserves device-coordinate
-gradient-dither phase in local integer-scale surfaces. Fractional surfaces retain
-both the target dimensions and origin of the full renderer.
+Each output starts with a 32-native-pixel guard. Before an eligible patch is
+allocated, `StaticPainter.staticOverlayBounds` replays the actual pattern,
+blocker, interstitial and mounted-decor placement methods through a data-only
+receiver. It collects complete transformed sprite/subrect quads, glow/dot
+circles and rounded pixel rectangles. The existing footer body is shared through
+`drawFooter`, so imported art sizes also contribute the actual footer sprite
+bounds. The collector does not allocate a canvas, touch image sources or caches,
+look up LUT colors, request materials or modify the runtime painter.
+
+`plan(previous, next, {overlayBounds})` expands the guard to contain every such
+primitive that can touch the tight output, including the existing two-native-
+pixel conservative projection margin. It does not trim to nontransparent texels
+or recursively pull in primitives touching only the enlarged guard. These
+exterior pixels are not uploaded. Bounds round outward to the same 16-pixel
+grid and clip to the frame. Floor ranges are then recalculated with the existing
+four-logical-pixel plus two-native-pixel input halo; all output, redraw, floor
+and capacity budgets apply to the enlarged geometry before allocation.
+
+The footer's unfiltered background gradient, full-width stripe, panel and
+stroke retain their bounded clip. They are analytical backgrounds rather than
+sampled image quads. Footer sprites are always collected; their default sizes
+sit below the terrain, but imported metadata can extend them into an output.
+Whole-texture native tests include the footer boundary and would reject a
+clipping difference in those analytical backgrounds too.
+
+Collection caps emitted primitives at 4,096 and prebounds room sets, lamp/
+objective arrays and copied role lists to the 760-cell room size. Invalid or
+excessive geometry selects the full renderer. The collected data is transient;
+ordinary noops, dependency fallbacks and forced builds skip this additional
+replay. No room-name or sprite-category fallback substitutes for geometry.
+
+Floor inputs replay in original row-major order. Alignment preserves device-
+coordinate gradient-dither phase in local integer-scale surfaces. Fractional
+surfaces retain both the target dimensions and origin of the full renderer.
 
 | Region fields | Meaning |
 | --- | --- |
@@ -228,6 +256,7 @@ These failed candidates informed the design; none is successful qualification.
 | [Local floor divergence](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41572947659) | A fractional local patch differed in 19 floor bytes before overlays. |
 | [Origin-only divergence](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41574605048) | An untranslated prefix still changed a mounted-sprite byte during the original same-count move. |
 | [Origin plus mounted fallback](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41576567695) | The genuine foliage-overlap edit exposed two required floor bytes even with identical global origin. |
+| [Native target with fixed guard](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41579124347) | Floor pixels matched, but clipping the nest swirl introduced two required color bytes. |
 
 In the last case, tile `(8,6)` changed ground to path at 997×563. Output
 `(199,150,30,29)` came from a 272×224 prefix. Canvas pixels `(209,168)` and
@@ -257,6 +286,40 @@ differences in four edge pixels, with maximum difference 5; the guard remains
 necessary. This is the prerequisite evidence for the native-clip design.
 Resolving this diagnostic does not replace the complete original matrix.
 
+### Complete sprite geometry matters independently of target size
+
+With the full native target, the adjacent repeated-edit case at 997×563 still
+differed at top-origin pixels `(502,285)` and `(504,285)`: two color bytes,
+maximum difference one, with unchanged materials and exterior. Both pixels
+really changed from the previous terrain. Floor-only matched; adding the nest
+pattern introduced both differences. The guard `(432,240,144,96)` clipped the
+swirl's complete destination bounds, approximately
+`[431.609,238.005,565.391,353.645]`.
+
+[Diagnostic run 41580112159](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41580112159)
+separated clipping from omitted floor commands. All controls used the same
+997×563 target and unchanged transforms and compared the complete output crop.
+
+| Diagnostic control | Floor calls | Color differences |
+| --- | ---: | ---: |
+| Pattern or all overlays, no clip | 35 | 0 |
+| Pattern or all overlays, clip enclosing the complete swirl | 35 | 0 |
+| Pattern or all overlays, guarded floor then unclipped overlays | 35 | 0 |
+| Pattern, all floor cells, original guard | 760 | 2 bytes / 2 pixels / maximum 1 |
+
+The enclosing diagnostic clip was `(429,236,147,120)`, derived from real sprite
+geometry with a two-native-pixel margin. Production does not hard-code that
+case: it collects every relevant overlay and reuses the existing alignment and
+work limits. Including the nearby glow yields a guarded redraw of 39,936 pixels
+and 100 floor cells for that edit, within the unchanged limits. The original
+water/path benchmark guards do not grow.
+
+Skia's [rectangular clip optimization](https://skia.googlesource.com/skia/+/d2b9e48baf1697760afc1dc8ea3ad40110b8cacc/src/gpu/ganesh/SurfaceDrawContext.cpp)
+can fold a clip into a textured quad and recompute local texture coordinates.
+This source and the discriminating controls support the clipping explanation;
+they are not a captured trace of this Chromium draw. The complete native
+matrix, including a new unchanged 1280×720 matrix, remains the production gate.
+
 ## Stable transformed-normal sources
 
 The previous 64-entry FIFO cache could churn its own room working set: Dawn
@@ -274,11 +337,12 @@ Terrain patches keep material contexts detached and do not advance it.
 
 - Planner: immutable authority, same-count/history, dependencies/identities,
   full-grid floor envelopes, separate clip/canvas geometry, single-axis fractional
-  scales, peak/cumulative budgets, and malformed/stale inputs.
+  scales, complete primitive bounds, nonrecursive guards, unchanged work and
+  peak/cumulative budgets, and malformed/stale inputs.
 - Runtime: real Game/StaticPainter/GLRenderer methods; full/partial command
   traces; independent allocation, clip, crop and material observations; unpack
   restoration, partial failure, full repair and cleanup.
-- Native browser: every color/normal/specular byte at 640×360 and 997×563;
+- Native browser: every color/normal/specular byte at 640×360, 997×563 and 1280×720;
   independent accepted full-build compatibility across nine rooms; exterior
   invariance, overlays/materials/footer, history/final flush/cancel/coalescing,
   every fallback, water and live ownership.

@@ -15,7 +15,7 @@
   const DEFAULT_LIMITS=Object.freeze({maxChangedCells:16,maxRegions:8,maxPixelRatio:.20,maxRasterRatio:.35,maxScratchPixels:262144,maxNativeScratchPixels:1048576,maxScratchAllocationPixels:2097152});
   const GEOMETRY_KEYS=['renderWidth','renderHeight','logicalWidth','logicalHeight','tileSize','columns','rows'];
   const REFERENCE_KEYS=['sourceRef','rendererRef','artRef','atlasRef','normalRef','specularRef'];
-  const MAX_CELLS=65536,MAX_VALUE_NODES=65536,MAX_VALUE_DEPTH=32;
+  const MAX_CELLS=65536,MAX_VALUE_NODES=65536,MAX_VALUE_DEPTH=32,MAX_OVERLAY_BOUNDS=4096;
   const LOGICAL_HALO=4,NATIVE_HALO=2,NATIVE_ALIGNMENT=16,NATIVE_RASTER_GUARD=32;
   const snapshots=new WeakSet();
   const own=(object,key)=>Object.prototype.hasOwnProperty.call(object,key);
@@ -189,6 +189,23 @@
     if(![4,8,16].includes(next.microtile)||next.geometry.tileSize!==16)return full('unsupported-microtile',changes);
     const g=next.geometry,sx=g.renderWidth/g.logicalWidth,sy=g.renderHeight/g.logicalHeight,overhangX=next.microtile===4?3:0,overhangY=next.microtile===4?2:0;
     const fractionalScale=!Number.isInteger(sx)||!Number.isInteger(sy);
+    // Bounds come from a metadata-only replay of the actual overlay placement
+    // methods. Preserve complete primitives that can touch the uploaded output:
+    // clipping a sampled quad can change its interpolated texture coordinates.
+    // Do not recursively include primitives touching only the enlarged guard;
+    // those pixels are never uploaded. The fixed count bounds this planning work.
+    const overlayBounds=[];
+    if(own(options,'overlayBounds')){
+      if(!Array.isArray(options.overlayBounds))return full('invalid-overlay-bounds',changes);
+      if(options.overlayBounds.length>MAX_OVERLAY_BOUNDS)return full('overlay-bounds-budget',changes);
+      for(const b of options.overlayBounds){
+        if(!b||!['x0','y0','x1','y1'].every(key=>Number.isFinite(b[key]))||b.x1<b.x0||b.y1<b.y0)return full('invalid-overlay-bounds',changes);
+        if(b.x0===b.x1||b.y0===b.y1)continue;
+        const native={x0:b.x0*sx-NATIVE_HALO,y0:b.y0*sy-NATIVE_HALO,x1:b.x1*sx+NATIVE_HALO,y1:b.y1*sy+NATIVE_HALO};
+        if(!Object.values(native).every(Number.isFinite))return full('invalid-overlay-bounds',changes);
+        overlayBounds.push(native);
+      }
+    }
     const raw=changes.map(cell=>{
       const x0=Math.floor(cell.x*g.tileSize*sx),y0=Math.floor(cell.y*g.tileSize*sy);
       const x1=Math.ceil(((cell.x+1)*g.tileSize+overhangX)*sx),y1=Math.ceil(((cell.y+1)*g.tileSize+overhangY)*sy);
@@ -205,10 +222,12 @@
       // Every patch redraws only its local, aligned guard. Fractional scales
       // retain the full target size and global device origin separately: the
       // painter clips that native canvas to these guarded raster bounds.
-      const rasterX=Math.max(0,Math.floor((rect.x0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
-      const rasterY=Math.max(0,Math.floor((rect.y0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
-      const rasterX1=Math.min(g.renderWidth,Math.ceil((rect.x1+NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
-      const rasterY1=Math.min(g.renderHeight,Math.ceil((rect.y1+NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      let x0=rect.x0-NATIVE_RASTER_GUARD,y0=rect.y0-NATIVE_RASTER_GUARD,x1=rect.x1+NATIVE_RASTER_GUARD,y1=rect.y1+NATIVE_RASTER_GUARD;
+      for(const b of overlayBounds)if(touching(rect,b)){x0=Math.min(x0,b.x0);y0=Math.min(y0,b.y0);x1=Math.max(x1,b.x1);y1=Math.max(y1,b.y1)}
+      const rasterX=Math.max(0,Math.floor(x0/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      const rasterY=Math.max(0,Math.floor(y0/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      const rasterX1=Math.min(g.renderWidth,Math.ceil(x1/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      const rasterY1=Math.min(g.renderHeight,Math.ceil(y1/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       return{x:rect.x0,y:rect.y0,width:rect.x1-rect.x0,height:rect.y1-rect.y0,
         rasterX,rasterY,rasterWidth:rasterX1-rasterX,rasterHeight:rasterY1-rasterY,
         canvasMode:fractionalScale?'native-clip':'local',

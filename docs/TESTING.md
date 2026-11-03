@@ -71,7 +71,7 @@ Do not use one absolute CI millisecond value as a universal pass/fail target. Th
 
 PERF-003 adds complete-field bounded-vs-full comparisons to the ordinary self-test. The native browser suite checks the uploaded water textures against full-rebuild references. The timing harness requires bounded SurfaceFX and legacy-mask paths for the representative rivet/editor-water scenarios and a field upload smaller than the full texture. Its diagnostic timings must still be inspected for remaining synchronous stalls; passing the bounded-work assertions alone does not certify smooth hardware frame times.
 
-PERF-004 adds authoritative static-terrain planning and runtime failure tests to the self-test. The browser fixture compares every color, normal and specular texture byte with a clean full build at integer and fractional native scales. It also compares the refactored full builder against the accepted pre-change composition, checks untouched exterior pixels, exercises editor history/final flushes and verifies all dependency/failure fallbacks. The representative water/path scenarios must use bounded color scratch and subuploads without invoking the full painter, and must preserve both unchanged material textures exactly. Changes to material dependencies still require all three full uploads. See [PERF-004 implementation and validation](validation/performance/PERF-004.md).
+PERF-004 adds authoritative static-terrain planning and runtime failure tests to the self-test. The browser fixture compares every color, normal and specular texture byte with a clean full build at 640×360, 997×563 and 1280×720. It also compares the refactored full builder against the accepted pre-change composition, checks untouched exterior pixels, exercises editor history/final flushes and verifies all dependency/failure fallbacks. Guards include complete relevant overlay geometry before their floor/work budgets are applied; native observations independently check the actual draw transforms, clip and source canvas. The representative water/path scenarios must use bounded color scratch and subuploads without invoking the full painter, and must preserve both unchanged material textures exactly. Changes to material dependencies still require all three full uploads. See [PERF-004 implementation and validation](validation/performance/PERF-004.md).
 
 Fractional scales retain the full native canvas dimensions and origin, with an explicit guarded clip and bounded floor inputs. Integer scales retain local guarded surfaces. Output and summed guarded redraw area remain limited to 20%, and floor work to 35%. The original universal 1 MiB capacity limit is explicitly revised: local surfaces keep 1 MiB; one transient fractional color surface is capped at 4 MiB; cumulative color allocation is capped at 8 MiB per partial refresh. Allocation/initialization may touch the full backing, so actual canvas capacity and allocation counts are reported separately from clipped redraw area. Native instrumentation checks canvas dimensions, clip, transform, floor calls, source crop, release and all three complete textures independently. Earlier mounted/prefix fallbacks are removed; original fractional lamp, foliage, far-edit, history and footer cases must patch when ordinary local budgets fit. The added foliage case must cover nontransparent material pixels at both sizes. Failure-only target/clip diagnostics isolate the observed rounding issue; no pixel tolerance or benchmark coordinates change.
 
@@ -84,19 +84,24 @@ Each candidate water/path timing record also includes `staticParity`: an exact c
 `raster_export_regression_415.js` exercises production F8 snapshot composition,
 persistent content and progression, runtime rotation geometry, metadata capture
 before asynchronous encoding, concurrent requests, failure cleanup/retry and
-editor keyboard routing. `floor_microtile_regression_415.js` exercises loaded
+editor keyboard routing. Private-cache lifecycle cases exercise real tint and
+normal transforms, eviction, runtime source ownership and cleanup before
+encoding. `floor_microtile_regression_415.js` exercises loaded
 rooms and direct painter inputs, accepts finite numeric detail sizes from 3
 through 16, checks validation against unchanged source data, and rejects the
 old unbounded/nonfinite drawing behavior. Both run in `self_test.py`.
 
 `raster_export_browser_415.py` runs inside the existing native browser harness
-after static terrain qualification. It decodes a real exported PNG and checks
-pixels, captured metadata, delayed navigation, failure and rotation. Its shared
-cache-pressure case exports many distinct tints, checks bounded cache ownership,
-and immediately paints terrain before any reference rebuild. That edit must
+in a fresh browser context, independently of the static terrain gate. It decodes
+a real exported PNG and checks pixels, captured metadata, delayed navigation,
+failure and rotation. Its private cache-pressure case exports many distinct
+tints, checks bounded eviction and cleanup while preserving runtime cache
+entries, order and backings, and immediately paints terrain before any reference
+rebuild. That edit must
 retain bounded color-only work and match all three complete GPU textures exactly.
 The stage records its results alongside the ordinary browser evidence and saves
-static-raster diagnostics on a failed terrain comparison.
+its own diagnostics on failure, including private-cache ownership evidence on a
+failed terrain comparison. Either native gate failing remains fatal.
 
 ## Continuous integration
 

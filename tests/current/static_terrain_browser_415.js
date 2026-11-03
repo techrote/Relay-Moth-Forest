@@ -275,6 +275,162 @@
     }
   }
 
+  // Failure-only full-frame controls distinguish nonlocal command-stream
+  // changes from reference/source-cache instability. Never mutate authority or
+  // cache policy, and retain only weak source identities and numeric metadata.
+  function fullFrameTerrainDiagnostics(actual,expected,before,uploads,priorSnapshot,failurePixels){
+    const width=actual.width,height=actual.height,art=game.art,currentRoom=game.room;
+    const report={diagnosticOnly:true,native:[width,height],channels:['color'],pixelCoordinates:'WebGL bottom-left',controls:[],comparisons:[]};
+    if(!priorSnapshot?.valid){report.skipped='prior authoritative snapshot unavailable';return report}
+    const current=RelayStaticTerrain.capture(currentRoom,game.staticTerrainContext()),types=RelayStaticTerrain.CELL_TYPES;
+    check(current.valid&&priorSnapshot.geometry.renderWidth===width&&priorSnapshot.geometry.renderHeight===height&&
+      JSON.stringify(priorSnapshot.geometry)===JSON.stringify(current.geometry),'full-frame diagnostic snapshot geometry differs');
+    check(priorSnapshot.dependencies.length===current.dependencies.length&&priorSnapshot.dependencies.every((entry,i)=>entry[0]===current.dependencies[i][0]&&entry[1]===current.dependencies[i][1])&&
+      priorSnapshot.lutSignature===current.lutSignature&&priorSnapshot.resourceSignature===current.resourceSignature&&priorSnapshot.references.every((ref,i)=>ref===current.references[i]),'full-frame diagnostic static dependencies changed');
+    const geometry=current.geometry,dependencies=new Map(priorSnapshot.dependencies),oldRoom=Object.create(currentRoom);
+    oldRoom.walls=new Set(JSON.parse(dependencies.get('walls')));oldRoom.border=new Set(JSON.parse(dependencies.get('border')));
+    oldRoom.water=new Set();oldRoom.paths=new Set();oldRoom.floorMicrotile=priorSnapshot.microtile;
+    report.priorSnapshotFrozen=Object.isFrozen(priorSnapshot)&&Object.isFrozen(priorSnapshot.cellTypes);
+    report.changedCells=[];
+    for(let i=0;i<priorSnapshot.cellTypes.length;i++){
+      const x=i%geometry.columns,y=Math.floor(i/geometry.columns),key=x+','+y,type=priorSnapshot.cellTypes[i];
+      if(type===types.water)oldRoom.water.add(key);else if(type===types.path)oldRoom.paths.add(key);
+      check((oldRoom.walls.has(key)||oldRoom.border.has(key))===(type===types.blocker),'old effective blocker classification cannot be reconstructed');
+      if(type!==current.cellTypes[i])report.changedCells.push({x,y,before:type,after:current.cellTypes[i]});
+    }
+    const rects=uploads.filter(u=>u.channel==='color'),covered=(x,y)=>rects.some(r=>x>=r.x&&x<r.x+r.width&&y>=r.y&&y<r.y+r.height);
+    const probes=failurePixels.map(p=>({x:p.x,y:p.y,canvasY:height-1-p.y,insideOutput:covered(p.x,p.y)}));
+    report.probes=probes.map(p=>{const i=(p.y*width+p.x)*4;return{...p,actual:Array.from(actual.maps[0].subarray(i,i+4)),expected:Array.from(expected[0].subarray(i,i+4)),before:before?Array.from(before.maps[0].subarray(i,i+4)):null}});
+    const identities=new WeakMap();let nextIdentity=1,activeControl=null;
+    const identity=canvas=>{if(!canvas)return null;if(!identities.has(canvas))identities.set(canvas,nextIdentity++);return identities.get(canvas)};
+    const source=canvas=>canvas?{id:identity(canvas),width:canvas.width,height:canvas.height}:null;
+    const inventory=()=>[...art.tintCache].map(([key,canvas])=>({key,...source(canvas)}));
+    const tintOwn=Object.prototype.hasOwnProperty.call(art,'tintedRegion'),tintedRegion=art.tintedRegion,cache=art.tintCache,frames=new Map();
+    const compareBytes=(left,right)=>{
+      const whole=differences(left,right,width),exterior={bytes:0,pixels:0,max:0,examples:[]},inside={bytes:0,pixels:0,max:0,examples:[]};
+      for(let i=0;i<left.length;i+=4){
+        const x=(i/4)%width,y=Math.floor(i/4/width),area=covered(x,y)?inside:exterior;
+        let changed=false;
+        for(let k=0;k<4;k++){const delta=Math.abs(left[i+k]-right[i+k]);if(delta){changed=true;area.bytes++;area.max=Math.max(area.max,delta)}}
+        if(changed){area.pixels++;if(area.examples.length<6)area.examples.push({x,y,canvasY:height-1-y,left:Array.from(left.subarray(i,i+4)),right:Array.from(right.subarray(i,i+4))})}
+      }
+      return{whole,exterior,inside,probes:probes.map(p=>{const i=(p.y*width+p.x)*4;return{...p,left:Array.from(left.subarray(i,i+4)),right:Array.from(right.subarray(i,i+4))}})};
+    };
+    const compare=(left,right,compatibility=false)=>{
+      if(frames.has(left)&&frames.has(right)){
+        const a=frames.get(left),b=frames.get(right),entry={left,right,...compareBytes(a,b)};
+        if(compatibility){
+          const upper=[1,2,3,4,8,16,32,Infinity],histogram=Array(8).fill(0),channelBytes=[0,0,0,0],channelMax=[0,0,0,0];
+          for(let i=0;i<a.length;i++){const delta=Math.abs(a[i]-b[i]);if(!delta)continue;const k=i%4;channelBytes[k]++;channelMax[k]=Math.max(channelMax[k],delta);histogram[upper.findIndex(limit=>delta<=limit)]++}
+          entry.compatibility={channelOrder:['R','G','B','A'],channelBytes,channelMax,histogramBuckets:['1','2','3','4','5..8','9..16','17..32','>32'],histogram};
+        }
+        report.comparisons.push(entry);
+      }
+      else report.comparisons.push({left,right,skipped:'control render failed'});
+    };
+    art.tintedRegion=function(name,colour,strength){
+      const key=name+'|'+colour+'|'+strength.toFixed(3),hit=this.tintCache.has(key),prior=source(this.tintCache.get(key));
+      const canvas=tintedRegion.call(this,name,colour,strength);
+      if(activeControl){activeControl.tint[hit?'hits':'misses']++;activeControl.tint.calls.push({key,hit,before:prior,returned:source(canvas),cacheSize:this.tintCache.size})}
+      return canvas;
+    };
+    const withColorReadHint=(entry,targetWidth,targetHeight,build)=>{
+      const prototype=OffscreenCanvas.prototype,getContext=prototype.getContext;entry.colorContextOverrides=0;
+      // A diagnostic optimization hint, not a standardized backend guarantee.
+      // Override only the first native color context; source and material
+      // canvases keep their original options and cache policy.
+      prototype.getContext=function(type,options){
+        if(!entry.colorContextOverrides&&type==='2d'&&options?.alpha===false&&this.width===targetWidth&&this.height===targetHeight){
+          entry.colorContextOverrides++;return getContext.call(this,type,{...options,willReadFrequently:true});
+        }
+        return getContext.call(this,type,options);
+      };
+      try{return build()}
+      finally{prototype.getContext=getContext}
+    };
+    const finishControl=entry=>{
+      entry.tint.after=inventory();entry.tint.cacheObjectUnchanged=art.tintCache===cache;
+      const beforeKeys=new Map(entry.tint.before.map(s=>[s.key,s.id])),afterKeys=new Map(entry.tint.after.map(s=>[s.key,s.id]));
+      entry.tint.removed=entry.tint.before.filter(s=>!afterKeys.has(s.key));entry.tint.added=entry.tint.after.filter(s=>!beforeKeys.has(s.key));
+      entry.tint.replaced=entry.tint.after.filter(s=>beforeKeys.has(s.key)&&beforeKeys.get(s.key)!==s.id);
+      entry.normalGenerationAfter=art.normalTransformGeneration;report.controls.push(entry);
+    };
+    const render=(name,room,snapshot,floorOnly,readFrequently=false)=>{
+      const painter=new StaticPainter(art,game.luts),entry={name,floorOnly,readFrequentlyRequested:readFrequently,footerRetained:true,floorCalls:0,
+        tint:{hits:0,misses:0,calls:[],before:inventory()},normalGenerationBefore:art.normalTransformGeneration};
+      let color=null,maps=null;activeControl=entry;
+      try{
+        if(floorOnly)for(const method of ['patternDecor','drawBlockerSprites','drawVegetationInterstitials','drawDecor'])painter[method]=()=>{};
+        const baseTile=painter.baseTile;
+        painter.baseTile=function(ctx,tx,ty,seed,type){
+          entry.floorCalls++;check(types[type]===snapshot.cellTypes[ty*geometry.columns+tx],'full-frame replay changed an effective floor classification');
+          return baseTile.call(this,ctx,tx,ty,seed,type);
+        };
+        const build=()=>painter.build(room,game.state,width,height);
+        color=readFrequently?withColorReadHint(entry,width,height,build):build();maps=painter.lastMaterialMaps;
+        check(entry.floorCalls===geometry.columns*geometry.rows,'full-frame control did not replay the complete floor list');
+        entry.canvasSize=[color.width,color.height];entry.colorAttributes=color.getContext('2d').getContextAttributes();
+        entry.materialContextAttributes={normal:maps.normal.getContext('2d').getContextAttributes(),specular:maps.spec.getContext('2d').getContextAttributes()};
+        if(readFrequently)check(entry.colorContextOverrides===1&&entry.colorAttributes.willReadFrequently===true&&entry.materialContextAttributes.normal.willReadFrequently===false&&entry.materialContextAttributes.specular.willReadFrequently===false,'read-frequently diagnostic changed material context options or rejected the color hint');
+        const bytes=uploadReference(game.renderer.gl,color,width,height);frames.set(name,bytes);
+        entry.probes=probes.map(p=>{const i=(p.y*width+p.x)*4;return{...p,rgba:Array.from(bytes.subarray(i,i+4))}});
+        entry.glError=game.renderer.gl.getError();check(entry.glError===game.renderer.gl.NO_ERROR,'full-frame control WebGL error');
+      }catch(error){entry.error=String(error);entry.stack=error?.stack}
+      finally{
+        activeControl=null;release(color);release(maps?.normal);release(maps?.spec);
+        finishControl(entry);
+      }
+    };
+    try{
+      frames.set('actual',actual.maps[0]);frames.set('initial-reference',expected[0]);if(before)frames.set('prior-gpu',before.maps[0]);
+      for(const [stage,floorOnly] of [['floor-only',true],['full-composition',false]]){
+        for(const [label,room,snapshot] of [['old-1',oldRoom,priorSnapshot],['old-2',oldRoom,priorSnapshot],['new-1',currentRoom,current],['new-2',currentRoom,current],['old-after-new',oldRoom,priorSnapshot]])render(stage+'/'+label,room,snapshot,floorOnly);
+        for(const [left,right] of [['old-1','old-2'],['new-1','new-2'],['old-2','new-1'],['old-1','old-after-new']])compare(stage+'/'+left,stage+'/'+right);
+      }
+      if(before)compare('prior-gpu','full-composition/old-1');
+      compare('actual','full-composition/new-1');compare('initial-reference','full-composition/new-1');
+      compare('floor-only/old-2','full-composition/old-2');compare('floor-only/new-1','full-composition/new-1');
+      report.readFrequentlyQualification='Only color requests willReadFrequently:true; accepted context attributes are reported. Canvas2D exposes an optimization hint, not a portable backend guarantee.';
+      for(const [stage,floorOnly] of [['floor-only',true],['full-composition',false]]){
+        for(const [label,room,snapshot] of [['old-1',oldRoom,priorSnapshot],['old-2',oldRoom,priorSnapshot],['new-1',currentRoom,current],['new-2',currentRoom,current],['old-after-new',oldRoom,priorSnapshot]])render('cpu-color/'+stage+'/'+label,room,snapshot,floorOnly,true);
+        for(const [left,right] of [['old-1','old-2'],['new-1','new-2'],['old-2','new-1'],['old-1','old-after-new']])compare('cpu-color/'+stage+'/'+left,'cpu-color/'+stage+'/'+right);
+        for(const authority of ['old-1','new-1'])compare(stage+'/'+authority,'cpu-color/'+stage+'/'+authority,true);
+      }
+      // Reconstruct a complete read-frequently color result using the actual
+      // production patch geometry, preserving untouched old bytes verbatim.
+      const cpuOld=frames.get('cpu-color/full-composition/old-1'),regions=game.staticRefreshStats?.regions||[];
+      if(cpuOld&&regions.length){
+        const composed=cpuOld.slice();let complete=true;
+        for(let index=0;index<regions.length;index++){
+          const region=regions[index],painter=new StaticPainter(art,game.luts),entry={name:'cpu-color/production-patch-'+index,region,readFrequentlyRequested:true,floorCalls:0,
+            tint:{hits:0,misses:0,calls:[],before:inventory()},normalGenerationBefore:art.normalTransformGeneration};
+          let color=null,maps=null;activeControl=entry;
+          try{
+            check(rects.some(r=>r.x===region.x&&r.y===height-region.y-region.height&&r.width===region.width&&r.height===region.height),'CPU reconstruction region does not match an executed upload');
+            const baseTile=painter.baseTile;painter.baseTile=function(ctx,tx,ty,seed,type){entry.floorCalls++;check(types[type]===current.cellTypes[ty*geometry.columns+tx],'CPU patch changed a floor classification');return baseTile.call(this,ctx,tx,ty,seed,type)};
+            const cw=region.canvasWidth??region.rasterWidth??region.width,ch=region.canvasHeight??region.rasterHeight??region.height;
+            color=withColorReadHint(entry,cw,ch,()=>painter.buildPatch(currentRoom,game.state,width,height,region));maps=painter.lastMaterialMaps;
+            check(!maps&&entry.floorCalls===(region.tx1-region.tx0)*(region.ty1-region.ty0),'CPU patch changed its material/floor work');
+            entry.canvasSize=[color.width,color.height];entry.colorAttributes=color.getContext('2d').getContextAttributes();
+            check(entry.colorContextOverrides===1&&entry.colorAttributes.willReadFrequently===true,'CPU patch color hint was not accepted');
+            const bytes=uploadCroppedReference(game.renderer.gl,color,region),bottom=height-region.y-region.height;
+            for(let y=0;y<region.height;y++)composed.set(bytes.subarray(y*region.width*4,(y+1)*region.width*4),((bottom+y)*width+region.x)*4);
+            entry.glError=game.renderer.gl.getError();check(entry.glError===game.renderer.gl.NO_ERROR,'CPU patch control WebGL error');
+          }catch(error){complete=false;entry.error=String(error);entry.stack=error?.stack}
+          finally{activeControl=null;release(color);release(maps?.normal);release(maps?.spec);finishControl(entry)}
+        }
+        if(complete){frames.set('cpu-color/reconstructed-patches',composed);compare('cpu-color/reconstructed-patches','cpu-color/full-composition/new-1');compare('cpu-color/full-composition/old-1','cpu-color/reconstructed-patches')}
+        else report.cpuPatchReconstructionError='one or more patch controls failed';
+      }else report.cpuPatchReconstructionError='CPU old frame or production patch regions unavailable';
+      render('default-after-cpu/full-composition/new',currentRoom,current,false);
+      compare('full-composition/new-1','default-after-cpu/full-composition/new');
+      const after=RelayStaticTerrain.capture(currentRoom,game.staticTerrainContext());
+      report.authorityUnchanged=game.room===currentRoom&&after.valid&&after.cellTypes.every((type,i)=>type===current.cellTypes[i])&&
+        after.dependencies.every((entry,i)=>entry[0]===current.dependencies[i][0]&&entry[1]===current.dependencies[i][1]);
+      return report;
+    }finally{if(tintOwn)art.tintedRegion=tintedRegion;else delete art.tintedRegion;frames.clear()}
+  }
+
   function patchRasterDiagnostics(actual,expected,uploads){
     const width=actual.width,height=actual.height,sx=width/640,sy=height/360;
     const upload=uploads.find(item=>item.channel==='color');if(!upload)return[];
@@ -378,7 +534,7 @@
         };
       }
     };
-    const results=[];let floorReference=null;
+    const results=[];let floorReference=null,patternReference=null,overlayReference=null;
     try{
       for(const stage of stages){
         const fullPainter=new StaticPainter(art,game.luts),patchPainter=new StaticPainter(art,game.luts),corrections=[];
@@ -389,6 +545,8 @@
           fullColor=fullPainter.build(game.room,game.state,width,height);fullMaps=fullPainter.lastMaterialMaps;
           const fullBytes=uploadReference(game.renderer.gl,fullColor,width,height),fullCrop=cropFull(fullBytes);
           if(stage.name==='floor-only')floorReference={bytes:fullBytes,crop:fullCrop};
+          if(stage.name==='floor+pattern')patternReference={bytes:fullBytes,crop:fullCrop};
+          if(stage.name==='all-overlays')overlayReference={bytes:fullBytes,crop:fullCrop};
           patchColor=patchPainter.buildPatch(game.room,game.state,width,height,region);patchMaps=patchPainter.lastMaterialMaps;
           const patchBytes=uploadCroppedReference(game.renderer.gl,patchColor,region);
           entry.color=differences(patchBytes,fullCrop,upload.width);
@@ -402,10 +560,99 @@
         finally{release(fullColor);release(fullMaps?.normal);release(fullMaps?.spec);release(patchColor);release(patchMaps?.normal);release(patchMaps?.spec)}
         results.push(entry);
       }
+      const fullTarget={...region,rasterX:0,rasterY:0,rasterWidth:width,rasterHeight:height,canvasMode:'local',canvasX:0,canvasY:0,canvasWidth:width,canvasHeight:height};
+      // Failure-only textured-quad controls. Recording actual pattern sprite
+      // geometry does not draw, populate caches or change production policy.
+      // The enclosing clip uses a diagnostic two-native-pixel margin; it is
+      // deliberately independent of the planner's fixed guard and budgets.
+      const geometryPainter=new StaticPainter(art,game.luts),patternSprites=[];
+      const recordSprite=(name,x,y,w,h,options)=>{
+        const anchor=options.anchor||'bottom',top=anchor==='bottom'?-h:anchor==='top'?0:-h/2,angle=options.rot||0,co=Math.cos(angle),si=Math.sin(angle),flip=options.flip?-1:1;
+        const corners=[[-w/2,top],[w/2,top],[-w/2,top+h],[w/2,top+h]].map(([px,py])=>[(x+co*px*flip-si*py)*width/640,(y+si*px*flip+co*py)*height/360]);
+        patternSprites.push({name,anchor,logical:[x,y,w,h],rotation:angle,flip:!!options.flip,
+          nativeBounds:{x0:Math.min(...corners.map(p=>p[0])),y0:Math.min(...corners.map(p=>p[1])),x1:Math.max(...corners.map(p=>p[0])),y1:Math.max(...corners.map(p=>p[1]))}});
+        return[w,h];
+      };
+      geometryPainter.sprite=function(ctx,name,x,y,options={}){
+        if(!name||!art.regions[name])return[0,0];
+        const [w,h]=art.worldSize(name,this.spriteScale(name,options.scale??1));return recordSprite(name,x,y,w,h,options);
+      };
+      geometryPainter.spriteSubrect=(ctx,name,sx,sy,sw,sh,x,y,w,h,options={})=>recordSprite(name,x,y,w,h,options);
+      geometryPainter.glow=()=>{};geometryPainter.patternDecor(null,game.room,game.state);
+      const guard={x:region.rasterX,y:region.rasterY,width:region.rasterWidth,height:region.rasterHeight},margin=2;
+      const x0=Math.max(0,Math.min(guard.x,...patternSprites.map(s=>Math.floor(s.nativeBounds.x0-margin))));
+      const y0=Math.max(0,Math.min(guard.y,...patternSprites.map(s=>Math.floor(s.nativeBounds.y0-margin))));
+      const x1=Math.min(width,Math.max(guard.x+guard.width,...patternSprites.map(s=>Math.ceil(s.nativeBounds.x1+margin))));
+      const y1=Math.min(height,Math.max(guard.y+guard.height,...patternSprites.map(s=>Math.ceil(s.nativeBounds.y1+margin))));
+      const enclosingClip={x:x0,y:y0,width:x1-x0,height:y1-y0};
+      const nativeGuard={...region,canvasMode:'native-clip',canvasX:0,canvasY:0,canvasWidth:width,canvasHeight:height};
+      const textureVariants=[];
+      for(const [prefix,referenceStage] of [[1,'floor+pattern'],[4,'all-overlays']]){
+        const label=prefix===1?'pattern':'overlays';
+        textureVariants.push(
+          {name:label+'-full-target-bounded-list-no-clip',prefix,referenceStage,region:fullTarget},
+          {name:label+'-full-target-bounded-list-enclosing-pattern-clip',prefix,referenceStage,region:fullTarget,clip:enclosingClip},
+          {name:label+'-full-target-guarded-floor-unclipped-overlays',prefix,referenceStage,region:nativeGuard,clip:guard,productionClip:true,restoreOverlayClip:true}
+        );
+      }
+      textureVariants.push({name:'pattern-full-target-full-list-guard-clip',prefix:1,referenceStage:'floor+pattern',
+        region:{...nativeGuard,tx0:0,ty0:0,tx1:40,ty1:19},clip:guard,productionClip:true});
+      for(const variant of textureVariants){
+        const painter=new StaticPainter(art,game.luts),prototype=OffscreenCanvas.prototype,getContext=prototype.getContext;
+        const reference=variant.prefix===1?patternReference:overlayReference;
+        const entry={name:variant.name,diagnosticOnly:true,referenceStage:variant.referenceStage,region:variant.region,
+          nativeClip:variant.clip||null,patternSprites,patternClipMargin:margin,footerRetained:true,floorCalls:0,clipApplications:0,overlayClipRestores:0,normalGenerationBefore:art.normalTransformGeneration};
+        let color=null,maps=null,patchContext=null,clipMethod=null,clipOwn=false;
+        try{
+          check(reference,'textured-quad diagnostic has no matching full reference');configure(painter,{prefix:variant.prefix},true,[]);
+          const baseTile=painter.baseTile;painter.baseTile=function(...args){entry.floorCalls++;return baseTile.apply(this,args)};
+          if(variant.restoreOverlayClip){
+            const pattern=painter.patternDecor;
+            painter.patternDecor=function(ctx,...args){
+              const m=ctx.getTransform(),properties=['fillStyle','strokeStyle','globalAlpha','globalCompositeOperation','lineWidth','imageSmoothingEnabled','imageSmoothingQuality'],state=Object.fromEntries(properties.map(key=>[key,ctx[key]]));
+              // Production saved this context immediately before its native
+              // guard clip. Restore that state, then repeat the original full
+              // save/scale protocol; do not substitute setTransform().
+              ctx.restore();ctx.save();ctx.scale(width/640,height/360);
+              for(const key of properties)ctx[key]=state[key];
+              const after=ctx.getTransform(),keys=['a','b','c','d','e','f'];
+              check(keys.every(key=>m[key]===after[key]),'unclipped overlay control changed its transform');
+              entry.overlayClipRestores++;entry.overlayTransform=Object.fromEntries(keys.map(key=>[key,after[key]]));
+              return pattern.call(this,ctx,...args);
+            };
+          }
+          prototype.getContext=function(type,options){
+            const ctx=getContext.call(this,type,options);
+            if(!patchContext&&type==='2d'&&options?.alpha===false&&this.width===width&&this.height===height){
+              patchContext=ctx;
+              if(variant.productionClip){
+                clipOwn=Object.prototype.hasOwnProperty.call(ctx,'clip');clipMethod=ctx.clip;
+                ctx.clip=function(...args){entry.clipApplications++;return clipMethod.apply(this,args)};
+              }else if(variant.clip){
+                const clip=variant.clip;ctx.beginPath();ctx.rect(clip.x,clip.y,clip.width,clip.height);ctx.clip();entry.clipApplications++;
+              }
+            }
+            return ctx;
+          };
+          try{color=painter.buildPatch(game.room,game.state,width,height,variant.region);maps=painter.lastMaterialMaps}
+          finally{prototype.getContext=getContext;if(clipMethod){if(clipOwn)patchContext.clip=clipMethod;else delete patchContext.clip}}
+          check(entry.floorCalls===(variant.region.tx1-variant.region.tx0)*(variant.region.ty1-variant.region.ty0),'textured-quad diagnostic floor list differs');
+          check(entry.clipApplications===(variant.clip?1:0)&&entry.overlayClipRestores===(variant.restoreOverlayClip?1:0),'textured-quad diagnostic clip protocol differs');
+          entry.canvasSize=[color.width,color.height];entry.colorAttributes=color.getContext('2d').getContextAttributes();
+          const bytes=uploadCroppedReference(game.renderer.gl,color,variant.region);
+          entry.color=differences(bytes,reference.crop,upload.width);
+          entry.failurePixels=points.map(p=>{
+            const f=(p.y*width+p.x)*4,l=((p.y-upload.y)*upload.width+p.x-upload.x)*4;
+            return{x:p.x,y:p.y,canvasY:height-1-p.y,full:Array.from(reference.bytes.subarray(f,f+4)),patch:Array.from(bytes.subarray(l,l+4))};
+          });
+          entry.normalGenerationAfter=art.normalTransformGeneration;
+        }catch(error){entry.error=String(error);entry.stack=error?.stack}
+        finally{prototype.getContext=getContext;if(clipMethod){if(clipOwn)patchContext.clip=clipMethod;else delete patchContext.clip}release(color);release(maps?.normal);release(maps?.spec)}
+        results.push(entry);
+      }
       // Failure-only target/clip/command-stream discrimination. Reuse the exact
       // floor-only full readback above, the production builder and shared art.
       // These four diagnostic surfaces never replace a production texture.
-      const fullTarget={...region,rasterX:0,rasterY:0,rasterWidth:width,rasterHeight:height,canvasMode:'local',canvasX:0,canvasY:0,canvasWidth:width,canvasHeight:height};
       const variants=[
         {name:'floor-full-target-bounded-list',region:fullTarget},
         {name:'floor-full-target-bounded-list-guard-clip',region:fullTarget,clip:{x:region.rasterX,y:region.rasterY,width:region.rasterWidth,height:region.rasterHeight}},
@@ -458,7 +705,7 @@
     return results;
   }
 
-  function parity(label,before=null,uploads=[]){
+  function parity(label,before=null,uploads=[],beforeSnapshot=null){
     const actual=capture(),expected=reference(),result={};let firstFailure=null;
     for(let c=0;c<channels.length;c++){
       const diff=differences(actual.maps[c],expected[c],actual.width);result[channels[c]]=diff;
@@ -503,6 +750,7 @@
       root.__staticRasterDiagnostics={kind:uploads.length?'patch-vs-full':before?'unchanged-vs-full':'full-vs-full',label,room:game.room.key,
         native:[actual.width,actual.height],beforeNative:before?[before.width,before.height]:null,maps:result,glError,
         pixelCoordinates:'WebGL bottom-left',uploadCoordinates:'WebGL bottom-left',subUploads:uploads.map(rect=>({...rect})),staticRefreshStats:JSON.parse(JSON.stringify(game.staticRefreshStats||{}))};
+      if(uploads.length||beforeSnapshot)try{root.__staticRasterDiagnostics.fullFrameTerrain=fullFrameTerrainDiagnostics(actual,expected,before,uploads,beforeSnapshot,result.color.examples)}catch(error){root.__staticRasterDiagnostics.fullFrameTerrainError=String(error)}
       if(uploads.length)try{root.__staticRasterDiagnostics.patchVariants=patchRasterDiagnostics(actual,expected,uploads)}catch(error){root.__staticRasterDiagnostics.patchVariantError=String(error)}
       if(uploads.length)try{root.__staticRasterDiagnostics.compositionStages=compositionStageDiagnostics(actual,uploads,result.color.examples)}catch(error){root.__staticRasterDiagnostics.compositionStageError=String(error)}
       check(false,(firstFailure||label+' WebGL error '+glError)+'\nPERF-004 raster diagnostics '+JSON.stringify(root.__staticRasterDiagnostics));
@@ -512,7 +760,7 @@
 
   function instrument(action){
     const r=game.renderer,g=r.gl,painter=game.painter,canvasRefs=[];
-    const stats={fullBuilds:0,patchBuilds:0,patchMaterialMaps:0,normalTransformRequests:0,floorCalls:0,fullUploads:[],subUploads:[],readbacks:[],patchCanvases:[],patchContextAllocations:[],patchBaseTransforms:[],patchBaseTranslations:[],patchClips:[],peakLiveScratchPixels:0,actorInitializations:0};
+    const stats={fullBuilds:0,patchBuilds:0,patchMaterialMaps:0,normalTransformRequests:0,floorCalls:0,fullUploads:[],subUploads:[],readbacks:[],patchCanvases:[],patchContextAllocations:[],patchBaseTransforms:[],patchBaseTranslations:[],patchClips:[],patchDrawImages:[],peakLiveScratchPixels:0,actorInitializations:0};
     const patchContexts=new WeakSet(),patchColorContexts=new WeakSet(),contextAllocations=new WeakSet(),paths=new WeakMap(),observedScratch=[];let patchDepth=0;
     const materialHandles=[r.bgNormalTex,r.bgSpecTex],normalGeneration=game.art.normalTransformGeneration;
     const unpack=()=>({flipY:g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels:g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows:g.getParameter(g.UNPACK_SKIP_ROWS)});
@@ -520,7 +768,7 @@
     const original={build:painter.build,patch:painter.buildPatch,tile:painter.baseTile,image:g.texImage2D,sub:g.texSubImage2D,
       creature:game.creatures.init,mini:game.miniGuides.init,normal:game.art.transformedNormal,normalOwn:Object.prototype.hasOwnProperty.call(game.art,'transformedNormal')};
     const canvasPrototype=OffscreenCanvas.prototype,contextPrototype=Object.getPrototypeOf(new OffscreenCanvas(1,1).getContext('2d'));
-    Object.assign(original,{getContext:canvasPrototype.getContext,read:contextPrototype.getImageData,beginPath:contextPrototype.beginPath,rect:contextPrototype.rect,clip:contextPrototype.clip,translate:contextPrototype.translate});
+    Object.assign(original,{getContext:canvasPrototype.getContext,read:contextPrototype.getImageData,beginPath:contextPrototype.beginPath,rect:contextPrototype.rect,clip:contextPrototype.clip,translate:contextPrototype.translate,canvasImage:contextPrototype.drawImage});
     const matrix=ctx=>{const m=ctx.getTransform();return{a:m.a,b:m.b,c:m.c,d:m.d,e:m.e,f:m.f}};
     const patchColor=ctx=>patchDepth&&patchColorContexts.has(ctx);
     const actors={creatures:game.creatures.units,mini:game.miniGuides.units,creatureData:JSON.stringify(game.creatures.units),miniData:JSON.stringify(game.miniGuides.units)};
@@ -544,6 +792,15 @@
       return original.clip.apply(this,args);
     };
     contextPrototype.translate=function(...args){if(patchColor(this)&&!patchContexts.has(this))stats.patchBaseTranslations.push({patchIndex:stats.patchBuilds-1,args:args.slice()});return original.translate.apply(this,args)};
+    contextPrototype.drawImage=function(...args){
+      if(patchColor(this)){
+        check([3,5,9].includes(args.length),'unrecognized patch drawImage overload');
+        const [source]=args,m=matrix(this),destination=args.length===9?args.slice(5):args.length===5?args.slice(1):[args[1],args[2],source.width,source.height];
+        const [x,y,w,h]=destination,corners=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([px,py])=>[m.a*px+m.c*py+m.e,m.b*px+m.d*py+m.f]);
+        stats.patchDrawImages.push({patchIndex:stats.patchBuilds-1,argumentCount:args.length,sourceSize:[source.width,source.height],destination,matrix:m,corners,alpha:this.globalAlpha});
+      }
+      return original.canvasImage.apply(this,args);
+    };
     painter.build=function(...args){stats.fullBuilds++;return original.build.apply(this,args)};
     if(original.patch)painter.buildPatch=function(...args){
       stats.patchBuilds++;patchDepth++;
@@ -577,7 +834,7 @@
     try{action()}finally{
       painter.build=original.build;if(original.patch)painter.buildPatch=original.patch;painter.baseTile=original.tile;
       g.texImage2D=original.image;g.texSubImage2D=original.sub;canvasPrototype.getContext=original.getContext;contextPrototype.getImageData=original.read;
-      contextPrototype.beginPath=original.beginPath;contextPrototype.rect=original.rect;contextPrototype.clip=original.clip;contextPrototype.translate=original.translate;
+      contextPrototype.beginPath=original.beginPath;contextPrototype.rect=original.rect;contextPrototype.clip=original.clip;contextPrototype.translate=original.translate;contextPrototype.drawImage=original.canvasImage;
       game.creatures.init=original.creature;game.miniGuides.init=original.mini;
       if(original.normalOwn)game.art.transformedNormal=original.normal;else delete game.art.transformedNormal;
       stats.releasedPatchCanvases=[...canvasRefs,...observedScratch].every(c=>c.width===1&&c.height===1);
@@ -607,7 +864,7 @@
 
   function measured(label,action,mode='patch',options={}){
     if(mode==='patch'||mode==='noop')assertNormalSources(label+' before action');
-    const before=mode==='patch'||mode==='noop'?capture():null,work=instrument(action),r=game.renderer,area=r.nativeW*r.nativeH;
+    const beforeSnapshot=game.staticTerrainSnapshot,before=mode==='patch'||mode==='noop'?capture():null,work=instrument(action),r=game.renderer,area=r.nativeW*r.nativeH;
     if(mode==='patch'||mode==='noop')assertNormalSources(label+' after action');
     check(work.diagnostics.mode===mode,label+' expected '+mode+' diagnostics: '+JSON.stringify(work.diagnostics));
     if(options.actors!==false)check(work.actorsUnchanged,label+' reset or moved unrelated actors');
@@ -626,7 +883,7 @@
       check(work.diagnostics.scratchAllocations===allocations.length&&work.diagnostics.scratchAllocationAttempts===allocations.length&&work.diagnostics.scratchAllocationPixels===allocatedPixels&&work.diagnostics.scratchAllocationBytes===allocatedPixels*4,label+' scratch allocation counters differ from actual color canvases');
       check(work.materialHandlesUnchanged&&work.normalSourceGenerationUnchanged&&work.normalTransformRequests===0&&work.subUploads.every(u=>u.channel==='color'),label+' rerendered or replaced unchanged material resources');
       check(work.diagnostics.regions.length===work.patchBuilds&&work.patchBaseTransforms.length===work.patchBuilds,label+' missing patch region or base transform observations');
-      let observedRasterPixels=0;
+      let observedRasterPixels=0;const contributingImages=[];
       for(let index=0;index<work.diagnostics.regions.length;index++){
         const region=work.diagnostics.regions[index],canvas=allocations[index],returned=work.patchCanvases[index],base=work.patchBaseTransforms[index];
         const cx=fractional?0:region.rasterX,cy=fractional?0:region.rasterY,cw=fractional?r.nativeW:region.rasterWidth,ch=fractional?r.nativeH:region.rasterHeight;
@@ -643,7 +900,22 @@
           check(clips.length===0&&translations.length===((cx||cy)?1:0)&&translations.every(t=>t.args[0]===-cx&&t.args[1]===-cy),label+' local canvas transform/implicit clip changed');
           check(cw*ch<area,label+' local path allocated a native-size canvas');observedRasterPixels+=cw*ch;
         }
+        // Observe the actual Canvas2D calls, independently of the metadata
+        // recorder. Relevant textured quads must retain their complete native
+        // geometry, clipped only by the same viewport as the full renderer.
+        const images=work.patchDrawImages.filter(draw=>draw.patchIndex===index);check(images.length>0,label+' observed no patch color image draws');
+        for(const draw of images){
+          const corners=draw.corners.map(([x,y])=>[x+cx,y+cy]);
+          const bounds={x0:Math.max(0,Math.min(...corners.map(p=>p[0]))),y0:Math.max(0,Math.min(...corners.map(p=>p[1]))),
+            x1:Math.min(r.nativeW,Math.max(...corners.map(p=>p[0]))),y1:Math.min(r.nativeH,Math.max(...corners.map(p=>p[1])))};
+          check(corners.flat().every(Number.isFinite),label+' observed a nonfinite image transform');
+          if(draw.alpha<=0||bounds.x1<=bounds.x0||bounds.y1<=bounds.y0||bounds.x1<=region.x||bounds.x0>=region.x+region.width||bounds.y1<=region.y||bounds.y0>=region.y+region.height)continue;
+          check(region.rasterX<=bounds.x0&&region.rasterY<=bounds.y0&&region.rasterX+region.rasterWidth>=bounds.x1&&region.rasterY+region.rasterHeight>=bounds.y1,
+            label+' clipped a contributing image quad '+JSON.stringify({patchIndex:index,bounds,region,destination:draw.destination,matrix:draw.matrix}));
+          contributingImages.push({...draw,nativeCorners:corners,nativeViewportBounds:bounds,guardEnclosesQuad:true});
+        }
       }
+      work.drawImageCalls=work.patchDrawImages.length;work.patchDrawImages=contributingImages;
       for(const name of ['color']){const uploads=work.subUploads.filter(u=>u.channel===name),pixels=uploads.reduce((n,u)=>n+u.width*u.height,0);
         check(uploads.length>0&&pixels>0&&pixels<area,label+' '+name+' uploads are not bounded');
         check(uploads.every(u=>Number.isInteger(u.x)&&Number.isInteger(u.y)&&u.x>=0&&u.y>=0&&u.width>0&&u.height>0&&u.x+u.width<=r.nativeW&&u.y+u.height<=r.nativeH),label+' '+name+' invalid native upload rectangle');
@@ -666,7 +938,7 @@
     }else if(mode==='noop')check(work.fullBuilds===0&&work.patchBuilds===0&&work.fullUploads.length===0&&work.subUploads.length===0,label+' unchanged authority did rendering work');
     else check(work.fullBuilds>=1&&channels.every(c=>work.fullUploads.some(u=>u.channel===c)),label+' full fallback did not repair all maps');
     if(options.authority!==false)authority(label);
-    const textures=parity(label,before,work.subUploads);
+    const textures=parity(label,before,work.subUploads,beforeSnapshot);
     if(mode==='patch'){check(textures.normal.changedOutside===0&&textures.specular.changedOutside===0,label+' modified material texture bytes');work.materialContentsUnchanged=true}
     if(mode==='patch'||mode==='noop')work.normalSources=assertNormalSources(label+' after full reference');
     // Coverage is defined by actual subuploads. A qualified full fallback has
@@ -750,7 +1022,7 @@
 
   function eligibleCases(width,height,sourceMaps){
     const result={native:[width,height],initial:setup(width,height,sourceMaps),cases:[]},out=result.cases,e=rmfEditor;
-    // Keep every original edit at both native sizes. Local guarded redraws
+    // Keep every original edit at all tested native sizes. Local guarded redraws
     // fit the fixed20% raster/35% floor budgets; fractional canvases preserve
     // the full native target and transform while clipping to those redraws.
     // At997x563 each transient color canvas is561311pixels (2245244bytes),
@@ -950,7 +1222,7 @@
     const sourceMaps=structuredClone(root.__json?.['relay_moth_maps.json']||saved.maps);
     try{
       const result={oracle:'clean full StaticPainter composition with production source canvases; all color/normal/specular GPU bytes; exact equality',nativeCrop:nativeCropCases(),legacyCompatibility:legacyCompatibility(sourceMaps),negativeControls:negativeControls(sourceMaps),native:[],naturalRooms:[],fallbacks:[],recovery:[],liveOwnership:[]};
-      for(const [width,height] of [[640,360],[997,563]])result.native.push(eligibleCases(width,height,sourceMaps));
+      for(const [width,height] of [[640,360],[997,563],[1280,720]])result.native.push(eligibleCases(width,height,sourceMaps));
       result.naturalRooms=naturalCases(sourceMaps);
       result.fallbacks=fallbackCases(sourceMaps);result.recovery=recoveryCases(sourceMaps);result.liveOwnership=ownershipCases(sourceMaps);
       return result;
