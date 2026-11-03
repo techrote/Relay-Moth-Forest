@@ -190,7 +190,10 @@
     // Unsupported microtiles keep the full painter until separately qualified.
     if(![4,8,16].includes(next.microtile)||next.geometry.tileSize!==16)return full('unsupported-microtile',changes);
     const g=next.geometry,sx=g.renderWidth/g.logicalWidth,sy=g.renderHeight/g.logicalHeight,overhangX=next.microtile===4?3:0,overhangY=next.microtile===4?2:0;
-    const fractionalScale=!Number.isInteger(sx)||!Number.isInteger(sy);
+    // Only the original 640x360 device target has qualified translated local
+    // canvases. Sampled sprites can change rounding on a smaller target even
+    // at integer scales, so every other size retains the full native target.
+    const nativeCanvas=g.renderWidth!==640||g.renderHeight!==360||g.logicalWidth!==640||g.logicalHeight!==360;
     // Bounds come from a metadata-only replay of the actual overlay placement
     // methods. Preserve complete primitives that can touch the uploaded output:
     // clipping a sampled quad can change its interpolated texture coordinates.
@@ -221,9 +224,9 @@
     const merged=merge(raw);
     if(merged.length>budget.maxRegions)return full('fragmentation',changes);
     const regions=merged.map(rect=>{
-      // Every patch redraws only its local, aligned guard. Fractional scales
-      // retain the full target size and global device origin separately: the
-      // painter clips that native canvas to these guarded raster bounds.
+      // Every patch redraws only its local, aligned guard. Targets other than
+      // the original 640x360 retain full dimensions and global device origin:
+      // the painter clips that native canvas to these guarded raster bounds.
       let x0=rect.x0-NATIVE_RASTER_GUARD,y0=rect.y0-NATIVE_RASTER_GUARD,x1=rect.x1+NATIVE_RASTER_GUARD,y1=rect.y1+NATIVE_RASTER_GUARD;
       for(const b of overlayBounds)if(touching(rect,b)){x0=Math.min(x0,b.x0);y0=Math.min(y0,b.y0);x1=Math.max(x1,b.x1);y1=Math.max(y1,b.y1)}
       const rasterX=Math.max(0,Math.floor(x0/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
@@ -232,10 +235,10 @@
       const rasterY1=Math.min(g.renderHeight,Math.ceil(y1/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       return{x:rect.x0,y:rect.y0,width:rect.x1-rect.x0,height:rect.y1-rect.y0,
         rasterX,rasterY,rasterWidth:rasterX1-rasterX,rasterHeight:rasterY1-rasterY,
-        canvasMode:fractionalScale?'native-clip':'local',
-        canvasX:fractionalScale?0:rasterX,canvasY:fractionalScale?0:rasterY,
-        canvasWidth:fractionalScale?g.renderWidth:rasterX1-rasterX,
-        canvasHeight:fractionalScale?g.renderHeight:rasterY1-rasterY,
+        canvasMode:nativeCanvas?'native-clip':'local',
+        canvasX:nativeCanvas?0:rasterX,canvasY:nativeCanvas?0:rasterY,
+        canvasWidth:nativeCanvas?g.renderWidth:rasterX1-rasterX,
+        canvasHeight:nativeCanvas?g.renderHeight:rasterY1-rasterY,
         // Replay every floor predecessor contributing to the guarded clip.
         // Source work and canvas capacity are accounted for independently.
         tx0:Math.max(0,Math.floor((rasterX/sx-LOGICAL_HALO-NATIVE_HALO/sx)/g.tileSize)),
@@ -248,7 +251,7 @@
     if(patch.pixelCount>g.renderWidth*g.renderHeight*budget.maxPixelRatio)return full('pixel-budget',changes);
     if(patch.rasterPixels>g.renderWidth*g.renderHeight*budget.maxPixelRatio)return full('raster-pixel-budget',changes);
     if(patch.rasterCellCount>g.columns*g.rows*budget.maxRasterRatio)return full('raster-budget',changes);
-    if(patch.scratchPixels>(fractionalScale?budget.maxNativeScratchPixels:budget.maxScratchPixels))return full('scratch-budget',changes);
+    if(patch.scratchPixels>(nativeCanvas?budget.maxNativeScratchPixels:budget.maxScratchPixels))return full('scratch-budget',changes);
     if(patch.scratchAllocationPixels>budget.maxScratchAllocationPixels)return full('scratch-allocation-budget',changes);
     return patch;
   }

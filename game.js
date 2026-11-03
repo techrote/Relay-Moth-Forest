@@ -434,7 +434,7 @@ class StaticPainter{
     return this.buildSurface(room,state,renderW,renderH,raster);
   }
   buildSurface(room,state,renderW,renderH,region){
-    // Full and partial draws share primitives. Fractional partial draws retain
+    // Full and partial draws share primitives. Scaled partial draws retain
     // the full native target dimensions as well as its origin: the GPU's device
     // projection depends on the target, independently of the Canvas2D matrix.
     const r=region||{x:0,y:0,width:renderW,height:renderH,tx0:0,ty0:0,tx1:GRID_W,ty1:GRID_H},phase=region?'static.patch':'static.full';

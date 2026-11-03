@@ -177,7 +177,7 @@ function project(bounds,width,height,halo=0,logicalHeight=360){return{x0:Math.ma
 function intersects(a,b){return a.x0<b.x1&&b.x0<a.x1&&a.y0<b.y1&&b.y0<a.y1}
 function expectedRegion(x,y,microtile,width,height,logicalHeight=360){
   const output=project({x0:x*16,y0:y*16,x1:(x+1)*16+(microtile===4?3:0),y1:(y+1)*16+(microtile===4?2:0)},width,height,0,logicalHeight);
-  const fractional=width%640!==0||height%logicalHeight!==0;
+  const nativeCanvas=width!==640||height!==360||logicalHeight!==360;
   const raster={x0:Math.max(0,Math.floor((output.x0-32)/16)*16),y0:Math.max(0,Math.floor((output.y0-32)/16)*16),x1:Math.min(width,Math.ceil((output.x1+32)/16)*16),y1:Math.min(height,Math.ceil((output.y1+32)/16)*16)};
   // Find the source strip by intersecting logical tile intervals with the
   // expanded input bounds, rather than reusing the production index formula.
@@ -187,7 +187,7 @@ function expectedRegion(x,y,microtile,width,height,logicalHeight=360){
     return[indices[0],indices[indices.length-1]+1];
   };
   const [tx0,tx1]=axis(raster.x0,raster.x1,width/640,40),[ty0,ty1]=axis(raster.y0,raster.y1,height/logicalHeight,19);
-  return{x:output.x0,y:output.y0,width:output.x1-output.x0,height:output.y1-output.y0,rasterX:raster.x0,rasterY:raster.y0,rasterWidth:raster.x1-raster.x0,rasterHeight:raster.y1-raster.y0,canvasMode:fractional?'native-clip':'local',canvasX:fractional?0:raster.x0,canvasY:fractional?0:raster.y0,canvasWidth:fractional?width:raster.x1-raster.x0,canvasHeight:fractional?height:raster.y1-raster.y0,tx0,ty0,tx1,ty1};
+  return{x:output.x0,y:output.y0,width:output.x1-output.x0,height:output.y1-output.y0,rasterX:raster.x0,rasterY:raster.y0,rasterWidth:raster.x1-raster.x0,rasterHeight:raster.y1-raster.y0,canvasMode:nativeCanvas?'native-clip':'local',canvasX:nativeCanvas?0:raster.x0,canvasY:nativeCanvas?0:raster.y0,canvasWidth:nativeCanvas?width:raster.x1-raster.x0,canvasHeight:nativeCanvas?height:raster.y1-raster.y0,tx0,ty0,tx1,ty1};
 }
 function defaultBudgetReason(regions,width,height){
   const outputPixels=regions.reduce((n,r)=>n+r.width*r.height,0),rasterPixels=regions.reduce((n,r)=>n+r.rasterWidth*r.rasterHeight,0),sourceCells=regions.reduce((n,r)=>n+(r.tx1-r.tx0)*(r.ty1-r.ty0),0),peakPixels=Math.max(...regions.map(r=>r.canvasWidth*r.canvasHeight)),allocatedPixels=regions.reduce((n,r)=>n+r.canvasWidth*r.canvasHeight,0);
@@ -219,7 +219,7 @@ function assertCrop(region,nativeHeight){
   return{cropX,cropY,skipRows};
 }
 function geometryOracle(){
-  for(const [width,height,microtile] of [[640,360,4],[997,563,4],[1280,720,4],[2560,1440,4],[997,563,8],[997,563,16]]){
+  for(const [width,height,microtile] of [[640,360,4],[997,563,4],[1280,720,4],[1280,360,4],[640,720,4],[2560,1440,4],[997,563,8],[997,563,16]]){
     const metadata=context({renderWidth:width,renderHeight:height}),room=fixture();room.floorMicrotile=microtile;const before=capture(room,metadata);
     for(let i=0;i<760;i++){
       const x=i%40,y=Math.floor(i/40),next=clone(room);next.water.add(`${x},${y}`);const delta=S.plan(before,capture(next,metadata));
@@ -248,7 +248,7 @@ function geometryOracle(){
       assert(raster.x0>=r.canvasX&&raster.y0>=r.canvasY&&raster.x1<=r.canvasX+r.canvasWidth&&raster.y1<=r.canvasY+r.canvasHeight,'guard clip stays inside its separate source canvas');
       assertCrop(r,height);
       assert(r.tx0<=x&&r.tx1>x&&r.ty0<=y&&r.ty1>y);
-      if(width%640||height%360){assert.strictEqual(r.canvasMode,'native-clip');assert.strictEqual(r.canvasX,0);assert.strictEqual(r.canvasY,0);assert.strictEqual(r.canvasWidth,width);assert.strictEqual(r.canvasHeight,height);assert.strictEqual(delta.scratchPixels,width*height)}
+      if(width!==640||height!==360){assert.strictEqual(r.canvasMode,'native-clip');assert.strictEqual(r.canvasX,0);assert.strictEqual(r.canvasY,0);assert.strictEqual(r.canvasWidth,width);assert.strictEqual(r.canvasHeight,height);assert.strictEqual(delta.scratchPixels,width*height)}
       else{assert.strictEqual(r.canvasMode,'local');assert.deepStrictEqual([r.canvasX,r.canvasY,r.canvasWidth,r.canvasHeight],[r.rasterX,r.rasterY,r.rasterWidth,r.rasterHeight])}
       assert(delta.rasterCellCount<=81,'all-scale local single-cell redraw stays within nine source tiles per axis at these native scales');
       assert.strictEqual(delta.scratchMode,r.canvasMode);assert.strictEqual(delta.pixelCount,r.width*r.height);assert.strictEqual(delta.rasterPixels,r.rasterWidth*r.rasterHeight);assert.strictEqual(delta.scratchPixels,r.canvasWidth*r.canvasHeight);assert.strictEqual(delta.scratchBytes,delta.scratchPixels*4);
@@ -322,9 +322,10 @@ function geometryOracle(){
 
 function canvasCapacityBudgets(){
   const metadata=context({renderWidth:997,renderHeight:563}),nativePixels=997*563;
-  // A fractional scale on either axis needs the same full target on both axes,
-  // while its floor input and guarded clip remain local to the changed cell.
-  for(const [width,height,cells] of [[640,563,48],[997,360,40]]){
+  // Every target other than the original 640x360 retains full dimensions on
+  // both axes, including integer and integer-anisotropic scaling. Its guarded
+  // redraw and floor input still remain local to the changed cell.
+  for(const [width,height,cells] of [[640,563,48],[997,360,40],[1280,720,25],[1280,360,40],[640,720,40]]){
     const delta=plan(fixture(),room=>room.water.add('11,6'),undefined,context({renderWidth:width,renderHeight:height}));
     assert.strictEqual(delta.kind,'patch');const r=delta.regions[0];
     assert.deepStrictEqual(r,expectedRegion(11,6,4,width,height));assert(r.rasterX>0&&r.rasterY>0&&r.tx0>0&&r.ty0>0);
@@ -332,6 +333,16 @@ function canvasCapacityBudgets(){
     assert.strictEqual(delta.scratchPixels,width*height);assert.strictEqual(delta.scratchBytes,width*height*4);assert.strictEqual(delta.rasterCellCount,cells);
     assert(delta.rasterPixels<delta.scratchPixels,'redraw work must not be mislabeled as canvas capacity');assertCrop(r,height);
   }
+  const doubled=plan(fixture(),room=>room.paths.add('20,18'),undefined,context({renderWidth:1280,renderHeight:720})),bottom=doubled.regions[0];
+  assert.strictEqual(doubled.kind,'patch');assert.strictEqual(bottom.canvasMode,'native-clip','the observed integer-scale footer case must retain the complete native target');
+  assert.deepStrictEqual([bottom.x,bottom.y,bottom.width,bottom.height],[640,576,38,36],'target policy does not enlarge the actual changed floor envelope');
+  assert.deepStrictEqual([bottom.rasterX,bottom.rasterY,bottom.rasterWidth,bottom.rasterHeight],[608,544,112,112]);
+  assert.deepStrictEqual([bottom.canvasX,bottom.canvasY,bottom.canvasWidth,bottom.canvasHeight],[0,0,1280,720]);
+  assert.deepStrictEqual([bottom.tx0,bottom.ty0,bottom.tx1,bottom.ty1],[18,16,23,19]);
+  assert.strictEqual(doubled.rasterCellCount,15);assert.strictEqual(doubled.rasterPixels,12544);assert.strictEqual(doubled.scratchBytes,1280*720*4);assert.strictEqual(doubled.uploadBytes,38*36*4);
+  assert.deepStrictEqual(assertCrop(bottom,720),{cropX:640,cropY:576,skipRows:108});
+  const alternateLogical=plan(fixture(),room=>room.water.add('11,6'),undefined,context({logicalHeight:304}));
+  assert.strictEqual(alternateLogical.kind,'patch');assert.strictEqual(alternateLogical.scratchMode,'native-clip','a custom logical extent must not masquerade as the qualified original 1x target');
   const mounted=fixture();mounted.decorLamps.push({tile:[10,8],lamp:'lamp_blue'});
   const underLamp=plan(mounted,room=>room.water.add('10,7'),undefined,metadata);
   assert.strictEqual(underLamp.kind,'patch','unchanged mounted art does not change local redraw or target policy');
@@ -356,12 +367,12 @@ function canvasCapacityBudgets(){
   for(const limit of [nativePixels-1,nativePixels])assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),{maxNativeScratchPixels:limit},metadata).reason,limit===nativePixels?'terrain':'scratch-budget');
   const local=plan(fixture(),room=>room.water.add('11,6'),{maxNativeScratchPixels:0});assert.strictEqual(local.kind,'patch');assert.strictEqual(local.scratchMode,'local');
   assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),{maxScratchPixels:local.scratchPixels}).kind,'patch');
-  assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),{maxScratchPixels:local.scratchPixels-1}).reason,'scratch-budget','integer local capacity retains its separate peak gate');
-  assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),undefined,context({renderWidth:25600,renderHeight:14400})).reason,'scratch-budget','large integral targets still use the original local 1MiB peak');
+  assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),{maxScratchPixels:local.scratchPixels-1}).reason,'scratch-budget','original 640x360 local capacity retains its separate peak gate');
+  assert.strictEqual(plan(fixture(),room=>room.water.add('11,6'),undefined,context({renderWidth:25600,renderHeight:14400})).reason,'scratch-budget','large integral targets must satisfy the unchanged full-native 4MiB peak');
   // Repeated full-native canvases can fit peak and all redraw limits while
   // exceeding cumulative allocation. This is an additional preflight gate.
-  const keys=['3,3','13,3','23,3','33,3'];
-  for(const [width,height,allowed] of [[997,563,3],[1278,718,2],[1024,1024,2]]){
+  const keys=['3,3','13,3','23,3','33,3','3,13'];
+  for(const [width,height,allowed] of [[997,563,3],[1278,718,2],[1280,720,2],[1280,360,4],[640,720,4],[1024,1024,2]]){
     const meta=context({renderWidth:width,renderHeight:height}),area=width*height;
     const accepted=plan(fixture(),room=>{for(const key of keys.slice(0,allowed))room.water.add(key)},undefined,meta);
     assert.strictEqual(accepted.kind,'patch');assert.strictEqual(accepted.scratchAllocationAttempts,allowed);assert.strictEqual(accepted.scratchAllocations,allowed);
@@ -373,7 +384,7 @@ function canvasCapacityBudgets(){
     assert.strictEqual(rejected.scratchPixels,area);assert.strictEqual(rejected.scratchBytes,area*12);assert.strictEqual(rejected.scratchAllocationPixels,area*3);assert.strictEqual(rejected.scratchAllocationBytes,area*12);
     assert.strictEqual(rejected.uploadCalls,3);assert.strictEqual(rejected.uploadBytes,area*12,'full fallback reports the actual three-map rebuild, not hypothetical partial work');
   }
-  for(const [width,height] of [[1025,1024],[1400,800],[2000,1000]])for(const key of ['0,0','11,6','39,18']){
+  for(const [width,height] of [[1025,1024],[1400,800],[2000,1000],[1920,1080],[1920,720],[1280,1080],[2560,1440]])for(const key of ['0,0','11,6','39,18']){
     const rejected=plan(fixture(),room=>room.water.add(key),undefined,context({renderWidth:width,renderHeight:height}));
     assert.strictEqual(rejected.kind,'full');assert.strictEqual(rejected.reason,'scratch-budget','oversized native target must fall back at every location before allocation');assert.strictEqual(rejected.regions.length,0);
   }
@@ -412,7 +423,7 @@ console.log('  authoritative classifications / invalidation checks:',authorityCa
 console.log('  native single-cell geometry cases:',geometryCases,'; production floor primitive footprints:',footprintCases);
 console.log('  default-budget geometry outcomes:',geometryPatches,'patches /',geometryFallbacks,'full fallbacks');
 console.log('  exact same-count moves, undo/redo, live-state noops, all static dependencies, identities, budgets and malformed/stale authority');
-console.log('  1x / fractional / 2x / 4x floor envelopes, tight outputs, local guarded redraw, native target geometry and flipped source crops');
+console.log('  original 640x360 local / fractional / 2x / integer-anisotropic / over-cap 4x floor envelopes, guarded redraw and native target crops');
 console.log('  1MiB local / 4MiB native peak, 8MiB cumulative allocation, separate attempted/allocation counts, clipped edges and unchanged redraw budgets');
 console.log('  bounded color-only bytes/calls, unchanged material authority, complete three-map full-build accounting');
 console.log('  explicit bounded color-policy tokens, immutable capture and full invalidation independent of source caches/material dependencies');

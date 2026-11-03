@@ -1033,7 +1033,7 @@
     check(work.diagnostics.mode===mode,label+' expected '+mode+' diagnostics: '+JSON.stringify(work.diagnostics));
     if(options.actors!==false)check(work.actorsUnchanged,label+' reset or moved unrelated actors');
     if(mode==='patch'){
-      const fractional=!Number.isInteger(r.nativeW/640)||!Number.isInteger(r.nativeH/360),scratchMode=fractional?'native-clip':'local';
+      const nativeTarget=r.nativeW!==640||r.nativeH!==360,scratchMode=nativeTarget?'native-clip':'local';
       const allocations=work.patchContextAllocations.filter(c=>c.explicitAlpha===false),peak=Math.max(...allocations.map(c=>c.width*c.height)),allocatedPixels=allocations.reduce((n,c)=>n+c.width*c.height,0);
       check(work.fullBuilds===0&&work.fullUploads.length===0,label+' full build or texture replacement in eligible edit');
       check(work.patchBuilds>0&&work.floorCalls>0&&work.floorCalls<760,label+' floor raster work is not bounded');
@@ -1045,7 +1045,7 @@
       check(syncReads.length===expectedSyncReads&&syncReads.every(read=>read.patchColor&&read.x===0&&read.y===0&&read.width===1&&read.height===1&&read.beforeOverlays),label+' color synchronization exceeded one discarded pixel per painted floor row');
       check(work.diagnostics.colorPolicy===StaticPainter.COLOR_POLICY&&work.diagnostics.colorSyncAttempts===expectedSyncReads&&work.diagnostics.colorSyncReads===expectedSyncReads&&work.diagnostics.colorSyncPixels===expectedSyncReads&&work.diagnostics.readbackPixels===expectedSyncReads&&Number.isFinite(work.diagnostics.colorSyncMs)&&work.diagnostics.colorSyncMs>=0,label+' color synchronization counters differ from observed reads');
       check(!game.currentStatic&&!game.painter.lastMaterialMaps,label+' retained full static backing');
-      check(work.diagnostics.scratchMode===scratchMode&&peak>0&&peak<=(fractional?1048576:262144)&&allocatedPixels<=2097152,label+' exceeded the explicit local/native peak or cumulative canvas capacity policy');
+      check(work.diagnostics.scratchMode===scratchMode&&peak>0&&peak<=(nativeTarget?1048576:262144)&&allocatedPixels<=2097152,label+' exceeded the explicit local/native peak or cumulative canvas capacity policy');
       check(work.diagnostics.scratchPixels===peak&&work.diagnostics.scratchBytes===peak*4&&work.peakLiveScratchPixels===peak,label+' peak scratch capacity differs from actual sequential color canvases');
       check(work.diagnostics.scratchAllocations===allocations.length&&work.diagnostics.scratchAllocationAttempts===allocations.length&&work.diagnostics.scratchAllocationPixels===allocatedPixels&&work.diagnostics.scratchAllocationBytes===allocatedPixels*4,label+' scratch allocation counters differ from actual color canvases');
       check(work.materialHandlesUnchanged&&work.normalSourceGenerationUnchanged&&work.normalTransformRequests===0&&work.subUploads.every(u=>u.channel==='color'),label+' rerendered or replaced unchanged material resources');
@@ -1053,14 +1053,14 @@
       let observedRasterPixels=0;const contributingImages=[];
       for(let index=0;index<work.diagnostics.regions.length;index++){
         const region=work.diagnostics.regions[index],canvas=allocations[index],returned=work.patchCanvases[index],base=work.patchBaseTransforms[index];
-        const cx=fractional?0:region.rasterX,cy=fractional?0:region.rasterY,cw=fractional?r.nativeW:region.rasterWidth,ch=fractional?r.nativeH:region.rasterHeight;
+        const cx=nativeTarget?0:region.rasterX,cy=nativeTarget?0:region.rasterY,cw=nativeTarget?r.nativeW:region.rasterWidth,ch=nativeTarget?r.nativeH:region.rasterHeight;
         check(region.canvasMode===scratchMode&&region.canvasX===cx&&region.canvasY===cy&&region.canvasWidth===cw&&region.canvasHeight===ch,label+' planner conflates source canvas and guarded raster geometry');
         check(canvas.patchIndex===index&&canvas.width===cw&&canvas.height===ch&&returned.width===cw&&returned.height===ch,label+' allocated color canvas differs from the required source dimensions');
         const rowReads=syncReads.filter(read=>read.patchIndex===index);
         check(rowReads.length===region.ty1-region.ty0&&rowReads.every((read,i)=>read.lastFloor?.tx===region.tx1-1&&read.lastFloor?.ty===region.ty0+i&&read.canvasWidth===cw&&read.canvasHeight===ch),label+' color synchronization did not follow the actual complete painted rows');
         check(base.patchIndex===index&&base.width===cw&&base.height===ch&&base.a===Math.fround(r.nativeW/640)&&base.b===0&&base.c===0&&base.d===Math.fround(r.nativeH/360)&&base.e===-cx&&base.f===-cy,label+' patch base transform differs from the full native scale/origin contract');
         const clips=work.patchClips.filter(c=>c.patchIndex===index),translations=work.patchBaseTranslations.filter(t=>t.patchIndex===index);
-        if(fractional){
+        if(nativeTarget){
           check(translations.length===0&&clips.length===1,label+' native clip path translated the canvas or lacks its single guard clip');
           const clip=clips[0],m=clip.matrix;
           check(clip.width===cw&&clip.height===ch&&clip.beforeFloor&&clip.argumentCount===0&&clip.rectangles.length===1&&JSON.stringify(clip.rectangles[0])===JSON.stringify([region.rasterX,region.rasterY,region.rasterWidth,region.rasterHeight])&&m.a===1&&m.b===0&&m.c===0&&m.d===1&&m.e===0&&m.f===0,label+' actual native guard clip differs from the planned redraw region');
@@ -1242,7 +1242,7 @@
   function eligibleCases(width,height,sourceMaps){
     const result={native:[width,height],initial:setup(width,height,sourceMaps),cases:[]},out=result.cases,e=rmfEditor;
     // Keep every original edit at all tested native sizes. Local guarded redraws
-    // fit the fixed20% raster/35% floor budgets; fractional canvases preserve
+    // fit the fixed20% raster/35% floor budgets; scaled canvases preserve
     // the full native target and transform while clipping to those redraws.
     // At997x563 each transient color canvas is561311pixels (2245244bytes),
     // below the explicit4MiB peak; the two-region case also fits8MiB cumulative.

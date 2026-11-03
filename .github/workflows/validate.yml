@@ -102,8 +102,21 @@ jobs:
         run: python self_test.py 2>&1 | tee "$VALIDATION_OUT/self-test.log"
 
       - name: Native Chromium, editor and bounded water/static textures
+        id: native_browser
         timeout-minutes: 12
         run: python tests/current/browser_render_regression_414.py --out "$VALIDATION_OUT/browser" 2>&1 | tee "$VALIDATION_OUT/browser.log"
+
+      - name: Preserve native failure evidence before performance
+        if: always() && !cancelled() && steps.native_browser.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: relay-moth-native-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.VALIDATION_OUT }}/source.json
+            ${{ env.VALIDATION_OUT }}/browser.log
+            ${{ env.VALIDATION_OUT }}/browser
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Check out accepted base for same-host performance comparison
         id: performance_baseline
