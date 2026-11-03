@@ -185,6 +185,7 @@
     // Unsupported microtiles keep the full painter until separately qualified.
     if(![4,8,16].includes(next.microtile)||next.geometry.tileSize!==16)return full('unsupported-microtile',changes);
     const g=next.geometry,sx=g.renderWidth/g.logicalWidth,sy=g.renderHeight/g.logicalHeight,overhangX=next.microtile===4?3:0,overhangY=next.microtile===4?2:0;
+    const fractionalScale=!Number.isInteger(sx)||!Number.isInteger(sy);
     const raw=changes.map(cell=>{
       const x0=Math.floor(cell.x*g.tileSize*sx),y0=Math.floor(cell.y*g.tileSize*sy);
       const x1=Math.ceil(((cell.x+1)*g.tileSize+overhangX)*sx),y1=Math.ceil(((cell.y+1)*g.tileSize+overhangY)*sy);
@@ -198,13 +199,13 @@
     const merged=merge(raw);
     if(merged.length>budget.maxRegions)return full('fragmentation',changes);
     const regions=merged.map(rect=>{
-      // Keep the color upload away from the scratch clip. Exact native color
-      // qualification remains required; a guard alone cannot guarantee it.
-      // Its 16px top-origin grid preserves Skia's 8x8 gradient-dither phase,
-      // independently of the later GL upload flip. Guard overlaps remain
-      // separate raster work and must not enlarge or merge upload regions.
-      const rasterX=Math.max(0,Math.floor((rect.x0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
-      const rasterY=Math.max(0,Math.floor((rect.y0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      // Fractional scale must retain the full painter's device origin: even an
+      // integer translation can change floor rasterization. Repaint the entire
+      // bounded prefix, with the same save/scale sequence as a full build.
+      // Integer scales retain local, 16px-aligned guards. Each prefix/guard is
+      // charged separately, including overlaps, against the unchanged limits.
+      const rasterX=fractionalScale?0:Math.max(0,Math.floor((rect.x0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      const rasterY=fractionalScale?0:Math.max(0,Math.floor((rect.y0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       const rasterX1=Math.min(g.renderWidth,Math.ceil((rect.x1+NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       const rasterY1=Math.min(g.renderHeight,Math.ceil((rect.y1+NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       return{x:rect.x0,y:rect.y0,width:rect.x1-rect.x0,height:rect.y1-rect.y0,

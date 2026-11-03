@@ -21,12 +21,13 @@ Painting, clearing, same-count moves, undo/redo, cancellation and persistence
 flushes use the same comparison. No editor tool name is trusted as proof that
 only terrain changed.
 
-At fractional native scales, an otherwise eligible edit that intersects a mounted
-lamp or pillar sprite uses the full renderer. Native comparison isolated a
-one-byte sampling difference in a mounted sprite; neither a larger guard nor
-rounding its translation to the full renderer's global float coordinates fixed
-it. This explicit correctness fallback does not include glow-only overlap and
-does not disable the representative small water/path benchmark actions.
+At fractional native scales, scratch rendering retains the full canvas's origin
+and draws a bounded prefix ending beyond the changed output. Translating a small
+destination changed both sprite samples and floor antialiasing in native tests.
+The prefix avoids that translation while retaining the same memory/work limits;
+an edit farther from the origin can therefore require a full rebuild even when
+only one tile changed. Integer scales keep the localized guarded raster. The
+representative small water/path benchmark actions must still remain bounded.
 
 ## Authority and fallback
 
@@ -49,16 +50,12 @@ The wall dependency deliberately catches the vegetation overlap threshold:
 changing a row pair from three shared blockers to four can change its whole
 interstitial population. Replacing a blocker/tree with water also falls back.
 
-After the data planner finds a bounded patch, the painter checks its output
-against the real `drawDecor` sprite placements when either native scale is
-fractional. A temporary receiver records those placement calls without creating
-a canvas, sampling an image or touching a cache. It uses actual atlas dimensions,
-sprite scale, anchor, rotation and flip, including objective-based lamp
-substitution. Projected sprite bounds receive a conservative two-native-pixel
-filter margin. An intersection selects `fractional-mounted-sprite` before any
-partial allocation or upload; malformed geometry selects a full fallback too.
-Lamp posts and radial glows alone do not trigger this sprite-specific restriction.
-The check adds no retained image data and does not change full composition.
+Fractional-scale eligibility also depends on the size of the origin-preserving
+raster. The same `raster-pixel-budget`, `raster-budget` and `scratch-budget`
+checks apply before allocation. Overlapping prefixes for distinct output regions
+count separately; their duplicated work cannot hide behind a union-area count.
+No sprite category, room name, tool or benchmark position is an eligibility
+exception.
 
 Generated decor, authored editor decor, recruitable robots, completed objectives,
 gates and bridge progression remain live presentation under PERF-002. Their
@@ -108,9 +105,10 @@ vegetation interstitials, room patterns, mounted lamps and footer.
 Each region creates one small color canvas.
 The raster surface includes a 32-native-pixel guard around the output rectangle,
 aligned outward and clipped to the native canvas. Only its interior is uploaded.
-Its transform uses the full native scale and an integer native-pixel translation,
-so a fractional display scale keeps the same raster phase. Nearby floor cells
-are replayed in their original order. Static color overlays are replayed into the
+At integer scales its transform uses the full native scale and an integer
+native-pixel translation. At fractional scales its origin is `(0,0)` and the
+context uses the full renderer's save/scale sequence without translation.
+Floor cells covering the raster are replayed in their original order. Static color overlays are replayed into the
 clipped scratch surface to preserve sprite/glow blending with the changed floor.
 No material sprite is drawn during a terrain patch. Footer sprites affect color
 only, as they do in a full build.
@@ -138,7 +136,9 @@ extra native output padding, without relying on an opaque-union occlusion claim.
 Only these affected output rectangles are merged. Output coordinates need no
 alignment: they crop pixels from an independently aligned raster. That raster
 adds the 32-native-pixel guard and rounds outward to a sixteen-pixel grid before
-clipping to the surface. Its floor-input range retains the symmetric
+clipping to the surface. If either native scale is fractional, its left and top
+edges remain zero; its right and bottom retain the same guarded, rounded bounds.
+Its floor-input range retains the symmetric
 four-logical-pixel plus two-native-pixel halo, replaying every neighboring floor
 mark that can reach the entire scratch. Other microtile sizes retain the full
 renderer until independently qualified.
@@ -187,10 +187,10 @@ the complete logical overhang, raster alignment, guard and input replay:
 | Native surface, cell `(11,6)` | Output `(x,y,width,height)` | Guarded raster `(x,y,width,height)` |
 | --- | --- | --- |
 | 640x360 | `(176,96,19,18)` | `(144,64,96,96)` |
-| 997x563 | `(274,150,30,29)` | `(240,112,96,112)` |
+| 997x563 | `(274,150,30,29)` | `(0,0,336,224)` |
 
 At 997x563, cell `(13,6)` uses output `(324,150,30,29)` and raster
-`(288,112,112,112)`. The two-native-pixel margin remains solely in the conservative
+`(0,0,400,224)`. The two-native-pixel margin remains solely in the conservative
 raster input range, not in the color upload.
 
 All memory, pixel and work limits still account for the guarded bounds. The
@@ -200,7 +200,7 @@ no comparison tolerance. Native qualification must still establish color
 equality inside the tightened output; alignment and guard constants alone are
 not proof.
 
-### Fractional mounted-sprite fallback
+### Why fractional rasters retain the full origin
 
 The next [native stage diagnostic](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41571669664)
 tested the required changed pixel, rather than an unrelated surrounding pixel.
@@ -225,13 +225,36 @@ not fix the sampled byte. It remains a failure-only diagnostic, not a production
 correction. The observed first divergence is a mounted sprite; the tests do not
 claim to establish the complete browser-internal filtering cause.
 
-The production response is to rebuild all three maps for fractional edits whose
-output reaches a mounted sprite footprint. The same editor actions remain in
-native acceptance and must equal the clean full reference exactly, with an
-asserted fallback reason. Integer-scale lamp overlaps and fractional glow-only,
-pattern, blocker and interstitial overlaps retain patch paths subject to the
-same native qualification. No fixture is moved to avoid the affected art, and the original
-representative benchmark edits must still perform bounded updates.
+A mounted-sprite-only fallback was tested next. It passed that case, but the
+[following native run](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41572947659)
+failed the ground-to-water edit at `(19,10)`: the final color crop differed in six
+required pixels, and the floor-only prefix already differed in 19 bytes before
+any overlay was drawn. Five final differences lay in native column 473, which
+partially covers the floor's left edge at 473.575; the remaining difference lay
+on a microtile boundary in native row 256. Normal/specular and exterior pixels
+again matched exactly. This rejects mounted-sprite classification as a sufficient
+rule for fractional patches.
+
+The implementation instead retains global native coordinates: a fractional
+scratch begins at `(0,0)`, uses the full scale without an offset, and replays the
+prefix of floor cells plus all static overlays. This preserves the original
+primitive coordinates and transform operations rather than trying to reproduce
+their rounded results after a translation. The special mounted-sprite collector
+and fallback were removed. Native whole-texture comparison remains mandatory;
+the coordinate argument does not substitute for a rendered pass.
+
+The prefix can exceed an unchanged work limit. In that case the original edit
+remains in native acceptance and uses the full renderer with the corresponding
+budget reason. Cases that fit, including the original benchmark actions, must
+still patch. No test fixture is relocated and no pixel tolerance or memory/work
+budget is relaxed. Farther edits and high-resolution fractional surfaces can
+therefore fall back more often than integer-scale edits.
+
+For example, at 997x563 a one-cell edit at `(11,6)` requires a 336x224 prefix
+(75,264 pixels) and 140 floor cells, within the 112,262.2-pixel and 266-cell
+limits. The edit at `(19,10)` would require 544x320 pixels and 322 floor cells,
+so it selects `raster-pixel-budget` before allocating a patch. The decision
+follows geometry and the same limits for every room and content type.
 
 Default planning limits are 16 changed cells, eight merged regions, at most 20%
 of native output pixels and guarded raster pixels, 35% of logical floor raster
@@ -367,9 +390,9 @@ authored rooms with larger working sets.
 ## Practical limits
 
 Large strokes and edits to static overlay dependencies intentionally rebuild the
-room. Fractional-scale output intersecting mounted sprite footprints also uses
-the full renderer until an exact bounded sampling method is independently
-qualified. Replaying overlay draw commands still has CPU cost, although native raster
+room. At fractional scales the origin-preserving prefix can exceed a work or
+scratch limit even for one changed cell; those edits use the full renderer.
+Replaying overlay draw commands still has CPU cost, although native raster
 and texture-transfer work is bounded. Linux software-rendered evidence does not
 certify Windows/Firefox drivers or physical low-end frame times. No gameplay,
 campaign data, art, schema or material appearance change is intended.
