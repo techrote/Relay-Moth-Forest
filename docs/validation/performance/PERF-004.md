@@ -65,7 +65,7 @@ pixels covers raster rounding/antialiasing. A separate conservative input range
 includes neighboring floor marks that can reach the output edge. Other microtile
 sizes retain the full renderer until independently qualified.
 
-Output bounds also expand to an eight-native-pixel grid before clipping to the
+Output bounds also expand to a sixteen-native-pixel grid before clipping to the
 canvas, merging regions and applying work budgets. Skia's gradient dither uses an
 [8x8 table at device coordinates](https://skia.googlesource.com/skia/+/5fdfc51ef3e8/src/gpu/ganesh/SkGr.cpp),
 and its [fragment coordinates use an upper-left origin](https://skia.googlesource.com/skia/+/89c0ddff982bf3383beeba6397d3236526fb4a76/src/sksl/README.md).
@@ -73,8 +73,16 @@ Preserving that phase matters for overlapping lamp glows: the unaligned native
 rectangle `(170,90,28,28)` differed from the full color texture by one byte level
 in 209 pixels, while normal/specular maps and exterior pixels matched exactly
 ([diagnostic run](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41563498272)).
-The expanded rectangle is `(168,88,32,32)`. The raster input range and all memory,
-pixel and work limits account for the expanded bounds.
+The expanded rectangle is `(160,80,48,48)`, preserving the eight-pixel dither
+phase. The larger grid also avoids the measured border-sprite sampling mismatch:
+at `(312,264,32,32)`, two specular-alpha bytes differed by one level, while the
+`(304,256,48,48)` diagnostic variant matched every color/normal/specular byte
+([native comparison](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41564327204)).
+The original lower clip cut through a flipped sprite sampled from the large
+specular atlas; extending only its horizontal bounds did not resolve the error.
+The raster input range and all memory, pixel and work limits account for the
+expanded bounds. The complete native acceptance matrix, not the alignment
+constant alone, qualifies the resulting image sampling.
 
 Default planning limits are 16 changed cells, eight merged regions, at most 20%
 of native pixels, 35% of logical floor raster work, and 262,144 pixels in the

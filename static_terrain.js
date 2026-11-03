@@ -15,7 +15,7 @@
   const GEOMETRY_KEYS=['renderWidth','renderHeight','logicalWidth','logicalHeight','tileSize','columns','rows'];
   const REFERENCE_KEYS=['sourceRef','rendererRef','artRef','atlasRef','normalRef','specularRef'];
   const MAX_CELLS=65536,MAX_VALUE_NODES=65536,MAX_VALUE_DEPTH=32;
-  const LOGICAL_HALO=4,NATIVE_HALO=2,NATIVE_ALIGNMENT=8;
+  const LOGICAL_HALO=4,NATIVE_HALO=2,NATIVE_ALIGNMENT=16;
   const snapshots=new WeakSet();
   const own=(object,key)=>Object.prototype.hasOwnProperty.call(object,key);
 
@@ -184,10 +184,10 @@
     const raw=changes.map(cell=>{
       const x0=Math.floor((cell.x*g.tileSize-LOGICAL_HALO)*sx)-NATIVE_HALO,y0=Math.floor((cell.y*g.tileSize-LOGICAL_HALO)*sy)-NATIVE_HALO;
       const x1=Math.ceil(((cell.x+1)*g.tileSize+LOGICAL_HALO)*sx)+NATIVE_HALO,y1=Math.ceil(((cell.y+1)*g.tileSize+LOGICAL_HALO)*sy)+NATIVE_HALO;
-      // Skia's gradient dither repeats in an 8x8 device-coordinate tile. Its
-      // sk_FragCoord origin is upper-left, independent of the later GL upload
-      // flip. Preserve that phase by moving scratch origins outward to this
-      // native grid. Recompute merging, raster inputs and all budgets afterward.
+      // The 16px native grid preserves Skia's 8x8 gradient-dither phase and
+      // the material edge sampling established by native pixel qualification.
+      // sk_FragCoord is upper-left, independent of the later GL upload flip.
+      // Round outward, then recompute merging, raster inputs and all budgets.
       return{
         x0:Math.max(0,Math.floor(x0/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT),
         y0:Math.max(0,Math.floor(y0/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT),
