@@ -79,6 +79,25 @@ Use `--baseline-root /path/to/accepted/checkout` with the timing harness to meas
 
 Each candidate water/path timing record also includes `staticParity`: an exact comparison of all three GPU textures at the benchmark's actual native resolution. This validation runs after the event and its first post-event frame, with timing disabled, so it does not enter the reported event or frame interval. A mismatch fails validation and writes a separate static-raster diagnostic JSON beside the requested performance report.
 
+## Raster snapshots and imported floor detail
+
+`raster_export_regression_415.js` exercises production F8 snapshot composition,
+persistent content and progression, runtime rotation geometry, metadata capture
+before asynchronous encoding, concurrent requests, failure cleanup/retry and
+editor keyboard routing. `floor_microtile_regression_415.js` exercises loaded
+rooms and direct painter inputs, accepts finite numeric detail sizes from 3
+through 16, checks validation against unchanged source data, and rejects the
+old unbounded/nonfinite drawing behavior. Both run in `self_test.py`.
+
+`raster_export_browser_415.py` runs inside the existing native browser harness
+after static terrain qualification. It decodes a real exported PNG and checks
+pixels, captured metadata, delayed navigation, failure and rotation. Its shared
+cache-pressure case exports many distinct tints, checks bounded cache ownership,
+and immediately paints terrain before any reference rebuild. That edit must
+retain bounded color-only work and match all three complete GPU textures exactly.
+The stage records its results alongside the ordinary browser evidence and saves
+static-raster diagnostics on a failed terrain comparison.
+
 ## Continuous integration
 
 [Validate source and runtime](../.github/workflows/validate.yml) uses one GitHub-hosted Ubuntu 24.04 job with Python 3.12 and Node 22. It runs for PRs targeting `main`, main pushes and manual dispatch. It checks the exact PR head, records the actual tested commit/tree separately from the event SHA and cancels stale runs for the same PR/ref. There is no parallel test matrix or duplicate feature-branch push run.

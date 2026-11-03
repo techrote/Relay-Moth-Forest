@@ -13,6 +13,7 @@ Documentation is organised by subsystem. Version-specific implementation notes, 
 | [RENDERING.md](RENDERING.md) | Frame order, sprite materials, shadows, sorting, tree splits and post-processing |
 | [SURFACE_AND_FOLIAGE.md](SURFACE_AND_FOLIAGE.md) | WaterField, GrassField and FoliageFX contracts and budgets |
 | [EDITOR.md](EDITOR.md) | F2 WYSIWYG editor, object layer, save behavior and authoring fields |
+| [RASTER_EXPORT.md](RASTER_EXPORT.md) | F8 background PNG/JSON snapshots, included layers and export lifecycle |
 | [DATA_FORMATS.md](DATA_FORMATS.md) | JSON authorities, map fields and schema responsibilities |
 | [ASSET_PIPELINE.md](ASSET_PIPELINE.md) | Sprite sheets, atlas generation, normal/specular derivation and tree splits |
 | [TESTING.md](TESTING.md) | Automated tests, rendered-pixel validation, browser evidence and limits |

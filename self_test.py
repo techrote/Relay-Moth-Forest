@@ -202,6 +202,7 @@ def main():
     subprocess.run(['node',str(ROOT/'tests'/'current'/'waterfield_bounded_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'static_terrain_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'static_terrain_runtime_regression_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'floor_microtile_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'normal_cache_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'foliagefx_regression_400.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'foliagefx_depth_regression_400.js')],check=True)
@@ -236,6 +237,7 @@ def main():
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_dirty_save_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_invalidation_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'mutable_presentation_regression_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'raster_export_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_behavior_regression_415.js')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'wysiwyg_editor_input_regression_411.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'object_editor_regression_412.py')],check=True)
@@ -244,7 +246,7 @@ def main():
     subprocess.run(['python',str(ROOT/'tests'/'current'/'grass_shadow_regression_3999.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'fault_regression.py')],check=True)
     subprocess.run(['python','-m','py_compile',str(ROOT/'tools'/'build_v391_assets.py')],check=True)
-    subprocess.run(['python','-m','py_compile',str(ROOT/'tools'/'generate_material_maps_413.py'),str(ROOT/'tools'/'rebuild_runtime_atlas.py'),str(ROOT/'tests'/'current'/'state_change_performance_415.py')],check=True)
+    subprocess.run(['python','-m','py_compile',str(ROOT/'tools'/'generate_material_maps_413.py'),str(ROOT/'tools'/'rebuild_runtime_atlas.py'),str(ROOT/'tests'/'current'/'state_change_performance_415.py'),str(ROOT/'tests'/'current'/'raster_export_browser_415.py')],check=True)
     assert 'globalThis.relayMothPerf=RelayPerfProbe' in js and "perfMeasure('static.build'" in js and "perfMeasure('progress.localStorage'" in js
     assert "begin('objective-complete'" in js and "begin('robot-recruit'" in js
     subprocess.run(['python',str(ROOT/'tests'/'current'/'release_docs_regression_415.py')],check=True)

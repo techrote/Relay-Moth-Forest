@@ -125,6 +125,8 @@ class LUTManager{
 
 
 class Room{
+  // Keep imported/raw authority intact while bounding runtime floor work.
+  static normalizeFloorMicrotile(value){return typeof value==='number'&&Number.isFinite(value)&&value>=3&&value<=16?value:FLOOR_TILE}
   constructor(index,spec,mapData){
     this.index=index;this.spec=spec;this.key=spec.key;
     const r=mapData.rooms[this.key];
@@ -142,7 +144,7 @@ class Room{
     this.patternExclusions=new Set((r.pattern_exclusions||[]).map(String));
     this.objectFxHidden=new Set((r.object_fx_hidden||[]).map(String));
     this.bridgeCells=new Set((r.bridge_cells||[]).map(p=>p.join(',')));
-    this.bridgePhases=(r.bridge_segments||r.bridge_phases||[]).map(g=>g.map(p=>p.join(',')));this.bridgeSegments=(r.bridge_segments||[]);this.bridgeIsland=r.bridge_island||[];this.foliageDensity=r.foliage_density||1;this.floorMicrotile=r.floor_microtile||FLOOR_TILE;this.miniRobotGroups=r.mini_robot_groups||[];
+    this.bridgePhases=(r.bridge_segments||r.bridge_phases||[]).map(g=>g.map(p=>p.join(',')));this.bridgeSegments=(r.bridge_segments||[]);this.bridgeIsland=r.bridge_island||[];this.foliageDensity=r.foliage_density||1;this.floorMicrotile=Room.normalizeFloorMicrotile(r.floor_microtile);this.miniRobotGroups=r.mini_robot_groups||[];
     this.creatureGroups=r.creature_groups||[];this.grassClumps=r.grass_clumps||[];this.floaterClumps=r.floater_clumps||[];this.outerBorderDepth=r.outer_border_depth||1;
     this.bridgeProgress=0;
     this.bridgeBuilt=false;
@@ -307,7 +309,7 @@ class StaticPainter{
   spriteSubrect(ctx,name,sx,sy,sw,sh,x,y,w,h,opts={}){if(!name||!this.art.regions[name])return[0,0];const info=this.art.tintInfo(name,this.luts,opts.element||null,opts.tintIndex??156),meta=this.art.regionMeta(name),drawOpts={anchor:opts.anchor||'bottom',alpha:opts.alpha??1,flip:opts.flip||false,rot:opts.rot||0,tint:info?.colour||null,tintStrength:opts.tintStrength??info?.strength??meta.tint_strength??0},wh=this.art.drawSubrect(ctx,name,sx,sy,sw,sh,x,y,w,h,drawOpts);if(this.materialNormalCtx)this.art.drawMapSubrect(this.materialNormalCtx,this.art.normalImg,name,sx,sy,sw,sh,x,y,w,h,drawOpts);if(this.materialSpecCtx)this.art.drawMapSubrect(this.materialSpecCtx,this.art.specImg,name,sx,sy,sw,sh,x,y,w,h,drawOpts);return wh}
   robotFrame(variant,frame='idle'){return this.art.roles.robot_variants?.[variant]?.[frame]||this.art.roles.robot_variants?.cream?.idle||'robot_warm'}
   baseTile(ctx,tx,ty,seed,type){
-    const x=tx*TILE,y=ty*TILE,micro=this.microtile||FLOOR_TILE;
+    const x=tx*TILE,y=ty*TILE,micro=Room.normalizeFloorMicrotile(this.microtile);
     let e='ground',lo=40,hi=116;if(type==='path'){e='path';lo=72;hi=160}else if(type==='water'){e='water';lo=38;hi=126}else if(type==='blocker'){e='ground';lo=25;hi=76}
     // v3.91 visual floor tessellation: 4px microtiles while collision stays 16px.
     for(let sy=0;sy<TILE;sy+=micro)for(let sx=0;sx<TILE;sx+=micro){const h=hash32(seed,sx+sy*17,3909),idx=lo+(h%Math.max(1,hi-lo));this.px(ctx,x+sx,y+sy,micro,micro,this.col(e,idx));
@@ -397,7 +399,7 @@ class StaticPainter{
     // Full reference and bounded patches share one composition path. Fractional
     // rasters preserve its global origin; integer scales can use local scratch.
     const r=region||{x:0,y:0,width:renderW,height:renderH,tx0:0,ty0:0,tx1:GRID_W,ty1:GRID_H},phase=region?'static.patch':'static.full';
-    let c=null,normalCanvas=null,specCanvas=null,ctx,bctx,sctx;this.lastMaterialMaps=null;this.microtile=room.floorMicrotile||FLOOR_TILE;
+    let c=null,normalCanvas=null,specCanvas=null,ctx,bctx,sctx;this.lastMaterialMaps=null;this.microtile=Room.normalizeFloorMicrotile(room.floorMicrotile);
     try{
       perfMeasure(phase+'.scratch',()=>{
         c=new OffscreenCanvas(r.width,r.height);ctx=c.getContext('2d',{alpha:false});
@@ -1007,7 +1009,7 @@ class Game{
     $('#gearButton').onclick=()=>toggleMixer();$('#fxButton').onclick=()=>toggleGraphics();$('#levelButton').onclick=()=>toggleLevelMenu();
     document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$('#'+b.dataset.close).classList.add('hidden'));$('#storyModal').addEventListener('pointerdown',()=>this.dismissStory())
   }
-  keyDown(e){const k=e.key.toLowerCase();if(e.repeat&&[' ','f','u','g','l','h','p'].includes(k)){if(k===' ')e.preventDefault();return}if(k==='f11'){e.preventDefault();document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();return}if(k==='u'){toggleMixer();return}if(k==='g'){toggleGraphics();return}if(k==='l'){toggleLevelMenu();return}
+  keyDown(e){const k=e.key.toLowerCase();if(e.repeat&&[' ','f','u','g','l','h','p','f8'].includes(k)){if(k===' '||k==='f8')e.preventDefault();return}if(k==='f11'){e.preventDefault();document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();return}if(k==='u'){toggleMixer();return}if(k==='g'){toggleGraphics();return}if(k==='l'){toggleLevelMenu();return}
     if(this.levelMenuOpen()){if(k==='escape'){toggleLevelMenu();return}const buttons=[...document.querySelectorAll('#levelList .levelEntry:not(:disabled)')];if(['arrowleft','arrowup','arrowright','arrowdown'].includes(k)&&buttons.length){e.preventDefault();let i=Math.max(0,buttons.indexOf(document.activeElement));i=(i+(k==='arrowleft'||k==='arrowup'?-1:1)+buttons.length)%buttons.length;buttons[i].focus();return}if(k==='enter'&&buttons.length){(buttons.includes(document.activeElement)?document.activeElement:buttons[0]).click();return}return}
     /* v3.999 diagnostic basename compatibility marker: relay-moth-runtime-diagnostics-3999.json */
     if(k==='f2'){e.preventDefault();toggleWysiwygEditor();return}if(k==='f3'){e.preventDefault();toggleColourLab();return}if(k==='f4'){e.preventDefault();toggleAdvanced();return}if(k==='f8'){e.preventDefault();exportRaster();return}if(k==='f10'){e.preventDefault();download('relay-moth-runtime-diagnostics-415.json',JSON.stringify(this.diagnostics(),null,2)+'\n');this.toast('Runtime diagnostics saved.',1.4);return}if(k==='f5'){e.preventDefault();reloadLuts();return}if(k==='f6'){e.preventDefault();this.luts.download();return}if(e.ctrlKey&&k==='z'){if(this.luts.undoOne()){refreshEditors();this.bgKey='';this.ensureBackground(true);this.toast('hidden undo',1)}return}
@@ -1149,7 +1151,57 @@ function setAdvancedCell(i){$('#advancedIndex').value=i;const theme=$('#advanced
 
 async function reloadLuts(){try{const d=await loadJSON('relay_moth_pixel_luts.json?'+Date.now());game.luts=new LUTManager(d);game.painter.luts=game.luts;game.bgKey='';game.ensureBackground(true);refreshEditors();game.toast('LUT file reloaded',1.5)}catch(e){game.toast('LUT reload rejected: '+e.message,3)}}
 function refreshEditors(){buildMixer();refreshColourLab();refreshAdvanced()}
-function exportRaster(){if(!game)return;const c=game.painter.build(game.room,game.state,W,H);c.convertToBlob({type:'image/png'}).then(b=>{downloadBlob(`${game.room.key}-pretty39952-static.png`,b);releaseCanvasBacking(c)}).catch(e=>{releaseCanvasBacking(c);game.toast('Raster export failed: '+e.message,3)});const semantic={schema:'relay-moth-raster/v3.9952',resolution:[W,H],room:game.room.key,completed:game.room.spec.objects.filter(o=>game.state.isDone(o.object_id)).map(o=>o.object_id),channels:Object.fromEntries(game.luts.channels().map(c=>[c,game.luts.themeForChannel(c)])),live_layer:['spark_cursor','relay_moths','followers','foreground_scenery','uncompleted_objectives','completion_particles','UI/dialogue']};download(`${game.room.key}-pretty39952-static.json`,JSON.stringify(semantic,null,2)+'\n')}
+function buildRasterSnapshot(source){
+  const {room,state,luts,art}=source,painter=new StaticPainter(art,luts);let canvas=null;
+  try{
+    canvas=painter.build(room,state,W,H);
+    // PERF-002 moved persistent presentation out of the runtime static cache.
+    // Reuse its placement/state/suppression authority in the exported background,
+    // without touching the runtime painter, GL queues or texture/cache ownership.
+    const ctx=canvas.getContext('2d'),presentation=Object.create(source),glows=[];
+    presentation.painter=painter;
+    presentation.mutableSprite=(name,x,y,opts={})=>{
+      if(!name||!art.regions[name])return[0,0];
+      // Runtime mutable quads convert anchors before rotating about their
+      // center. Canvas sprites otherwise rotate about the supplied anchor.
+      const [,h]=art.worldSize(name,painter.spriteScale(name,opts.scale??1)),anchor=opts.anchor||'bottom',cy=anchor==='bottom'?y-h/2:anchor==='top'?y+h/2:y;
+      return painter.sprite(ctx,name,x,cy,{...opts,anchor:'center'});
+    };
+    presentation.mutableGlow=(...args)=>glows.push(args);
+    presentation.renderMutablePresentation();
+    // The live renderer batches mutable HD sprites before their glow pass.
+    for(const args of glows)painter.glow(ctx,...args);
+    const semantic={
+      schema:'relay-moth-raster/v3.9952',resolution:[W,H],room:room.key,
+      completed:room.spec.objects.filter(o=>state.isDone(o.object_id)).map(o=>o.object_id),
+      recruited_robots:(room.decorRobots||[]).filter(r=>r.id&&state.hasRobot(r.id)).map(r=>r.id),
+      channels:Object.fromEntries(luts.channels().map(c=>[c,luts.themeForChannel(c)])),
+      exported_layers:['static_room','generated_decor','editor_decor','unrecruited_robots','completed_objectives','gate_state','bridge_and_pattern_state'],
+      live_layer:['water_effects','fine_grass','foliage','spark_cursor','relay_moths','followers','ambient_actors','foreground_scenery','uncompleted_objectives','completion_particles','UI/dialogue','lighting_and_postprocessing']
+    };
+    return {canvas,semantic,basename:`${room.key}-pretty39952-static`};
+  }catch(e){releaseCanvasBacking(canvas);throw e}
+  finally{
+    // Only the colour canvas is needed while the PNG encoder is pending.
+    releaseCanvasBacking(painter.lastMaterialMaps?.normal);releaseCanvasBacking(painter.lastMaterialMaps?.spec);
+    releaseCanvasBacking(painter.materialNormalCtx?.canvas);releaseCanvasBacking(painter.materialSpecCtx?.canvas);
+    painter.materialNormalCtx=null;painter.materialSpecCtx=null;painter.lastMaterialMaps=null;
+  }
+}
+let rasterExportInFlight=false;
+async function exportRaster(){
+  if(!game)return false;const source=game;
+  if(rasterExportInFlight){source.toast('A raster export is already in progress.',1.5);return false}
+  rasterExportInFlight=true;let snapshot=null;
+  try{
+    if(globalThis.rmfEditor?.game===source)globalThis.rmfEditor.flushForPersistence();
+    snapshot=buildRasterSnapshot(source);
+    const sidecar=JSON.stringify(snapshot.semantic,null,2)+'\n',blob=await snapshot.canvas.convertToBlob({type:'image/png'});
+    downloadBlob(snapshot.basename+'.png',blob);download(snapshot.basename+'.json',sidecar);
+    source.toast('Raster background exported.',1.5);return true;
+  }catch(e){source.toast('Raster export failed: '+e.message,3);return false}
+  finally{releaseCanvasBacking(snapshot?.canvas);rasterExportInFlight=false}
+}
 
 function buildLevelMenu(){if(!game)return;const box=$('#levelList');box.innerHTML='';game.storyData.rooms.forEach((r,i)=>{const b=document.createElement('button'),done=game.state.roomComplete(r),unlocked=game.roomUnlocked(i),moths=(game.maps.rooms[r.key].moth_pickups||[]).filter(m=>game.state.hasMoth(m.id)).length,total=(game.maps.rooms[r.key].moth_pickups||[]).length;b.className=unlocked?'levelEntry':'levelEntry locked';b.disabled=!unlocked;b.innerHTML=`<b>${i+1}. ${r.title}</b><span>${done?'OBJECTIVES ✓':'OBJECTIVES ···'} · MOTHS ${moths}/${total}</span>`;b.onclick=()=>game.gotoRoom(i);box.append(b)});$('#saveSummary').textContent=`OBJECTIVES ${game.state.completed.size} · RELAY MOTHS ${game.flock.m.length}/${game.totalMoths}`}
 

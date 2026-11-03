@@ -174,6 +174,7 @@ WATER_FAULT_CASE=r'''()=>{
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--out',type=Path);ap.add_argument('--chromium');args=ap.parse_args()
     from playwright.sync_api import sync_playwright
+    from raster_export_browser_415 import run_raster_export_checks
     if args.out:args.out.mkdir(parents=True,exist_ok=True)
     html=re.sub(r'<script\b[^>]*>.*?</script>','',(ROOT/'index.html').read_text(),flags=re.S)
     html=re.sub(r'<link[^>]*rel="stylesheet"[^>]*>','',html)
@@ -333,8 +334,20 @@ def main():
                 except Exception:
                     pass  # Preserve the original native assertion/driver error.
             raise
+        print('NATIVE WEBGL raster export snapshots, cache pressure and immediate terrain parity',flush=True)
+        try:
+            page.evaluate('()=>{delete window.__staticRasterDiagnostics}')
+            result['raster_export_415']=run_raster_export_checks(page)
+        except Exception:
+            if args.out:
+                try:
+                    diagnostic=page.evaluate('window.__staticRasterDiagnostics||null')
+                    if diagnostic:(args.out/'static_raster_failure.json').write_text(json.dumps(diagnostic,indent=2))
+                except Exception:
+                    pass  # Preserve the original export/integration assertion or driver error.
+            raise
         result['runtime_errors']=logs;assert not logs,logs
         if args.out:(args.out/'browser_results.json').write_text(json.dumps(result,indent=2))
-        print('NATIVE BROWSER WEBGL2 PASS: nine rooms, material/quality toggles, same-count invalidation, v4.15 right-click/inspector/cycle/recovery/dirty interactions, ghost geometry, UI input and q1-q4 bounded-water GPU/collision/history/fallback parity; '+result['driver']['renderer'],flush=True)
+        print('NATIVE BROWSER WEBGL2 PASS: nine rooms, material/quality toggles, same-count invalidation, v4.15 right-click/inspector/cycle/recovery/dirty interactions, ghost geometry, UI input, q1-q4 bounded-water GPU/collision/history/fallback parity, bounded static textures and raster export/cache-pressure terrain parity; '+result['driver']['renderer'],flush=True)
         browser.close()
 if __name__=='__main__':main()

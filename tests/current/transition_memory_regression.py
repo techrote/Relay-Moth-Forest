@@ -10,7 +10,9 @@ assert 'finally{releaseCanvasBacking(staticCanvas);releaseCanvasBacking(material
 assert 'retainedStaticCanvas:!!this.currentStatic' in js
 assert 'relayMothContextRecovery39951' in js
 assert 'automatic reload suppressed after repeated loss' in js
-assert "game.painter.build(game.room,game.state,W,H)" in js
+# Raster export now owns an isolated logical-size painter. The executable
+# raster_export_regression_415.js checks dimensions and all success/failure
+# release paths rather than requiring the former runtime-painter call text.
 assert 'this.trimTintCache(96)' in js
 surface=(ROOT/'surfacefx.js').read_text(encoding='utf-8')
 # PERF-003 retains the active logical mask canvas for bounded redraws; ownership is in Game.
