@@ -39,9 +39,53 @@ mode applies its clip before scaling. It does not repaint all floor cells or
 replace a complete GPU texture. Each surface is released immediately after its
 region is uploaded; no room-sized CPU backing or multiroom canvas cache remains.
 
-The original full renderer, floor rectangles/circles, gradients, sprite helpers,
-material math and drawing order remain intact. There is no replacement floor
-rasterizer, native-resolution change, coordinate quantization or pixel tolerance.
+The original floor rectangles/circles, gradients, sprite helpers, material math
+and drawing order remain intact. There is no replacement floor rasterizer,
+native-resolution change or coordinate quantization. Full and partial color
+builds share the explicit row-synchronization policy below. Their complete GPU
+textures must match exactly; original default-backend compatibility is measured
+separately because synchronization can change an RGB rounding step.
+
+## Explicit color row synchronization
+
+`canvas2d-row-sync-v1` requests `{alpha:false, willReadFrequently:false}` on the
+first static color context and discards one `getImageData(0,0,1,1)` result after
+each actually painted floor row. All floor commands retain their previous
+coordinates, values and order. Material and atlas-source contexts retain their
+existing policies. The common full/patch builder applies the same policy during
+repair. Its identifier is captured separately from source-resource identity;
+changing it forces a full rebuild without evicting unchanged art.
+
+This completes pending color work at row boundaries. Diagnostic 22 reproduced
+exact full-frame patch reconstruction for both the disjoint edit and independent
+export-to-path edit. The old default renderer changed distant unchanged floor
+pixels; the synchronized controls did not. The two renderers differed in a few
+one-step RGB values. **This is an explicit pixel-baseline change, not a claim
+of exact compatibility with the old default GPU batching.**
+
+| Comparison | Requirement |
+| --- | --- |
+| Bounded update versus synchronized clean full build, every map and exterior | Exact equality; one corrupted bit fails |
+| New full builder versus the unchanged frozen drawing program under independently applied row synchronization | Exact equality for all three maps, warm and independent cold sources |
+| New full builder versus the original default-context frozen renderer | Report all differences; at most one RGB quantization step, with exact alpha, normal and specular bytes |
+
+The latter comparisons cover all nine rooms at 640×360, 997×563 and 1280×720.
+A failed compatibility bound remains fatal when collected to finish the matrix.
+Existing GLES/material tests and all partial/full checks keep their previous
+tolerances; the one-step allowance applies only to the explicitly declared
+old-default-versus-new-policy comparison.
+
+The flag is not a portable GPU guarantee. Chromium's
+[readback implementation](https://chromium.googlesource.com/chromium/src/+/524531ca671a63eb3b9db3faea2b6fc06b69f092/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc)
+distinguishes explicit false from an omitted flag in its repeated-readback
+fallback heuristic. Native evidence records creation options and accepted
+attributes. This explains the setting, not the exact driver mechanism.
+
+One returned pixel does not make synchronization free: it can wait for all
+pending clipped floor work. Counts, successful pixels, failed attempts and time
+are reported. No returned pixel enters rendering, no full image is read back,
+and no synchronization bitmap is retained. The unchanged benchmark must measure
+this cost; diagnostic wall times are not performance qualification.
 
 ### Resource policy and the revised capacity ceiling
 
@@ -200,7 +244,8 @@ subupload crops directly from the actual canvas. With vertical flipping enabled,
 skip rows count from its bottom. Skips derive from canvas geometry, not the
 smaller redraw clip, following the
 [WebGL2 DOM-source pixel-store contract](https://registry.khronos.org/webgl/specs/latest/2.0/#PIXEL_STORE_PARAM_UPLOAD_DOM).
-There is no application crop canvas or readback and no zero-copy claim.
+There is no application crop canvas or crop readback, and no zero-copy claim.
+The separate one-pixel floor-row synchronization reads are accounted above.
 
 Flip and both skip settings are restored on success and failure. Snapshot and
 rendered revision advance only after all regions commit coherently. A partial
@@ -213,8 +258,9 @@ derived tint/normal canvases.
 
 F10 exposes `renderer.staticRefresh`: mode/reason, changed cells, charged floor
 inputs, output/redraw area, actual upload calls/bytes, canvas mode/geometry,
-actual peak capacity, allocation attempts/successes/cumulative capacity and
-retained scratch. Noops report zero work. Constructor attempts that throw are
+actual peak capacity, allocation attempts/successes/cumulative capacity, color
+policy, synchronization attempts/reads/pixels/time and retained scratch. Noops
+report zero work. Constructor attempts that throw are
 distinct from successful allocations; failed uploads and repair remain visible.
 
 `scratchPixels` is the largest allocated canvas area; `scratchBytes` is peak
@@ -223,11 +269,17 @@ simultaneous nominal capacity. Full builds retain three-map accounting.
 all three full maps, and its byte count is four times that sum. `rasterPixels`
 charges guarded redraw areas independently of allocation capacity.
 
-The opt-in probe separates planning, allocation, floor, overlays/materials,
+`colorSyncAttempts` includes failed reads; `colorSyncReads`, `colorSyncPixels`
+and `readbackPixels` count successful one-pixel color reads. `colorSyncMs`
+includes time in failed reads. Failed patch and full-repair work both accumulate.
+
+The opt-in probe separates planning, allocation, floor, color synchronization, overlays/materials,
 footer and uploads. To summarize the complete static event, sum nonoverlapping
 parent phases: full `static.build` plus three uploads; or `static.plan`,
 `static.patch.build` and color subupload. Do not double-count scratch/floor/overlay
-children already included in the build parent.
+children already included in the build parent. `static.full.color-sync` and
+`static.patch.color-sync` are nested within floor/build; their time includes
+deferred raster execution and is not an additive cost on top of those parents.
 
 The original visible-water move and path-paint actions keep their coordinates,
 viewport and responsive native resolution. They must avoid a full build and
@@ -365,6 +417,36 @@ SHA-256 `a9d7fee5dcc3279727be8d7eeef0321cd44d8b1ab7b2c0ca1512097c280e734d`.
 No production context setting, original coordinates, exact-zero tolerance or
 performance gate changed in these diagnostics. Native correctness and the
 same-host performance comparison remain outstanding.
+
+### GPU synchronization controls and the selected candidate
+
+[Diagnostic 22](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41585433900)
+tested explicit false, alpha, desynchronized, row-read and four-cell-read color
+controls. Explicit false and desynchronized matched default pixels but retained
+the error. Alpha changed 989 pixels with maximum difference 21 and retained it.
+Both synchronization controls reconstructed the complete new frame exactly:
+
+| Control / fixture | Old-to-new exterior differences | Patch reconstruction differences | Default versus synchronized old / new |
+| --- | ---: | ---: | --- |
+| Row / disjoint terrain | 0 | 0 | 2 bytes / 3 bytes, maximum 1 |
+| Four-cell / disjoint terrain | 0 | 0 | 5 bytes / 2 bytes, maximum 1 |
+| Row / export-to-path | 0 | 0 | 3 bytes / 0 bytes, maximum 1 |
+| Four-cell / export-to-path | 0 | 0 | 6 bytes / 3 bytes, maximum 1 |
+
+The independent export fixture ran in
+[41585631400](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41585631400).
+Sources remained stable and default-after-controls rendering was exact. The
+observed browser version was `156.0.8078.0`, distinct from the installed
+Playwright binary in dependency logs; the driver was ANGLE/Mesa llvmpipe.
+These results support qualifying the row policy, with its smaller read count;
+they do not replace the full matrix or original performance benchmark.
+
+The matrix collects exact pixel failures, repairs each failed baseline separately
+and continues, then fails if any mismatch was recorded. Structural/work/GL/source
+failures and failed repairs still stop immediately. Negative controls run outside
+collection. Repairs never count as successful bounded work. Artifacts retain
+measured failures, separate repairs and the completed/partial matrix. Seventeen
+focused control-flow cases and negative mutation controls verify this reporting.
 
 ## Stable transformed-normal sources
 

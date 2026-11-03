@@ -84,6 +84,7 @@
       if(geometry.columns*geometry.rows>MAX_CELLS||geometry.columns*geometry.tileSize!==geometry.logicalWidth||geometry.rows*geometry.tileSize>geometry.logicalHeight||!Number.isSafeInteger(geometry.renderWidth*geometry.renderHeight))fail('invalid-dimensions');
       if(typeof room.key!=='string'||typeof room.spec.key!=='string'||!Number.isSafeInteger(room.index))fail('invalid-room');
       if(typeof context.lutSignature!=='string'||(context.resourceSignature!==undefined&&typeof context.resourceSignature!=='string'))fail('invalid-resource-signature');
+      if(typeof context.colorPolicy!=='string'||!/^[a-z][a-z0-9-]{0,63}$/.test(context.colorPolicy))fail('invalid-color-policy');
       for(const key of ['sourceRef','rendererRef','artRef'])if(!own(context,key)||context[key]==null)fail('missing-'+key);
       const references=freezeArray(REFERENCE_KEYS.map(name=>context[name]??null));
       const walls=cellSet(room.walls,'walls',geometry),border=cellSet(room.border,'border',geometry);
@@ -118,7 +119,7 @@
         // water backing at every progression stage, so progression is excluded.
         cellTypes.push(room.border.has(key)||room.walls.has(key)?CELL_TYPES.blocker:room.water.has(key)?CELL_TYPES.water:room.paths.has(key)?CELL_TYPES.path:CELL_TYPES.ground);
       }
-      const snapshot=Object.freeze({version:VERSION,valid:true,geometry:Object.freeze(geometry),references,dependencies,cellTypes:freezeArray(cellTypes),microtile,lutSignature:context.lutSignature,resourceSignature:context.resourceSignature??''});
+      const snapshot=Object.freeze({version:VERSION,valid:true,geometry:Object.freeze(geometry),references,dependencies,cellTypes:freezeArray(cellTypes),microtile,colorPolicy:context.colorPolicy,lutSignature:context.lutSignature,resourceSignature:context.resourceSignature??''});
       snapshots.add(snapshot);
       return snapshot;
     }catch(error){return invalid(error instanceof Error?error.message:'invalid-authority')}
@@ -173,6 +174,7 @@
     if(!budget)return full('invalid-options');
     for(const key of GEOMETRY_KEYS)if(previous.geometry[key]!==next.geometry[key])return full('dimensions');
     for(let i=0;i<REFERENCE_KEYS.length;i++)if(previous.references[i]!==next.references[i])return full('identity:'+REFERENCE_KEYS[i]);
+    if(previous.colorPolicy!==next.colorPolicy)return full('color-policy');
     if(previous.lutSignature!==next.lutSignature)return full('lut');
     if(previous.resourceSignature!==next.resourceSignature)return full('resource');
     for(let i=0;i<next.dependencies.length;i++)if(previous.dependencies[i][1]!==next.dependencies[i][1])return full('dependency:'+next.dependencies[i][0]);

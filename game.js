@@ -297,7 +297,9 @@ class HDArtSheet{
 }
 
 class StaticPainter{
+  static COLOR_POLICY='canvas2d-row-sync-v1';
   constructor(art,luts){this.art=art;this.luts=luts;this.materialNormalCtx=null;this.materialSpecCtx=null;this.lastMaterialMaps=null}
+  get colorPolicy(){return StaticPainter.COLOR_POLICY}
   col(e,i){return this.luts.hex(e,i)}
   px(ctx,x,y,w,h,c,a=1){ctx.save();ctx.globalAlpha=a;ctx.fillStyle=c;ctx.fillRect(Math.floor(x),Math.floor(y),Math.ceil(w),Math.ceil(h));ctx.restore()}
   dot(ctx,x,y,c,s=2,a=1){ctx.save();ctx.globalAlpha=a;ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,s/2,0,TAU);ctx.fill();ctx.restore()}
@@ -436,11 +438,12 @@ class StaticPainter{
     const r=region||{x:0,y:0,width:renderW,height:renderH,tx0:0,ty0:0,tx1:GRID_W,ty1:GRID_H},phase=region?'static.patch':'static.full';
     const canvasX=region?(r.canvasX??r.x):0,canvasY=region?(r.canvasY??r.y):0,canvasWidth=r.canvasWidth??r.width,canvasHeight=r.canvasHeight??r.height;
     const allocation=this.lastScratchAllocation={attempts:0,count:0,pixels:0,maxMapPixels:0,peakBytes:0};
+    const sync=this.lastColorSync={attempts:0,reads:0,pixels:0,ms:0};
     const allocate=()=>{allocation.attempts++;const canvas=new OffscreenCanvas(canvasWidth,canvasHeight),pixels=canvasWidth*canvasHeight;allocation.count++;allocation.pixels+=pixels;allocation.maxMapPixels=Math.max(allocation.maxMapPixels,pixels);allocation.peakBytes=allocation.pixels*4;return canvas};
     let c=null,normalCanvas=null,specCanvas=null,ctx,bctx,sctx;this.lastMaterialMaps=null;this.microtile=room.floorMicrotile||FLOOR_TILE;
     try{
       perfMeasure(phase+'.scratch',()=>{
-        c=allocate();ctx=c.getContext('2d',{alpha:false});
+        c=allocate();ctx=c.getContext('2d',{alpha:false,willReadFrequently:false});
         // Terrain-only deltas cannot change material pixels: baseTile, sky and
         // footer paint color only, and the planner verifies every static sprite
         // dependency. Keep the already qualified normal/specular GPU textures.
@@ -461,7 +464,18 @@ class StaticPainter{
         const sky=ctx.createLinearGradient(0,0,0,PLAY_H);sky.addColorStop(0,this.col('sky',4));sky.addColorStop(.55,this.col('sky',19));sky.addColorStop(1,this.col('ground',30));ctx.fillStyle=sky;ctx.fillRect(0,0,W,PLAY_H);
         // Neighboring floor cells are replayed in their original row-major order;
         // microtile strokes can extend beyond the cell which owns them.
-        for(let ty=r.ty0;ty<r.ty1;ty++)for(let tx=r.tx0;tx<r.tx1;tx++){const k=`${tx},${ty}`,seed=hash32(tx,ty,room.index+311),bridgeCell=room.bridgeCells.has(k);if(room.border.has(k)||room.walls.has(k))this.baseTile(ctx,tx,ty,seed,'blocker');else if(room.water.has(k)&&(bridgeCell||!room.bridgeOpen(k)))this.baseTile(ctx,tx,ty,seed,'water');else if(room.paths.has(k)||(!bridgeCell&&room.bridgeOpen(k)))this.baseTile(ctx,tx,ty,seed,'path');else this.baseTile(ctx,tx,ty,seed,'ground')}
+        for(let ty=r.ty0;ty<r.ty1;ty++){
+          for(let tx=r.tx0;tx<r.tx1;tx++){const k=`${tx},${ty}`,seed=hash32(tx,ty,room.index+311),bridgeCell=room.bridgeCells.has(k);if(room.border.has(k)||room.walls.has(k))this.baseTile(ctx,tx,ty,seed,'blocker');else if(room.water.has(k)&&(bridgeCell||!room.bridgeOpen(k)))this.baseTile(ctx,tx,ty,seed,'water');else if(room.paths.has(k)||(!bridgeCell&&room.bridgeOpen(k)))this.baseTile(ctx,tx,ty,seed,'path');else this.baseTile(ctx,tx,ty,seed,'ground')}
+          // End each painted floor row before later commands can be batched with
+          // it. The one native pixel is discarded; this is synchronization, not
+          // a color source. Explicit false keeps the creation policy distinct
+          // from Chromium's omitted-hint repeated-readback heuristic.
+          if(r.tx0<r.tx1)perfMeasure(phase+'.color-sync',()=>{
+            sync.attempts++;const start=performance.now();
+            try{ctx.getImageData(0,0,1,1);sync.reads++;sync.pixels++}
+            finally{sync.ms+=performance.now()-start}
+          });
+        }
       });
       // Static overlays may reach across many cells. Replaying all of them into
       // the small clipped color surface preserves sorting and glows. Material
@@ -950,7 +964,7 @@ class Game{
   hdTint(name,elementOverride=null,index=170){const m=this.art.regionMeta(name),element=elementOverride||m.element;if(!element)return[1,1,1];return this.luts.rgb(element,index)}
   roomUnlocked(i){if(i<=0)return true;const spec=this.storyData.rooms[i];if(this.state.shown.has(spec.key))return true;return this.state.roomComplete(this.storyData.rooms[i-1])}
   updateUI(){const sp=this.room.spec;$('#roomTitle').textContent=`${sp.index+1}/9  ${sp.title}`;$('#roomSubtitle').textContent=sp.subtitle||'';$('#roomLead').textContent=(sp.intro||[])[0]||'';const pending=sp.objects.find(o=>!this.state.isDone(o.object_id));this.currentObjective=pending;this.renderObjectiveHud(pending);$('#mothHud').textContent=`✦ ${this.flock.m.length}/${this.totalMoths}`;this.uiDirty=false}
-  bgSignature(){return`${this.room.key}|${this.luts.signature()}|${this.renderer.nativeW}x${this.renderer.nativeH}`}
+  bgSignature(){return`${this.room.key}|${this.luts.signature()}|${this.renderer.nativeW}x${this.renderer.nativeH}|${this.painter.colorPolicy}`}
   releaseCurrentStatic(){if(this.currentStatic){releaseCanvasBacking(this.currentStatic);this.currentStatic=null}}
   syncEditorRenderStage(){this.room.bridgeProgress=this.room.key==='tin_stream'?this.room.spec.objects.filter(o=>this.state.isDone(o.object_id)).length:0;this.room.bridgeBuilt=this.room.key==='tin_stream'&&this.state.roomComplete(this.room.spec)}
   editorBackgroundKey(){return this.bgSignature()}
@@ -958,6 +972,7 @@ class Game{
     const imageKey=image=>image?[image.currentSrc||image.src||'',image.width,image.height]:null;
     return{renderWidth:this.renderer.nativeW,renderHeight:this.renderer.nativeH,logicalWidth:W,logicalHeight:H,tileSize:TILE,columns:GRID_W,rows:GRID_H,
       sourceRef:this.maps,rendererRef:this.renderer,artRef:this.art,atlasRef:this.art.img,normalRef:this.art.normalImg,specularRef:this.art.specImg,
+      colorPolicy:this.painter.colorPolicy,
       // Theme names alone do not change when a color is edited in place.
       lutSignature:JSON.stringify([this.luts.signature(),this.luts.data,Array.from(this.luts.elementChannel||[])]),
       resourceSignature:JSON.stringify([this.art.regions,this.art.meta,this.art.roles,this.art.worldScale,imageKey(this.art.img),imageKey(this.art.normalImg),imageKey(this.art.specImg)])};
@@ -981,14 +996,17 @@ class Game{
     if(previous?.valid&&snapshot?.valid&&previous.references[2]===this.art&&(previous.resourceSignature!==snapshot.resourceSignature||previous.references.slice(3).some((ref,i)=>ref!==snapshot.references[i+3]))){
       for(const cache of [this.art.tintCache,this.art.normalTransformCache]){if(cache){for(const canvas of cache.values())releaseCanvasBacking(canvas);cache.clear()}}
     }
-    const stats={mode:plan.kind,reason:plan.reason,changedCells:plan.changedCellCount||0,rasterCells:0,rasterPixels:0,pixels:0,uploadCalls:0,uploadBytes:0,scratchMode:plan.kind==='patch'?plan.scratchMode:plan.kind==='noop'?'none':'full',scratchPixels:0,scratchBytes:0,scratchAllocationAttempts:0,scratchAllocations:0,scratchAllocationPixels:0,scratchAllocationBytes:0,readbackPixels:0,regions:[],retainedScratchPixels:0};
+    const stats={mode:plan.kind,reason:plan.reason,colorPolicy:this.painter.colorPolicy,changedCells:plan.changedCellCount||0,rasterCells:0,rasterPixels:0,pixels:0,uploadCalls:0,uploadBytes:0,scratchMode:plan.kind==='patch'?plan.scratchMode:plan.kind==='noop'?'none':'full',scratchPixels:0,scratchBytes:0,scratchAllocationAttempts:0,scratchAllocations:0,scratchAllocationPixels:0,scratchAllocationBytes:0,colorSyncAttempts:0,colorSyncReads:0,colorSyncPixels:0,colorSyncMs:0,readbackPixels:0,regions:[],retainedScratchPixels:0};
     this.staticRefreshStats=stats;
     const paint=build=>{
       this.painter.lastScratchAllocation=null;
+      this.painter.lastColorSync=null;
       try{return build()}
       finally{
         const a=this.painter.lastScratchAllocation;
         if(a){stats.scratchAllocationAttempts+=a.attempts;stats.scratchAllocations+=a.count;stats.scratchAllocationPixels+=a.pixels;stats.scratchAllocationBytes+=a.pixels*4;stats.scratchPixels=Math.max(stats.scratchPixels,a.maxMapPixels);stats.scratchBytes=Math.max(stats.scratchBytes,a.peakBytes)}
+        const s=this.painter.lastColorSync;
+        if(s){stats.colorSyncAttempts+=s.attempts;stats.colorSyncReads+=s.reads;stats.colorSyncPixels+=s.pixels;stats.colorSyncMs+=s.ms;stats.readbackPixels+=s.pixels}
       }
     };
     const full=()=>{

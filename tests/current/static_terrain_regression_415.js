@@ -18,7 +18,7 @@ const core=vm.runInNewContext(`
   ({Room,StaticPainter,hash32});
 `);
 const shared={sourceRef:{},rendererRef:{},artRef:{},atlasRef:{},normalRef:{},specularRef:{}};
-const context=(extra={})=>({...shared,renderWidth:640,renderHeight:360,lutSignature:'ground:a|water:b',resourceSignature:'atlas-v1',...extra});
+const context=(extra={})=>({...shared,renderWidth:640,renderHeight:360,lutSignature:'ground:a|water:b',resourceSignature:'atlas-v1',colorPolicy:'canvas2d-row-sync-v1',...extra});
 function fixture(){return{key:'fixture',index:2,spec:{key:'fixture',pattern:'lane',objects:[{kind:'lamp',object_id:'a'}]},walls:new Set(),border:new Set(),water:new Set(),paths:new Set(),blockerStyles:{},largeTrees:[],decorLamps:[],decorExclusions:new Set(),patternExclusions:new Set(),bridgeCells:new Set(),bridgePhases:[],bridgeSegments:[],bridgeIsland:[],floorMicrotile:4}}
 function clone(room){const copy={};for(const [key,value] of Object.entries(room))copy[key]=value instanceof Set?new Set(value):JSON.parse(JSON.stringify(value));return copy}
 function capture(room,c=context()){const value=S.capture(room,c);assert(value.valid,value.reason);return value}
@@ -74,6 +74,45 @@ function dependencyFallbacks(){
     const a=capture(direction===1?vegetation:four),b=capture(direction===1?four:vegetation);
     assert.strictEqual(S.plan(a,b).reason,'dependency:walls','3↔4 shared-column interstitial threshold must fully rebuild');authorityCases++;
   }
+}
+
+function colorPolicyAuthority(){
+  const room=fixture(),metadata=context(),before=capture(room,metadata);
+  assert.strictEqual(core.StaticPainter.COLOR_POLICY,'canvas2d-row-sync-v1','planner fixture identifies the production color raster policy');
+  assert.strictEqual(before.colorPolicy,metadata.colorPolicy);
+  assert(Object.isFrozen(before));assert.throws(()=>{before.colorPolicy='canvas2d-row-sync-v2'},TypeError);
+  const missing=context();delete missing.colorPolicy;
+  for(const bad of [missing,...[undefined,null,false,0,{},[],new String('canvas2d-row-sync-v1'),'','Canvas2d-row-sync-v1','1canvas','-canvas','canvas_policy','canvas policy','canvas\n','canvas\t','canvas/row','café','a'.repeat(65)].map(colorPolicy=>context({colorPolicy}))]){
+    const next=S.capture(room,bad);
+    assert.strictEqual(next.valid,false,'missing, non-string or malformed policy must fail capture');
+    assert.strictEqual(next.reason,'invalid-color-policy');
+    const delta=S.plan(before,next);assert.strictEqual(delta.kind,'full');assert.strictEqual(delta.reason,'invalid-next:invalid-color-policy');
+    authorityCases++;
+  }
+  for(const colorPolicy of ['a','canvas2d-row-sync-v1','a'.repeat(64)]){
+    const accepted=capture(room,context({colorPolicy}));assert.strictEqual(accepted.colorPolicy,colorPolicy);authorityCases++;
+  }
+  for(const floorChanged of [false,true]){
+    const nextRoom=clone(room);if(floorChanged)nextRoom.water.add('10,8');
+    const next=capture(nextRoom,context({colorPolicy:'canvas2d-row-sync-v2'}));
+    assert.strictEqual(next.resourceSignature,before.resourceSignature,'destination policy must not invalidate source art caches through the resource signature');
+    assert.strictEqual(next.lutSignature,before.lutSignature);
+    assert.deepStrictEqual(next.dependencies,before.dependencies,'policy remains separate from room and material dependencies');
+    next.references.forEach((reference,index)=>assert.strictEqual(reference,before.references[index],'policy change must retain every source/renderer identity'));
+    const delta=S.plan(before,next);
+    assert.strictEqual(delta.kind,'full');assert.strictEqual(delta.reason,'color-policy','policy invalidation precedes both unchanged-floor noops and eligible terrain patches');
+    assert.strictEqual(delta.regions.length,0);assert.strictEqual(delta.uploadCalls,3);assert.strictEqual(delta.uploadBytes,640*360*12);
+    assert.strictEqual(S.plan(before,capture(nextRoom,metadata)).kind,floorChanged?'patch':'noop','a rejected policy transition must not mutate the previous authority');
+    authorityCases++;
+  }
+  const changedResources=capture(room,context({colorPolicy:'canvas2d-row-sync-v2',lutSignature:'changed-lut',resourceSignature:'changed-art'}));
+  assert.strictEqual(S.plan(before,changedResources).reason,'color-policy','explicit policy difference takes precedence over LUT/resource differences');
+  metadata.colorPolicy='canvas2d-row-sync-v2';
+  assert.strictEqual(before.colorPolicy,'canvas2d-row-sync-v1','snapshot owns its captured token independently of subsequent context mutation');
+  assert.strictEqual(before.resourceSignature,'atlas-v1');assert.deepStrictEqual(before.dependencies,capture(room).dependencies);
+  assert.strictEqual(S.plan(before,capture(room,metadata)).reason,'color-policy');
+  assert.strictEqual(S.plan(before,capture(room)).kind,'noop');
+  authorityCases+=2;
 }
 
 function budgetAndValidation(){
@@ -366,7 +405,7 @@ function overlayGeometryBudgets(){
   assert.strictEqual(plan(fixture(),change,{overlayBounds:Array(4097).fill(huge)},metadata).reason,'overlay-bounds-budget','bound data-only geometry traversal before any raster allocation');
 }
 
-authorityAndNoops();dependencyFallbacks();budgetAndValidation();productionRoomAuthority();geometryOracle();canvasCapacityBudgets();overlayGeometryBudgets();
+authorityAndNoops();dependencyFallbacks();colorPolicyAuthority();budgetAndValidation();productionRoomAuthority();geometryOracle();canvasCapacityBudgets();overlayGeometryBudgets();
 const browser={};vm.runInNewContext(fs.readFileSync(path.join(ROOT,'static_terrain.js'),'utf8'),browser);assert.strictEqual(typeof browser.RelayStaticTerrain.capture,'function');assert.strictEqual(browser.RelayStaticTerrain.VERSION,S.VERSION);
 console.log('STATIC TERRAIN PLANNER REGRESSION PERF-004 PASS');
 console.log('  authoritative classifications / invalidation checks:',authorityCases);
@@ -376,4 +415,5 @@ console.log('  exact same-count moves, undo/redo, live-state noops, all static d
 console.log('  1x / fractional / 2x / 4x floor envelopes, tight outputs, local guarded redraw, native target geometry and flipped source crops');
 console.log('  1MiB local / 4MiB native peak, 8MiB cumulative allocation, separate attempted/allocation counts, clipped edges and unchanged redraw budgets');
 console.log('  bounded color-only bytes/calls, unchanged material authority, complete three-map full-build accounting');
+console.log('  explicit bounded color-policy tokens, immutable capture and full invalidation independent of source caches/material dependencies');
 console.log('  complete overlay geometry, nonrecursive guards, recomputed floor inputs, immutable plans and unchanged work/capacity limits');

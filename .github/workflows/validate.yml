@@ -97,6 +97,7 @@ jobs:
           PY
 
       - name: Full deterministic, shader and pixel regression
+        id: regressions
         timeout-minutes: 5
         run: python self_test.py 2>&1 | tee "$VALIDATION_OUT/self-test.log"
 
@@ -105,7 +106,8 @@ jobs:
         run: python tests/current/browser_render_regression_414.py --out "$VALIDATION_OUT/browser" 2>&1 | tee "$VALIDATION_OUT/browser.log"
 
       - name: Check out accepted base for same-host performance comparison
-        if: github.event_name == 'pull_request'
+        id: performance_baseline
+        if: always() && !cancelled() && github.event_name == 'pull_request' && steps.regressions.outcome == 'success'
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
@@ -113,6 +115,7 @@ jobs:
           persist-credentials: false
 
       - name: Bounded state-change performance evidence
+        if: always() && !cancelled() && steps.regressions.outcome == 'success' && (github.event_name != 'pull_request' || steps.performance_baseline.outcome == 'success')
         timeout-minutes: 12
         env:
           BASELINE_ROOT: ${{ github.event_name == 'pull_request' && '.validation-baseline' || '' }}
