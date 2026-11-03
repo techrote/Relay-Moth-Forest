@@ -342,7 +342,31 @@ function canvasCapacityBudgets(){
   assert.strictEqual(noop.kind,'noop');assert.strictEqual(noop.scratchMode,'none');assert.strictEqual(noop.scratchAllocationAttempts,0);assert.strictEqual(noop.scratchAllocations,0);assert.strictEqual(noop.scratchAllocationPixels,0);assert.strictEqual(noop.scratchAllocationBytes,0,'unchanged authority needs no canvas despite a zero capacity budget');
 }
 
-authorityAndNoops();dependencyFallbacks();budgetAndValidation();productionRoomAuthority();geometryOracle();canvasCapacityBudgets();
+function overlayGeometryBudgets(){
+  const metadata=context({renderWidth:997,renderHeight:563}),change=room=>room.paths.add('11,6'),base=plan(fixture(),change,undefined,metadata);
+  const bounds={x0:130,y0:60,x1:240,y1:145},expanded=plan(fixture(),change,{overlayBounds:[bounds]},metadata),r=expanded.regions[0];
+  assert.strictEqual(expanded.kind,'patch');
+  assert.deepStrictEqual([r.x,r.y,r.width,r.height],[base.regions[0].x,base.regions[0].y,base.regions[0].width,base.regions[0].height],'whole-primitive guards never enlarge the uploaded output');
+  assert.deepStrictEqual([r.rasterX,r.rasterY,r.rasterWidth,r.rasterHeight],[192,80,192,160]);
+  assert.deepStrictEqual([r.tx0,r.ty0,r.tx1,r.ty1],[7,2,16,10],'expanded guard must recompute every required floor input');
+  assert.strictEqual(expanded.rasterPixels,30720);assert.strictEqual(expanded.rasterCellCount,72);
+  assert.strictEqual(expanded.scratchPixels,997*563,'geometry cannot relabel clipped work as native capacity');
+  assert.strictEqual(expanded.scratchAllocationBytes,base.scratchAllocationBytes);
+  const unrelated={x0:230,y0:90,x1:500,y1:130};
+  assert.deepStrictEqual(plan(fixture(),change,{overlayBounds:[unrelated]},metadata),base,'an unrelated large primitive does not enlarge the dirty guard');
+  assert.deepStrictEqual(plan(fixture(),change,{overlayBounds:[bounds,unrelated]},metadata),expanded,'do not recursively expand through primitives touching only the guard');
+  assert.deepStrictEqual(plan(fixture(),change,{overlayBounds:[{x0:176,y0:96,x1:176,y1:114}]},metadata),base,'zero-area primitives contribute no pixels');
+  bounds.x0=-100;assert.strictEqual(r.rasterX,192,'plans retain numeric geometry rather than mutable caller bounds');
+  const huge={x0:-100,y0:-100,x1:800,y1:500};
+  assert.strictEqual(plan(fixture(),change,{overlayBounds:[huge]},metadata).reason,'raster-pixel-budget','whole-primitive geometry must retain the existing redraw limit');
+  assert.strictEqual(plan(fixture(),change,{overlayBounds:[{x0:130,y0:60,x1:240,y1:145}],maxRasterRatio:71/760},metadata).reason,'raster-budget','expanded inputs must retain the existing floor-work gate');
+  for(const bad of [null,{},[null],[{x0:0,y0:0,x1:NaN,y1:1}],[{x0:2,y0:0,x1:1,y1:1}],[{x0:0,y0:0,x1:1.7e308,y1:1}]]){
+    assert.strictEqual(plan(fixture(),change,{overlayBounds:bad},metadata).reason,'invalid-overlay-bounds');
+  }
+  assert.strictEqual(plan(fixture(),change,{overlayBounds:Array(4097).fill(huge)},metadata).reason,'overlay-bounds-budget','bound data-only geometry traversal before any raster allocation');
+}
+
+authorityAndNoops();dependencyFallbacks();budgetAndValidation();productionRoomAuthority();geometryOracle();canvasCapacityBudgets();overlayGeometryBudgets();
 const browser={};vm.runInNewContext(fs.readFileSync(path.join(ROOT,'static_terrain.js'),'utf8'),browser);assert.strictEqual(typeof browser.RelayStaticTerrain.capture,'function');assert.strictEqual(browser.RelayStaticTerrain.VERSION,S.VERSION);
 console.log('STATIC TERRAIN PLANNER REGRESSION PERF-004 PASS');
 console.log('  authoritative classifications / invalidation checks:',authorityCases);
@@ -352,3 +376,4 @@ console.log('  exact same-count moves, undo/redo, live-state noops, all static d
 console.log('  1x / fractional / 2x / 4x floor envelopes, tight outputs, local guarded redraw, native target geometry and flipped source crops');
 console.log('  1MiB local / 4MiB native peak, 8MiB cumulative allocation, separate attempted/allocation counts, clipped edges and unchanged redraw budgets');
 console.log('  bounded color-only bytes/calls, unchanged material authority, complete three-map full-build accounting');
+console.log('  complete overlay geometry, nonrecursive guards, recomputed floor inputs, immutable plans and unchanged work/capacity limits');

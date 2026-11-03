@@ -603,7 +603,7 @@
 
   function instrument(action){
     const r=game.renderer,g=r.gl,painter=game.painter,canvasRefs=[];
-    const stats={fullBuilds:0,patchBuilds:0,patchMaterialMaps:0,normalTransformRequests:0,floorCalls:0,fullUploads:[],subUploads:[],readbacks:[],patchCanvases:[],patchContextAllocations:[],patchBaseTransforms:[],patchBaseTranslations:[],patchClips:[],peakLiveScratchPixels:0,actorInitializations:0};
+    const stats={fullBuilds:0,patchBuilds:0,patchMaterialMaps:0,normalTransformRequests:0,floorCalls:0,fullUploads:[],subUploads:[],readbacks:[],patchCanvases:[],patchContextAllocations:[],patchBaseTransforms:[],patchBaseTranslations:[],patchClips:[],patchDrawImages:[],peakLiveScratchPixels:0,actorInitializations:0};
     const patchContexts=new WeakSet(),patchColorContexts=new WeakSet(),contextAllocations=new WeakSet(),paths=new WeakMap(),observedScratch=[];let patchDepth=0;
     const materialHandles=[r.bgNormalTex,r.bgSpecTex],normalGeneration=game.art.normalTransformGeneration;
     const unpack=()=>({flipY:g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels:g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows:g.getParameter(g.UNPACK_SKIP_ROWS)});
@@ -611,7 +611,7 @@
     const original={build:painter.build,patch:painter.buildPatch,tile:painter.baseTile,image:g.texImage2D,sub:g.texSubImage2D,
       creature:game.creatures.init,mini:game.miniGuides.init,normal:game.art.transformedNormal,normalOwn:Object.prototype.hasOwnProperty.call(game.art,'transformedNormal')};
     const canvasPrototype=OffscreenCanvas.prototype,contextPrototype=Object.getPrototypeOf(new OffscreenCanvas(1,1).getContext('2d'));
-    Object.assign(original,{getContext:canvasPrototype.getContext,read:contextPrototype.getImageData,beginPath:contextPrototype.beginPath,rect:contextPrototype.rect,clip:contextPrototype.clip,translate:contextPrototype.translate});
+    Object.assign(original,{getContext:canvasPrototype.getContext,read:contextPrototype.getImageData,beginPath:contextPrototype.beginPath,rect:contextPrototype.rect,clip:contextPrototype.clip,translate:contextPrototype.translate,canvasImage:contextPrototype.drawImage});
     const matrix=ctx=>{const m=ctx.getTransform();return{a:m.a,b:m.b,c:m.c,d:m.d,e:m.e,f:m.f}};
     const patchColor=ctx=>patchDepth&&patchColorContexts.has(ctx);
     const actors={creatures:game.creatures.units,mini:game.miniGuides.units,creatureData:JSON.stringify(game.creatures.units),miniData:JSON.stringify(game.miniGuides.units)};
@@ -635,6 +635,15 @@
       return original.clip.apply(this,args);
     };
     contextPrototype.translate=function(...args){if(patchColor(this)&&!patchContexts.has(this))stats.patchBaseTranslations.push({patchIndex:stats.patchBuilds-1,args:args.slice()});return original.translate.apply(this,args)};
+    contextPrototype.drawImage=function(...args){
+      if(patchColor(this)){
+        check([3,5,9].includes(args.length),'unrecognized patch drawImage overload');
+        const [source]=args,m=matrix(this),destination=args.length===9?args.slice(5):args.length===5?args.slice(1):[args[1],args[2],source.width,source.height];
+        const [x,y,w,h]=destination,corners=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([px,py])=>[m.a*px+m.c*py+m.e,m.b*px+m.d*py+m.f]);
+        stats.patchDrawImages.push({patchIndex:stats.patchBuilds-1,argumentCount:args.length,sourceSize:[source.width,source.height],destination,matrix:m,corners,alpha:this.globalAlpha});
+      }
+      return original.canvasImage.apply(this,args);
+    };
     painter.build=function(...args){stats.fullBuilds++;return original.build.apply(this,args)};
     if(original.patch)painter.buildPatch=function(...args){
       stats.patchBuilds++;patchDepth++;
@@ -668,7 +677,7 @@
     try{action()}finally{
       painter.build=original.build;if(original.patch)painter.buildPatch=original.patch;painter.baseTile=original.tile;
       g.texImage2D=original.image;g.texSubImage2D=original.sub;canvasPrototype.getContext=original.getContext;contextPrototype.getImageData=original.read;
-      contextPrototype.beginPath=original.beginPath;contextPrototype.rect=original.rect;contextPrototype.clip=original.clip;contextPrototype.translate=original.translate;
+      contextPrototype.beginPath=original.beginPath;contextPrototype.rect=original.rect;contextPrototype.clip=original.clip;contextPrototype.translate=original.translate;contextPrototype.drawImage=original.canvasImage;
       game.creatures.init=original.creature;game.miniGuides.init=original.mini;
       if(original.normalOwn)game.art.transformedNormal=original.normal;else delete game.art.transformedNormal;
       stats.releasedPatchCanvases=[...canvasRefs,...observedScratch].every(c=>c.width===1&&c.height===1);
@@ -717,7 +726,7 @@
       check(work.diagnostics.scratchAllocations===allocations.length&&work.diagnostics.scratchAllocationAttempts===allocations.length&&work.diagnostics.scratchAllocationPixels===allocatedPixels&&work.diagnostics.scratchAllocationBytes===allocatedPixels*4,label+' scratch allocation counters differ from actual color canvases');
       check(work.materialHandlesUnchanged&&work.normalSourceGenerationUnchanged&&work.normalTransformRequests===0&&work.subUploads.every(u=>u.channel==='color'),label+' rerendered or replaced unchanged material resources');
       check(work.diagnostics.regions.length===work.patchBuilds&&work.patchBaseTransforms.length===work.patchBuilds,label+' missing patch region or base transform observations');
-      let observedRasterPixels=0;
+      let observedRasterPixels=0;const contributingImages=[];
       for(let index=0;index<work.diagnostics.regions.length;index++){
         const region=work.diagnostics.regions[index],canvas=allocations[index],returned=work.patchCanvases[index],base=work.patchBaseTransforms[index];
         const cx=fractional?0:region.rasterX,cy=fractional?0:region.rasterY,cw=fractional?r.nativeW:region.rasterWidth,ch=fractional?r.nativeH:region.rasterHeight;
@@ -734,7 +743,22 @@
           check(clips.length===0&&translations.length===((cx||cy)?1:0)&&translations.every(t=>t.args[0]===-cx&&t.args[1]===-cy),label+' local canvas transform/implicit clip changed');
           check(cw*ch<area,label+' local path allocated a native-size canvas');observedRasterPixels+=cw*ch;
         }
+        // Observe the actual Canvas2D calls, independently of the metadata
+        // recorder. Relevant textured quads must retain their complete native
+        // geometry, clipped only by the same viewport as the full renderer.
+        const images=work.patchDrawImages.filter(draw=>draw.patchIndex===index);check(images.length>0,label+' observed no patch color image draws');
+        for(const draw of images){
+          const corners=draw.corners.map(([x,y])=>[x+cx,y+cy]);
+          const bounds={x0:Math.max(0,Math.min(...corners.map(p=>p[0]))),y0:Math.max(0,Math.min(...corners.map(p=>p[1]))),
+            x1:Math.min(r.nativeW,Math.max(...corners.map(p=>p[0]))),y1:Math.min(r.nativeH,Math.max(...corners.map(p=>p[1])))};
+          check(corners.flat().every(Number.isFinite),label+' observed a nonfinite image transform');
+          if(draw.alpha<=0||bounds.x1<=bounds.x0||bounds.y1<=bounds.y0||bounds.x1<=region.x||bounds.x0>=region.x+region.width||bounds.y1<=region.y||bounds.y0>=region.y+region.height)continue;
+          check(region.rasterX<=bounds.x0&&region.rasterY<=bounds.y0&&region.rasterX+region.rasterWidth>=bounds.x1&&region.rasterY+region.rasterHeight>=bounds.y1,
+            label+' clipped a contributing image quad '+JSON.stringify({patchIndex:index,bounds,region,destination:draw.destination,matrix:draw.matrix}));
+          contributingImages.push({...draw,nativeCorners:corners,nativeViewportBounds:bounds,guardEnclosesQuad:true});
+        }
       }
+      work.drawImageCalls=work.patchDrawImages.length;work.patchDrawImages=contributingImages;
       for(const name of ['color']){const uploads=work.subUploads.filter(u=>u.channel===name),pixels=uploads.reduce((n,u)=>n+u.width*u.height,0);
         check(uploads.length>0&&pixels>0&&pixels<area,label+' '+name+' uploads are not bounded');
         check(uploads.every(u=>Number.isInteger(u.x)&&Number.isInteger(u.y)&&u.x>=0&&u.y>=0&&u.width>0&&u.height>0&&u.x+u.width<=r.nativeW&&u.y+u.height<=r.nativeH),label+' '+name+' invalid native upload rectangle');
@@ -841,7 +865,7 @@
 
   function eligibleCases(width,height,sourceMaps){
     const result={native:[width,height],initial:setup(width,height,sourceMaps),cases:[]},out=result.cases,e=rmfEditor;
-    // Keep every original edit at both native sizes. Local guarded redraws
+    // Keep every original edit at all tested native sizes. Local guarded redraws
     // fit the fixed20% raster/35% floor budgets; fractional canvases preserve
     // the full native target and transform while clipping to those redraws.
     // At997x563 each transient color canvas is561311pixels (2245244bytes),
@@ -1041,7 +1065,7 @@
     const sourceMaps=structuredClone(root.__json?.['relay_moth_maps.json']||saved.maps);
     try{
       const result={oracle:'clean full StaticPainter composition with production source canvases; all color/normal/specular GPU bytes; exact equality',nativeCrop:nativeCropCases(),legacyCompatibility:legacyCompatibility(sourceMaps),negativeControls:negativeControls(sourceMaps),native:[],naturalRooms:[],fallbacks:[],recovery:[],liveOwnership:[]};
-      for(const [width,height] of [[640,360],[997,563]])result.native.push(eligibleCases(width,height,sourceMaps));
+      for(const [width,height] of [[640,360],[997,563],[1280,720]])result.native.push(eligibleCases(width,height,sourceMaps));
       result.naturalRooms=naturalCases(sourceMaps);
       result.fallbacks=fallbackCases(sourceMaps);result.recovery=recoveryCases(sourceMaps);result.liveOwnership=ownershipCases(sourceMaps);
       return result;

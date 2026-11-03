@@ -13,13 +13,15 @@ const legacyFullSource=browserSource.slice(legacyStart,legacyEnd);
 const artManifest=JSON.parse(fs.readFileSync(path.join(ROOT,'hd_remake_atlas.json'),'utf8'));
 const source=(start,end)=>{const a=gameSource.indexOf(start),b=gameSource.indexOf(end,a+start.length);assert(a>=0&&b>a);return gameSource.slice(a,b)};
 const allocations=[],allocationAttempts=[],phases=[],faults={allocationAt:0,rasterAt:0,allocationCalls:0,rasterCalls:0};
-let traceCanvases=false;
+let traceCanvases=false,tracePrimitives=false;
 class FakeCanvas{
   constructor(width,height){const attempt={width,height,allocated:false};allocationAttempts.push(attempt);if(++faults.allocationCalls===faults.allocationAt)throw new Error('injected canvas allocation failure');this.width=width;this.height=height;this.originalWidth=width;this.originalHeight=height;this.contextRequests=[];this.context=new FakeContext(this);allocations.push(this);attempt.allocated=true}
   getContext(kind,options){assert.strictEqual(kind,'2d');this.contextRequests.push({kind,options});return this.context}
 }
 class FakeContext{
-  constructor(canvas){this.canvas=canvas;this.transforms=[];this.matrix=[1,0,0,1,0,0];this.stack=[];this.images=[];this.clips=[];this.clipBounds=null;this.pathRectangles=[];this.commands=traceCanvases?[]:null;this.floorCommands=traceCanvases?new Map():null;this.floorCell=null}
+  constructor(canvas){this.canvas=canvas;this.transforms=[];this.matrix=[1,0,0,1,0,0];this.stack=[];this.images=[];this.clips=[];this.clipBounds=null;this.pathRectangles=[];this.pathCircles=[];this.globalAlpha=1;this.primitives=tracePrimitives?[]:null;this.footerBackground=false;this.commands=traceCanvases?[]:null;this.floorCommands=traceCanvases?new Map():null;this.floorCell=null}
+  recordPrimitive(kind,corners){if(!this.primitives||this.globalAlpha<=0)return;const xs=corners.map(p=>p[0]),ys=corners.map(p=>p[1]),bounds={x0:Math.min(...xs),y0:Math.min(...ys),x1:Math.max(...xs),y1:Math.max(...ys)};if(bounds.x0<bounds.x1&&bounds.y0<bounds.y1)this.primitives.push({kind,bounds})}
+  corners(x,y,w,h){const[a,b,c,d,e,f]=this.matrix;return[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([px,py])=>[a*px+c*py+e,b*px+d*py+f])}
   recordCommand(name,args=[]){if(!this.commands)return;const entry={name,args:[...args],matrix:[...this.matrix],clip:this.clipBounds?[...this.clipBounds]:null};if(this.floorCell){if(!this.floorCommands.has(this.floorCell))this.floorCommands.set(this.floorCell,[]);this.floorCommands.get(this.floorCell).push(entry)}else this.commands.push(entry)}
   // Record the effective matrix at drawing/restoration boundaries, so the first
   // entry remains the full native transform after translate followed by scale.
@@ -28,19 +30,20 @@ class FakeContext{
   translate(x,y){this.recordCommand('translate',[x,y]);assert(Number.isFinite(x)&&Number.isFinite(y));const[a,b,c,d,e,f]=this.matrix;this.matrix=[a,b,c,d,e+a*x+c*y,f+b*x+d*y]}
   scale(x,y){this.recordCommand('scale',[x,y]);assert(Number.isFinite(x)&&Number.isFinite(y));const[a,b,c,d,e,f]=this.matrix;this.matrix=[a*x,b*x,c*y,d*y,e,f]}
   rotate(angle){this.recordCommand('rotate',[angle]);assert(Number.isFinite(angle));const[a,b,c,d,e,f]=this.matrix,co=Math.cos(angle),si=Math.sin(angle);this.matrix=[a*co+c*si,b*co+d*si,-a*si+c*co,-b*si+d*co,e,f]}
-  save(){this.recordCommand('save');this.stack.push({matrix:[...this.matrix],clip:this.clipBounds?[...this.clipBounds]:null})}
-  restore(){this.recordCommand('restore');this.recordTransform();if(this.stack.length){const state=this.stack.pop();this.matrix=state.matrix;this.clipBounds=state.clip}}
+  save(){this.recordCommand('save');this.stack.push({matrix:[...this.matrix],clip:this.clipBounds?[...this.clipBounds]:null,alpha:this.globalAlpha})}
+  restore(){this.recordCommand('restore');this.recordTransform();if(this.stack.length){const state=this.stack.pop();this.matrix=state.matrix;this.clipBounds=state.clip;this.globalAlpha=state.alpha}}
   createLinearGradient(...args){this.recordCommand('createLinearGradient',args);return{addColorStop:(...stop)=>this.recordCommand('addColorStop',stop)}}
   createRadialGradient(...args){this.recordCommand('createRadialGradient',args);return{addColorStop:(...stop)=>this.recordCommand('addColorStop',stop)}}
-  fillRect(...args){this.recordCommand('fillRect',args);this.recordTransform();if(++faults.rasterCalls===faults.rasterAt)throw new Error('injected floor raster failure')}
+  fillRect(...args){this.recordCommand('fillRect',args);this.recordTransform();if(this.primitives&&!this.footerBackground)this.recordPrimitive('rectangle',this.corners(...args));if(++faults.rasterCalls===faults.rasterAt)throw new Error('injected floor raster failure')}
   drawImage(...args){
     this.recordCommand('drawImage',args);this.recordTransform();assert.strictEqual(args.length,9,'atlas drawing uses an explicit source and destination rectangle');
     const[image,sx,sy,sw,sh,x,y,w,h]=args;assert([sx,sy,sw,sh,x,y,w,h].every(Number.isFinite),'drawImage coordinates must be finite');
     const[a,b,c,d,e,f]=this.matrix,corners=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([px,py])=>[a*px+c*py+e,b*px+d*py+f]);
     this.images.push({image,source:[sx,sy,sw,sh],destination:[x,y,w,h],matrix:[...this.matrix],corners});
+    this.recordPrimitive('sprite',corners);
   }
   clearRect(...args){this.recordCommand('clearRect',args);this.recordTransform()}
-  beginPath(){this.recordCommand('beginPath');this.pathRectangles=[]}
+  beginPath(){this.recordCommand('beginPath');this.pathRectangles=[];this.pathCircles=[]}
   rect(x,y,width,height){
     this.recordCommand('rect',[x,y,width,height]);assert([x,y,width,height].every(Number.isFinite));
     const[a,b,c,d,e,f]=this.matrix,points=[[x,y],[x+width,y],[x+width,y+height],[x,y+height]].map(([px,py])=>[a*px+c*py+e,b*px+d*py+f]);
@@ -51,11 +54,14 @@ class FakeContext{
     this.clipBounds=[Math.max(prior[0],rectangle[0]),Math.max(prior[1],rectangle[1]),Math.min(prior[2],rectangle[2]),Math.min(prior[3],rectangle[3])];
     this.clips.push({rectangle,matrix:[...this.matrix],bounds:[...this.clipBounds]});this.recordCommand('clip');
   }
-  arc(...args){this.recordCommand('arc',args);this.recordTransform()}fill(){this.recordCommand('fill');this.recordTransform()}strokeRect(...args){this.recordCommand('strokeRect',args);this.recordTransform()}
+  arc(...args){this.recordCommand('arc',args);this.recordTransform();if(this.primitives)this.pathCircles.push(args)}
+  fill(){this.recordCommand('fill');this.recordTransform();if(this.primitives){const[a,b,c,d,e,f]=this.matrix;for(const[x,y,r,start,end]of this.pathCircles){assert.strictEqual(start,0);assert.strictEqual(end,Math.PI*2);const cx=a*x+c*y+e,cy=b*x+d*y+f,rx=Math.hypot(a,c)*r,ry=Math.hypot(b,d)*r;this.recordPrimitive('circle',[[cx-rx,cy-ry],[cx+rx,cy+ry]])}}}
+  strokeRect(...args){this.recordCommand('strokeRect',args);this.recordTransform()}
 }
 const sandbox={OffscreenCanvas:FakeCanvas,RelayStaticTerrain:terrain,perfMeasure:(name,fn)=>{phases.push(name);return fn()}};
 const production=vm.runInNewContext(`
   const W=640,H=360,TILE=16,FLOOR_TILE=4,GRID_W=40,GRID_H=19,PLAY_H=304,BOTTOM_H=56,TAU=Math.PI*2,HD_WORLD_SCALE_DEFAULT=.18;
+  ${gameSource.match(/const BLOCKER_FOREGROUND_FRACTION=[^\n]+/)[0]}
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   ${source('function hash32(','\nfunction h01(')}
   ${source('function releaseCanvasBacking(','\n\n// PERF-001A:')}
@@ -158,6 +164,96 @@ function spriteFixture(width=997,height=563){
   return g;
 }
 function actorState(g){return JSON.stringify([g.x,g.y,g.vx,g.vy,g.followers,g.miniGuides,g.flock,[...g.state.completed],[...g.state.robots],[...g.state.moths],g.room.objects,[...g.room.objectFxHidden]])}
+// Record actual production draw commands at logical identity coordinates. This
+// oracle knows Canvas geometry, not StaticPainter placement/anchor formulas.
+function observedOverlayPrimitives(g){
+  tracePrimitives=true;const canvas=new FakeCanvas(640,360),ctx=canvas.context;
+  try{
+    for(const method of ['patternDecor','drawBlockerSprites','drawVegetationInterstitials','drawDecor'])g.painter[method](ctx,g.room,g.state);
+    ctx.footerBackground=true;g.painter.drawFooter(ctx);
+    return{bounds:ctx.primitives.map(p=>p.bounds),primitives:ctx.primitives,images:ctx.images};
+  }finally{canvas.width=canvas.height=1;tracePrimitives=false}
+}
+function isolatedOverlayBounds(g,run=()=>g.painter.staticOverlayBounds(g.room,g.state)){
+  const descriptors=[],deny=(o,k)=>{descriptors.push([o,k,Object.getOwnPropertyDescriptor(o,k)]);Object.defineProperty(o,k,{configurable:true,get(){throw Error('Bounds replay touched '+k)}})};
+  const first=allocations.length,attempts=allocationAttempts.length,raster=faults.rasterCalls,actors=actorState(g),material=[g.painter.materialNormalCtx,g.painter.materialSpecCtx,g.painter.lastMaterialMaps];
+  const resources=JSON.stringify([g.art.regions,g.art.meta,g.art.roles,g.art.worldScale]),caches=[g.art.tintCache,g.art.normalTransformCache],entries=caches.map(c=>[...c]),generation=g.art.normalTransformGeneration;
+  for(const key of ['img','normalImg','specImg','bumpImg','tintCache','normalTransformCache','normalTransformGeneration','tintInfo','tintedRegion','trimTintCache','draw','drawSubrect','drawMap','drawMapSubrect','transformedNormal'])deny(g.art,key);
+  deny(g.luts,'hex');for(const[key,value]of Object.entries(g.renderer.gl))if(typeof value==='function')deny(g.renderer.gl,key);
+  try{return run()}finally{
+    for(const[o,k,d]of descriptors.reverse())if(d)Object.defineProperty(o,k,d);else delete o[k];
+    assert.strictEqual(allocations.length,first);assert.strictEqual(allocationAttempts.length,attempts,'bounds replay cannot attempt a canvas allocation');assert.strictEqual(faults.rasterCalls,raster);
+    assert.strictEqual(actorState(g),actors);assert.deepStrictEqual([g.painter.materialNormalCtx,g.painter.materialSpecCtx,g.painter.lastMaterialMaps],material,'dry receiver cannot alter real painter material pointers');
+    assert.strictEqual(JSON.stringify([g.art.regions,g.art.meta,g.art.roles,g.art.worldScale]),resources,'dry replay cannot mutate authoring metadata');
+    assert.deepStrictEqual([g.art.tintCache,g.art.normalTransformCache],caches);assert.deepStrictEqual(caches.map(c=>[...c]),entries);assert.strictEqual(g.art.normalTransformGeneration,generation);
+  }
+}
+function expectedOverlayRaster(output,bounds,width,height){
+  const sx=width/640,sy=height/360;let left=output.x-32,top=output.y-32,right=output.x+output.width+32,bottom=output.y+output.height+32;
+  for(const b of bounds){const x0=b.x0*sx-2,y0=b.y0*sy-2,x1=b.x1*sx+2,y1=b.y1*sy+2;
+    if(x0<=output.x+output.width&&output.x<=x1&&y0<=output.y+output.height&&output.y<=y1){left=Math.min(left,x0);top=Math.min(top,y0);right=Math.max(right,x1);bottom=Math.max(bottom,y1)}
+  }
+  const x=Math.max(0,Math.floor(left/16)*16),y=Math.max(0,Math.floor(top/16)*16),x1=Math.min(width,Math.ceil(right/16)*16),y1=Math.min(height,Math.ceil(bottom/16)*16);
+  const tx0=Math.max(0,Math.floor((x/sx-4-2/sx)/16)),ty0=Math.max(0,Math.floor((y/sy-4-2/sy)/16)),tx1=Math.min(40,Math.ceil((x1/sx+4+2/sx)/16)),ty1=Math.min(19,Math.ceil((y1/sy+4+2/sy)/16));
+  return{raster:[x,y,x1-x,y1-y],pixels:(x1-x)*(y1-y),floorCells:(tx1-tx0)*(ty1-ty0)};
+}
+function overlayCollectorGeometryAndPurity(){
+  const verify=g=>{
+    const actual=observedOverlayPrimitives(g),normal={},spec={},maps={};g.painter.materialNormalCtx=normal;g.painter.materialSpecCtx=spec;g.painter.lastMaterialMaps=maps;
+    const bounds=isolatedOverlayBounds(g);assert(Object.isFrozen(bounds)&&bounds.every(Object.isFrozen));assert.strictEqual(bounds.length,actual.bounds.length,'collector includes every real overlay and sampled footer primitive');
+    // Different equivalent double-matrix multiplication orders can differ at
+    // machine epsilon; this checks geometry, never the exact native pixel gate.
+    for(let i=0;i<bounds.length;i++)for(const key of ['x0','y0','x1','y1'])assert(Math.abs(bounds[i][key]-actual.bounds[i][key])<1e-10,'bounds disagree with actual drawing at '+i+' '+key);
+    g.painter.materialNormalCtx=g.painter.materialSpecCtx=g.painter.lastMaterialMaps=null;scenarios++;return actual;
+  };
+  const variants=['default','objective-substitution','metadata-scale','footer-scale',...['top','center','bottom'].flatMap(anchor=>[false,true].map(flip=>({anchor,flip})))];
+  for(const variant of variants){
+    const g=spriteFixture();
+    for(const name of ['gear','orb_cyan','flower_pink']){g.art.regions[name]=[...artManifest.regions[name]];g.art.meta[name]={...artManifest.region_meta[name],tint_strength:0}}
+    g.art.tintInfo=()=>null;
+    if(variant==='objective-substitution'){g.art.roles.objective.lamp='lamp_blue';g.room.spec.objects=[{kind:'lamp',object_id:'fixture-objective'}]}
+    if(variant==='metadata-scale'){g.art.worldScale=.27;g.art.meta.lamp_blue.world_scale=.65;g.art.meta.orb_pillar.world_scale=1.25}
+    if(variant==='footer-scale'){g.art.meta.gear.world_scale=24;g.art.meta.orb_cyan.world_scale=24}
+    if(typeof variant==='object'){
+      const draw=g.painter.drawDecor;
+      g.painter.drawDecor=function(ctx,room){draw.call(this,ctx,room);this.sprite(ctx,'flower_pink',173.25,114.5,{...variant,rot:.37,scale:.73,alpha:.8});this.spriteSubrect(ctx,'lamp_blue',0,70,82,70,215.25,126.5,9.7416,8.316,{...variant,rot:-.41,alpha:.8});this.dot(ctx,10.5,20.25,'#fff',1.3,.8);this.px(ctx,15.5,20.5,3.5,2.2,'#fff',.4)};
+    }
+    const actual=verify(g);
+    assert.deepStrictEqual(actual.images.slice(-2).map(d=>d.source),[artManifest.regions.gear,artManifest.regions.orb_cyan],'footer sprites come from the actual footer method');
+    if(variant==='footer-scale')assert(actual.bounds.slice(-2).every(b=>b.y0<304&&b.y1>304),'imported footer scaling reaches terrain and must participate in bounds');
+  }
+  const story=JSON.parse(fs.readFileSync(path.join(ROOT,'relay_moth_story.json'),'utf8')),maps=JSON.parse(fs.readFileSync(path.join(ROOT,'relay_moth_maps.json'),'utf8'));
+  for(let i=0;i<story.rooms.length;i++){
+    const g=spriteFixture();g.room=new production.Room(i,story.rooms[i],maps);g.art=new production.HDArtSheet({width:4096,height:4096},artManifest);g.art.tintInfo=()=>null;g.painter=new production.StaticPainter(g.art,g.luts);verify(g);
+  }
+  for(const kind of ['nonfinite-size','oversized-lamps','oversized-roles','emission-limit']){
+    const g=spriteFixture();let visited=0;
+    if(kind==='nonfinite-size')g.art.meta.lamp_blue.world_scale=NaN;
+    if(kind==='oversized-lamps')g.room.decorLamps=Array(761).fill({tile:[1,1]});
+    if(kind==='oversized-roles')g.art.roles.foliage_v391=Array(761).fill('lamp_blue');
+    if(kind==='emission-limit')g.painter.patternDecor=function(ctx){for(let i=0;i<5000;i++){visited++;this.dot(ctx,20,20,'#fff')}};
+    assert.throws(()=>isolatedOverlayBounds(g),/Invalid static overlay bounds/);
+    if(kind==='emission-limit')assert.strictEqual(visited,4097,'bounded replay must stop at the first excess primitive');scenarios++;
+  }
+}
+function overlayGeometryFallbacks(){
+  for(const kind of ['invalid-size','oversized-quad']){
+    const g=spriteFixture();if(kind==='oversized-quad'){g.room.decorLamps=[{tile:[20,14]}];g.art.meta.lamp_blue.world_scale=60}
+    const actual=kind==='oversized-quad'?observedOverlayPrimitives(g):null;
+    refresh(g);const previous=g.staticTerrainSnapshot,first=allocations.length,attempts=allocationAttempts.length,uploads=g.renderer.gl.uploads.length,build=g.painter.build,worldSize=g.art.worldSize,query=g.painter.staticOverlayBounds;let bad=kind==='invalid-size',queries=0;
+    if(bad)g.art.worldSize=function(name,...args){if(name==='lamp_blue'&&bad){bad=false;return[NaN,20]}return worldSize.call(this,name,...args)};
+    g.painter.staticOverlayBounds=function(...args){queries++;return isolatedOverlayBounds(g,()=>query.apply(this,args))};
+    g.room.water.add('3,2');const basic=terrain.plan(previous,terrain.capture(g.room,g.staticTerrainContext()));assert.strictEqual(basic.kind,'patch','the new geometry check is the binding fallback');
+    if(actual)assert(expectedOverlayRaster(basic.regions[0],actual.bounds,997,563).pixels>997*563*.20,'the negative fixture must exceed the unchanged clip budget using independently observed geometry');
+    g.painter.buildPatch=()=>{throw Error('invalid/oversized overlay geometry must not start a partial draw')};
+    g.painter.build=function(...args){assert.strictEqual(allocations.length,first);assert.strictEqual(allocationAttempts.length,attempts);assert.strictEqual(g.renderer.gl.uploads.length,uploads);return build.apply(this,args)};
+    const stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,kind==='invalid-size'?'invalid-overlay-bounds':'raster-pixel-budget');assert.strictEqual(queries,1);assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(stats.regions.length,0);scenarios++;
+  }
+  const g=spriteFixture();refresh(g);let queries=0;g.painter.staticOverlayBounds=()=>{queries++;throw Error('nonpatch plan must skip bounds replay')};
+  assert.strictEqual(refresh(g).mode,'noop');assert.strictEqual(g.refreshEditorStatic({force:true}).reason,'forced');released(g);
+  g.renderer.backgroundRevision++;assert.strictEqual(refresh(g).reason,'stale-background');g.room.walls.add('4,4');assert.strictEqual(refresh(g).reason,'dependency:walls');assert.strictEqual(queries,0);scenarios+=4;
+}
+
 function nativeClipMatchesFullCommands(){
   const cases=[
     {label:'floor-only',width:997,height:563,cell:'8,6'},
@@ -165,6 +261,7 @@ function nativeClipMatchesFullCommands(){
     {label:'objective-substitution',width:997,height:563,cell:'10,7'},
     {label:'custom-metadata',width:997,height:563,cell:'10,7'},
     {label:'rotated-subrect',width:997,height:563,cell:'10,7'},
+    {label:'footer-imported-scale',width:997,height:563,cell:'38,18'},
     {label:'fractional-x',width:997,height:360,cell:'19,10'},
     {label:'fractional-y',width:640,height:563,cell:'19,10'}
   ];
@@ -177,6 +274,11 @@ function nativeClipMatchesFullCommands(){
     const g=spriteFixture(test.width,test.height);g.room.decorLamps=test.label==='floor-only'?[]:[{tile:[10,8]}];
     if(test.label==='objective-substitution'){g.art.roles.objective.lamp='lamp_blue';g.room.spec.objects=[{object_id:'fixture-objective',kind:'lamp'}]}
     if(test.label==='custom-metadata'){g.art.worldScale=.27;g.art.meta.lamp_blue.world_scale=.65;g.art.meta.orb_pillar.world_scale=1.25}
+    if(test.label==='footer-imported-scale'){
+      g.room.decorLamps=[];
+      for(const name of ['gear','orb_cyan']){g.art.regions[name]=[...artManifest.regions[name]];g.art.meta[name]={...artManifest.region_meta[name],tint_strength:0}}
+      g.art.meta.gear.world_scale=4;
+    }
     if(test.label==='rotated-subrect'){
       g.art.normalImg=null;const drawDecor=g.painter.drawDecor;
       g.painter.drawDecor=function(ctx,room){drawDecor.call(this,ctx,room);return this.spriteSubrect(ctx,'lamp_blue',0,70,82,70,168.25,124.5,9.7416,8.316,{anchor:'center',rot:.37,flip:true,alpha:.8})};
@@ -235,12 +337,14 @@ function nativeClipCapacityAndFallbacks(){
   // Guards can overlap, but drawing and independently allocated native targets
   // are summed. The previous backing must be released before the next begins.
   {
-    const g=spriteFixture();refresh(g);const actors=actorState(g),buildPatch=g.painter.buildPatch,first=allocations.length;let lastCanvas=null,patches=0;
+    const g=spriteFixture(),observed=observedOverlayPrimitives(g);refresh(g);const actors=actorState(g),buildPatch=g.painter.buildPatch,first=allocations.length;let lastCanvas=null,patches=0;
     g.painter.buildPatch=function(...args){if(lastCanvas)assert(lastCanvas.width===1&&lastCanvas.height===1,'release each native target before allocating the next');lastCanvas=buildPatch.apply(this,args);patches++;return lastCanvas};
     g.room.water.add('3,2');g.room.water.add('6,2');const stats=refresh(g);
     assert.strictEqual(stats.mode,'patch');assert.strictEqual(patches,2);assert.strictEqual(allocations.length-first,2);
-    assert.deepStrictEqual(Array.from(stats.regions,r=>[r.rasterX,r.rasterY,r.rasterWidth,r.rasterHeight]),[[32,16,112,96],[112,16,112,96]]);
-    assert.strictEqual(stats.rasterPixels,21504);assert.strictEqual(stats.rasterCells,65);assert.strictEqual(stats.scratchPixels,997*563);assert.strictEqual(stats.scratchBytes,997*563*4);
+    const expected=Array.from(stats.regions,r=>expectedOverlayRaster(r,observed.bounds,997,563));
+    assert.deepStrictEqual(Array.from(stats.regions,r=>[r.rasterX,r.rasterY,r.rasterWidth,r.rasterHeight]),expected.map(r=>r.raster),'guards enclose actual sprite/circle geometry independently of the dry collector');
+    assert.deepStrictEqual(expected.map(r=>r.raster),[[32,16,144,128],[48,16,176,128]],'the existing mounted glow enlarges both unchanged fixture regions');
+    assert.strictEqual(stats.rasterPixels,expected.reduce((n,r)=>n+r.pixels,0));assert.strictEqual(stats.rasterCells,expected.reduce((n,r)=>n+r.floorCells,0));assert.strictEqual(stats.rasterPixels,40960);assert.strictEqual(stats.rasterCells,119);assert.strictEqual(stats.scratchPixels,997*563);assert.strictEqual(stats.scratchBytes,997*563*4);
     assert.strictEqual(stats.scratchAllocations,2);assert.strictEqual(stats.scratchAllocationBytes,997*563*8);assert.strictEqual(stats.pixels,1798);assert.strictEqual(stats.uploadCalls,2);assert.strictEqual(stats.uploadBytes,1798*4);assert.strictEqual(actorState(g),actors);scenarios++;
   }
   const eligible=[
@@ -268,6 +372,7 @@ function nativeClipCapacityAndFallbacks(){
     const probe=terrain.plan(previous,terrain.capture(g.room,g.staticTerrainContext()),{maxNativeScratchPixels:4000000,maxScratchAllocationPixels:8000000});
     assert.strictEqual(probe.kind,'patch','only the explicit capacity policy forces this full fallback');assert(probe.rasterPixels<test.width*test.height*.20&&probe.rasterCellCount<760*.35);
     g.painter.buildPatch=()=>{throw Error('capacity fallback must precede every partial build')};
+    g.painter.staticOverlayBounds=()=>{throw Error('basic capacity fallback must skip overlay bounds work')};
     g.painter.build=function(...args){assert.strictEqual(allocations.length,first,'no partial scratch before a planned capacity fallback');assert.strictEqual(allocationAttempts.length,attemptStart,'not even a failed partial allocation may precede fallback');assert.strictEqual(g.renderer.gl.uploads.length,uploads);return build.apply(this,args)};
     const stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,test.reason);assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(stats.regions.length,0);assert.strictEqual(stats.rasterCells,760);assert.strictEqual(allocations.length-first,3);
     assert.strictEqual(stats.scratchAllocationPixels,test.width*test.height*3);assert(!phases.slice(phaseStart).some(name=>name.startsWith('static.patch.')));
@@ -286,7 +391,7 @@ function nativeClipCapacityAndFallbacks(){
   {
     const g=spriteFixture();refresh(g);g.room.water.add('3,2');g.room.water.add('6,2');g.renderer.gl.failSubAt=2;
     const stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'patch-failed');assert.strictEqual(stats.uploadCalls,5);assert.strictEqual(stats.regions.length,2);
-    assert(stats.regions.every(r=>r.canvasMode==='native-clip'&&r.rasterX>0&&r.canvasX===0));assert.strictEqual(stats.rasterPixels,997*563+21504);assert.strictEqual(stats.scratchBytes,997*563*12);
+    assert(stats.regions.every(r=>r.canvasMode==='native-clip'&&r.rasterX>0&&r.canvasX===0));assert.strictEqual(stats.rasterPixels,997*563+40960);assert.strictEqual(stats.scratchBytes,997*563*12);
     assert.strictEqual(stats.scratchAllocations,5);assert.strictEqual(stats.scratchAllocationAttempts,5);assert.strictEqual(stats.scratchAllocationBytes,997*563*20);assert.strictEqual(g.renderer.backgroundReady,true);scenarios++;
   }
 }
@@ -357,11 +462,11 @@ function materialPreservationAndDependencies(){
     const g=fixture();refresh(g);const first=allocations.length,full=g.renderer.gl.fullCount;
     g.art.normalTransformGeneration+=100;
     assert.strictEqual(refresh(g).mode,'noop');assert.strictEqual(allocations.length,first);
-    const overlay=g.painter.patternDecor;let overlays=0;
-    g.painter.patternDecor=function(...args){assert(!this.materialNormalCtx&&!this.materialSpecCtx,'partial overlays have no material drawing contexts');overlays++;return overlay.apply(this,args)};
+    const overlay=g.painter.patternDecor;let overlays=0,dryOverlays=0;
+    g.painter.patternDecor=function(...args){assert(!this.materialNormalCtx&&!this.materialSpecCtx,'partial overlays have no material drawing contexts');if(args[0]===null)dryOverlays++;else overlays++;return overlay.apply(this,args)};
     g.painter.build=()=>{throw Error('normal cache pressure must not force a terrain full build')};
     g.room.water.add('6,7');const stats=refresh(g);
-    assert.strictEqual(stats.mode,'patch');assert.strictEqual(stats.uploadCalls,1);assert.strictEqual(g.renderer.gl.fullCount,full);assert.strictEqual(overlays,1);assert.strictEqual(g.painter.lastMaterialMaps,null);scenarios+=2;
+    assert.strictEqual(stats.mode,'patch');assert.strictEqual(stats.uploadCalls,1);assert.strictEqual(g.renderer.gl.fullCount,full);assert.strictEqual(overlays,1,'exactly one real overlay paint');assert.strictEqual(dryOverlays,1,'one metadata-only placement replay');assert.strictEqual(g.painter.lastMaterialMaps,null);scenarios+=2;
   }
   for(const changedAt of [1,2]){
     const g=fixture();refresh(g);const previous=g.staticTerrainSnapshot,revision=g.renderer.backgroundRevision,patch=g.painter.buildPatch;let patches=0;
@@ -540,10 +645,11 @@ function rejectInvalidPatches(){
   c.width=c.height=1;scenarios++;
 }
 
-fullPatchNoopAndHistory();staticIdentityAndStaleness();materialPreservationAndDependencies();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();guardedEdgeRasterMetrics();croppedUploadRestoresUnpackState();rejectInvalidPatches();nativeClipMatchesFullCommands();nativeClipCapacityAndFallbacks();nativeClipAllocationFailures();
+fullPatchNoopAndHistory();staticIdentityAndStaleness();materialPreservationAndDependencies();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();guardedEdgeRasterMetrics();croppedUploadRestoresUnpackState();rejectInvalidPatches();nativeClipMatchesFullCommands();nativeClipCapacityAndFallbacks();nativeClipAllocationFailures();overlayCollectorGeometryAndPurity();overlayGeometryFallbacks();
 console.log('STATIC TERRAIN RUNTIME REGRESSION PERF-004 PASS');
 console.log('  production Game / StaticPainter / GLRenderer scenarios:',scenarios);
 console.log('  color-only guarded-raster uploads, preserved material handles/bytes, full material-dependency refreshes, asymmetric flipped crops and exact scratch/raster accounting');
 console.log('  coherent snapshot/revision commits, unpack restoration, upload / GL error / context-loss repair, failed repair invalidation, allocation/raster cleanup, zero retained scratch');
 console.log('  fractional native targets use bounded clips and accepted full floor/atlas command traces; local integer rasters, exact capacity/attempt accounting and early peak/cumulative fallbacks');
 console.log('  far and mounted edits remain eligible, fractional capacity is capped at 4 MiB peak / 8 MiB cumulative, and every surface is released before the next allocation');
+console.log('  dry whole-primitive bounds agree with actual atlas quads/circles/rounded pixels across all rooms, anchors, flips, rotations and imported footer scales; no source/cache/LUT/material mutations');

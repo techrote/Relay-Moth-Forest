@@ -350,6 +350,80 @@ class StaticPainter{
     if(p==='garden'){const names=['bush_yellow','bush_blue','bush_pair','flower_pink','flower_blue','flower_bush'];for(let i=0;i<24;i++){if(skip(`garden:${i}`))continue;const seed=hash32(i,room.index,440),x=42+(seed%555),y=72+((seed>>>8)%175),n=names[i%names.length];this.sprite(ctx,n,x,y+18,{element:'far_forest',alpha:.9})}}
   }
   persistentObjective(ctx,obj,x,y,roomDone){if(obj.kind==='pip')return;let n=(this.art.roles.objective||{})[obj.kind];if(n){this.sprite(ctx,n,x,y+12,{element:'discoveries',alpha:.97});this.glow(ctx,x,y,'discoveries',225,obj.kind==='dawn'?50:26,.26)}if(roomDone)this.glow(ctx,x,y,'discoveries',245,23,.14)}
+  // Metadata-only replay of unchanged color overlays. The returned
+  // AABBs are logical, whole-primitive geometry, never alpha-trimmed bounds.
+  // Native projection, output intersection, alignment and work gates belong
+  // to the planner. Any invalid/unbounded metadata must select a full refresh.
+  staticOverlayBounds(room,state){
+    const invalid=()=>{throw new Error('Invalid static overlay bounds context')};
+    const maxCells=GRID_W*GRID_H,maxPrimitives=4096;
+    if(!room?.spec||!this.art?.roles||!this.art.regions||typeof this.art.region!=='function'||typeof this.art.worldSize!=='function'||typeof state?.isDone!=='function'||typeof this.drawFooter!=='function')invalid();
+    // Bound traversal before the production methods create their temporary
+    // sorted wall lists, vegetation role list or objective substitutions.
+    for(const cells of [room.border,room.walls]){
+      if(Object.prototype.toString.call(cells)!=='[object Set]'||cells.size>maxCells)invalid();
+      for(const key of cells){
+        if(typeof key!=='string'||!/^(0|[1-9]\d*),(0|[1-9]\d*)$/.test(key))invalid();
+        const [x,y]=key.split(',').map(Number);if(x>=GRID_W||y>=GRID_H)invalid();
+      }
+    }
+    const lamps=room.decorLamps||[],objects=room.spec.objects||[];
+    if(!Array.isArray(lamps)||lamps.length>maxCells||!Array.isArray(objects)||objects.length>maxCells)invalid();
+    for(const lamp of lamps)if(!lamp||!Array.isArray(lamp.tile)||lamp.tile.length!==2||!lamp.tile.every(Number.isFinite))invalid();
+    for(const object of objects)if(!object||typeof object.kind!=='string')invalid();
+    for(const key of ['foliage_v391','foliage_mix','blocker_variants','blockers','decor_plants','lamps']){
+      const names=this.art.roles[key];if(names!=null&&(!Array.isArray(names)||names.length>maxCells||names.some(name=>typeof name!=='string')))invalid();
+    }
+    const bounds=[],recorder=Object.create(this);let primitives=0;
+    const emit=(x0,y0,x1,y1,alpha=1)=>{
+      if(++primitives>maxPrimitives||![x0,y0,x1,y1,alpha].every(Number.isFinite)||alpha<0||alpha>1)invalid();
+      const left=Math.min(x0,x1),top=Math.min(y0,y1),right=Math.max(x0,x1),bottom=Math.max(y0,y1);
+      if(alpha>0&&left<right&&top<bottom)bounds.push(Object.freeze({x0:left,y0:top,x1:right,y1:bottom}));
+    };
+    const quad=(x,y,w,h,opts={})=>{
+      const rotation=opts.rot||0,anchor=opts.anchor||'bottom',alpha=opts.alpha??1;
+      if(![x,y,w,h,rotation].every(Number.isFinite)||w<=0||h<=0||typeof anchor!=='string')invalid();
+      const top=anchor==='bottom'?-h:anchor==='top'?0:-h/2,flip=opts.flip?-1:1,co=Math.cos(rotation),si=Math.sin(rotation);
+      let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+      for(const [u,v] of [[-w/2,top],[w/2,top],[-w/2,top+h],[w/2,top+h]]){
+        const px=x+u*flip*co-v*si,py=y+u*flip*si+v*co;
+        x0=Math.min(x0,px);y0=Math.min(y0,py);x1=Math.max(x1,px);y1=Math.max(y1,py);
+      }
+      emit(x0,y0,x1,y1,alpha);return[w,h];
+    };
+    recorder.sprite=(_ctx,name,x,y,opts={})=>{
+      if(!name||!recorder.art.regions[name])return[0,0];
+      const scale=recorder.spriteScale(name,opts.scale??1);if(!Number.isFinite(scale)||scale<=0)invalid();
+      const [w,h]=recorder.art.worldSize(name,scale);return quad(x,y,w,h,opts);
+    };
+    recorder.spriteSubrect=(_ctx,name,sx,sy,sw,sh,x,y,w,h,opts={})=>{
+      if(!name||!recorder.art.regions[name])return[0,0];
+      if(![sx,sy,sw,sh].every(Number.isFinite)||sw<=0||sh<=0)invalid();
+      return quad(x,y,w,h,opts);
+    };
+    recorder.glow=(_ctx,x,y,_element,_index,r=18,alpha=.26)=>{
+      if(![x,y,r].every(Number.isFinite)||r<0)invalid();emit(x-r,y-r,x+r,y+r,alpha);
+    };
+    recorder.px=(_ctx,x,y,w,h,_colour,alpha=1)=>{
+      if(![x,y,w,h].every(Number.isFinite))invalid();
+      emit(Math.floor(x),Math.floor(y),Math.floor(x)+Math.ceil(w),Math.floor(y)+Math.ceil(h),alpha);
+    };
+    recorder.dot=(_ctx,x,y,_colour,size=2,alpha=1)=>{
+      if(![x,y,size].every(Number.isFinite)||size<0)invalid();emit(x-size/2,y-size/2,x+size/2,y+size/2,alpha);
+    };
+    recorder.col=()=>'';recorder.materialNormalCtx=null;recorder.materialSpecCtx=null;recorder.lastMaterialMaps=null;
+    for(const method of ['patternDecor','drawBlockerSprites','drawVegetationInterstitials','drawDecor'])recorder[method](null,room,state);
+    // Replay the real footer authority for sampled sprites. The footer's
+    // unfiltered background gradient, stripe, panel and stroke are intentionally
+    // not whole-sprite geometry: they retain their original bounded clip path.
+    recorder.px=()=>{};
+    const footerContext={createLinearGradient:()=>({addColorStop(){}}),fillRect(){},strokeRect(){}};
+    recorder.drawFooter(footerContext);
+    return Object.freeze(bounds);
+  }
+  drawFooter(ctx){
+    const ui=ctx.createLinearGradient(0,PLAY_H,0,H);ui.addColorStop(0,this.col('ui',14));ui.addColorStop(1,this.col('ui',4));ctx.fillStyle=ui;ctx.fillRect(0,PLAY_H,W,BOTTOM_H);this.px(ctx,0,PLAY_H,W,2,this.col('ui',105),.7);this.px(ctx,8,PLAY_H+7,W-16,BOTTOM_H-14,this.col('ui',24),.92);ctx.strokeStyle=this.col('ui',88);ctx.lineWidth=1.5;ctx.strokeRect(8.5,PLAY_H+7.5,W-17,BOTTOM_H-15);this.sprite(ctx,'gear',W-31,H-17,{anchor:'bottom',alpha:.42,element:'ui'});this.sprite(ctx,'orb_cyan',28,H-18,{anchor:'bottom',alpha:.38,element:'ui'});
+  }
   build(room,state,renderW=W,renderH=H){return this.buildSurface(room,state,renderW,renderH,null)}
   buildPatch(room,state,renderW,renderH,region){
     const raster={...region,x:region.rasterX??region.x,y:region.rasterY??region.y,width:region.rasterWidth??region.width,height:region.rasterHeight??region.height};
@@ -396,9 +470,7 @@ class StaticPainter{
       // editor_decor, recruitable robots, completed objectives, gates and bridge/progression presentation are live mutable content.
       // Footer sprites affect color only, including a patch crossing PLAY_H.
       this.materialNormalCtx=null;this.materialSpecCtx=null;bctx?.restore();sctx?.restore();
-      perfMeasure(phase+'.footer',()=>{
-        const ui=ctx.createLinearGradient(0,PLAY_H,0,H);ui.addColorStop(0,this.col('ui',14));ui.addColorStop(1,this.col('ui',4));ctx.fillStyle=ui;ctx.fillRect(0,PLAY_H,W,BOTTOM_H);this.px(ctx,0,PLAY_H,W,2,this.col('ui',105),.7);this.px(ctx,8,PLAY_H+7,W-16,BOTTOM_H-14,this.col('ui',24),.92);ctx.strokeStyle=this.col('ui',88);ctx.lineWidth=1.5;ctx.strokeRect(8.5,PLAY_H+7.5,W-17,BOTTOM_H-15);this.sprite(ctx,'gear',W-31,H-17,{anchor:'bottom',alpha:.42,element:'ui'});this.sprite(ctx,'orb_cyan',28,H-18,{anchor:'bottom',alpha:.38,element:'ui'});
-      });
+      perfMeasure(phase+'.footer',()=>this.drawFooter(ctx));
       ctx.restore();this.lastMaterialMaps=region?null:{normal:normalCanvas,spec:specCanvas};return c;
     }catch(err){releaseCanvasBacking(c);releaseCanvasBacking(normalCanvas);releaseCanvasBacking(specCanvas);throw err}
     finally{this.materialNormalCtx=null;this.materialSpecCtx=null}
@@ -899,6 +971,10 @@ class Game{
       catch(_err){plan={kind:'full',reason:'invalid-context'}}
       if(force)plan={...plan,kind:'full',reason:'forced'};
       else if(previous&&(!renderer.backgroundReady||this.staticBackgroundRevision!==renderer.backgroundRevision))plan={...plan,kind:'full',reason:'stale-background'};
+      if(plan.kind==='patch'){
+        try{plan=planner.plan(previous,snapshot,{overlayBounds:this.painter.staticOverlayBounds(this.room,this.state)})}
+        catch(_err){plan={...plan,kind:'full',reason:'invalid-overlay-bounds'}}
+      }
     });
     // Asset replacement on an existing HDArtSheet must also discard derived
     // tint/normal tiles; their historical keys identify sprite names, not images.
