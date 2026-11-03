@@ -1,0 +1,86 @@
+name: Diagnostic row synchronization experiment
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: row-sync-diagnostic-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONUNBUFFERED: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the exact diagnostic source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Initialize isolated diagnostic evidence
+        run: |
+          diagnostic_out="$RUNNER_TEMP/relay-row-oob-diagnostic"
+          mkdir -p "$diagnostic_out"
+          printf 'ROW_DIAGNOSTIC_OUT=%s\n' "$diagnostic_out" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements-authoring.txt
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Verify tracked source and diagnostic scope controls
+        run: |
+          python tools/source_manifest.py --check 2>&1 | tee "$ROW_DIAGNOSTIC_OUT/manifest-before.log"
+          node tests/current/row_oob_scope_regression_415.js 2>&1 | tee "$ROW_DIAGNOSTIC_OUT/scope-controls.log"
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          ast.parse(Path('tests/current/row_oob_diagnostic_415.py').read_text())
+          PY
+
+      - name: Install identical browser and GLES dependencies
+        timeout-minutes: 12
+        run: |
+          python -m pip install -r tools/requirements-authoring.txt playwright
+          python -m playwright install --with-deps chromium
+          sudo apt-get install -y --no-install-recommends libegl1 libegl-mesa0 libgles2 libgl1-mesa-dri
+          python -m pip freeze > "$ROW_DIAGNOSTIC_OUT/python-packages.txt"
+
+      - name: Compare test-only OOB rows with original in-bounds policy
+        timeout-minutes: 15
+        run: |
+          python tests/current/row_oob_diagnostic_415.py \
+            --out "$ROW_DIAGNOSTIC_OUT" --samples 3 \
+            2>&1 | tee "$ROW_DIAGNOSTIC_OUT/diagnostic.log"
+
+      - name: Verify experiment did not change shipped source
+        if: always()
+        run: python tools/source_manifest.py --check 2>&1 | tee "$ROW_DIAGNOSTIC_OUT/manifest-after.log"
+
+      - name: Preserve diagnostic-only evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: relay-row-oob-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.ROW_DIAGNOSTIC_OUT }}
+          if-no-files-found: error
+          retention-days: 14
