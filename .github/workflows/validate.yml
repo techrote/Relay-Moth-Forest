@@ -22,11 +22,16 @@ jobs:
       PYTHONUNBUFFERED: '1'
       PYTHONDONTWRITEBYTECODE: '1'
       LIBGL_ALWAYS_SOFTWARE: '1'
-      VALIDATION_OUT: ${{ runner.temp }}/relay-moth-validation
     defaults:
       run:
         shell: bash
     steps:
+      - name: Initialize validation evidence directory
+        run: |
+          validation_out="$RUNNER_TEMP/relay-moth-validation"
+          mkdir -p "$validation_out"
+          printf 'VALIDATION_OUT=%s\n' "$validation_out" >> "$GITHUB_ENV"
+
       - name: Check out the exact source commit
         uses: actions/checkout@v7
         with:

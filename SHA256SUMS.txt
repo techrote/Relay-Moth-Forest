@@ -1,5 +1,5 @@
 3c7994c81a2654319f67a893b9f5a75d2647b621181163c95f8c092de02c81e2  ./.github/workflows/publish-wiki.yml
-769d9322acbe2271f7661ef191fb9835c58a54aff67df5171e266973a0319104  ./.github/workflows/validate.yml
+74ed8af743baf9ce8c71de2e81bf39d32a7dd30cf9bf9e10dc084f6f5e3d2cba  ./.github/workflows/validate.yml
 b4fec017fb0dc9b6415526f44193ca24e5e11bfad663a497ec4e297203dcd376  ./0Play.cmd
 a6745f18f2c8d07175d90295b64c23f85ca61158be241f82d72ff910a16afc5e  ./CHANGELOG.txt
 238cbe4fde3bec452fff9be1c0e95fd60c724bebd36a5bb45211b389234ff55b  ./README.md
