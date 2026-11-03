@@ -1,427 +1,297 @@
-# PERF-004 bounded static terrain and material refresh
+# PERF-004 bounded terrain refresh
 
 Issue: [#37](https://github.com/techrote/Relay-Moth-Forest/issues/37).
 Accepted starting source: `5e6ea67c0ca8ba4d00b35d0e68ac4bb4d573680d`.
 
-## Problem and scope
+## Problem and contract
 
-PERF-003 removed the water-mask readback stall, but small editor terrain edits
-still painted all 760 logical floor cells into three native-resolution canvases
-and replaced all background textures. Its prior same-host editor-water sample
-reported a 602.9 ms median in `static.build`. That historical number motivates
-the work; it is not a matched PERF-004 before/after measurement.
+After PERF-003 removed the water-mask readback stall, small editor terrain
+changes still repainted all 760 floor cells and replaced three native background
+textures. The historical PERF-003 editor-water sample spent a median 602.9 ms
+in `static.build`. That number motivates this work; it is not a matched
+PERF-004 before/after measurement.
 
-Ground, path and water edits now use bounded static color patches when the final
-authoritative room differs only in a small number of floor cells. Existing normal
-and specular textures remain authoritative because those floor classifications
-do not contribute to either material map.
-The game continues to synchronously rebind room/collision data, refresh static
-presentation, update water and refresh foliage in the existing editor flush.
-Painting, clearing, same-count moves, undo/redo, cancellation and persistence
-flushes use the same comparison. No editor tool name is trusted as proof that
-only terrain changed.
+Small ground, path and water changes now recompose bounded color regions while
+preserving the existing normal and specular textures. Every material-writing
+dependency must be unchanged. The complete resulting color, normal and specular
+GPU textures must still equal a clean full build byte for byte, including pixels
+outside the uploaded regions.
 
-At fractional native scales, scratch rendering retains the full canvas's origin
-and draws a bounded prefix ending beyond the changed output. Translating a small
-destination changed both sprite samples and floor antialiasing in native tests.
-The prefix avoids that translation while retaining the same memory/work limits;
-an edit farther from the origin can therefore require a full rebuild even when
-only one tile changed. Fractional-scale outputs that intersect mounted sprites
-also use the full renderer: matching the origin alone did not remove a native
-sprite-sampling discrepancy. Integer scales keep the localized guarded raster.
-The representative small water/path benchmark actions must still remain bounded.
+The editor synchronously rebinds room/collision authority and refreshes terrain,
+water and foliage before returning to gameplay. Same-count movement, painting,
+clearing, undo/redo, cancellation and final pointerup/save flushes use the same
+authoritative comparison. Brush names do not establish eligibility.
+
+## Preserve fractional target dimensions, not just the transform
+
+Native qualification rejected both translated small surfaces and untranslated
+prefix surfaces. Keeping the Canvas2D transform identical was insufficient:
+the GPU projection also depends on the actual target dimensions.
+
+| Surface mode | Canvas | Transform | Explicit redraw |
+| --- | --- | --- | --- |
+| Both native scales are integers | Local guarded color surface | Native scale plus integer translation | Local guarded surface |
+| Either scale is fractional | One transient color surface at full native dimensions | Full renderer's origin and scale, without translation | Integer native clip around the guarded dirty region |
+
+Both modes draw only the floor inputs needed by the guarded region, then replay
+unchanged static overlays and footer in their established order. Fractional
+mode applies its clip before scaling. It does not repaint all floor cells or
+replace a complete GPU texture. Each surface is released immediately after its
+region is uploaded; no room-sized CPU backing or multiroom canvas cache remains.
+
+The original full renderer, floor rectangles/circles, gradients, sprite helpers,
+material math and drawing order remain intact. There is no replacement floor
+rasterizer, native-resolution change, coordinate quantization or pixel tolerance.
+
+### Resource policy and the revised capacity ceiling
+
+The initial design imposed a universal 1 MiB color-scratch ceiling. Native tests
+showed that smaller fractional targets can change legacy pixels. This design
+**revises that ceiling for fractional rendering**. Issue #37 requires bounded
+scratch and forbids retaining three full native CPU backings; it does not
+prescribe that initial numeric ceiling.
+
+| Limit | Partial-path policy |
+| --- | --- |
+| Changed authoritative cells | At most 16 |
+| Output regions | At most 8 |
+| Summed output area | At most 20% of native pixels |
+| Summed guarded redraw area | At most 20%, counting overlaps separately |
+| Floor inputs | At most 35% of 760 cells, counting repeated inputs separately |
+| Peak local color capacity | 262,144 pixels / 1 MiB |
+| Peak fractional native color capacity | 1,048,576 pixels / 4 MiB |
+| Cumulative allocated color capacity per planned partial refresh | 2,097,152 pixels / 8 MiB |
+| Retained room scratch after completion | Zero |
+
+At 997×563, fractional color capacity is 2,245,244 bytes (about 2.141 MiB).
+At the unchanged 1278×718 benchmark resolution it is 3,670,416 bytes (about
+3.500 MiB), versus 11,011,248 bytes for the former simultaneous three-map full
+build. These are nominal RGBA canvas capacities, not total process or driver
+memory. Larger fractional targets select the existing full renderer before any
+partial allocation. Integer scales retain the local 1 MiB ceiling.
+
+**A small clip does not make allocation free.** Creating a native-sized canvas
+may initialize or clear its entire backing. The 20% limit describes explicit
+guarded redraw area, not all browser/GPU memory writes. Actual capacity,
+allocation attempts/count, cumulative capacity and scratch timing are separate
+diagnostics. Sequential release bounds peak capacity; the cumulative limit
+also bounds repeated native allocations across disjoint regions. The existing
+full fallback can exceed partial-path limits, as it did before this optimization.
 
 ## Authority and fallback
 
 `static_terrain.js` is a data-only UMD module. `capture(room, context)` copies
-the effective floor classifications and canonical static dependencies into an
-immutable snapshot. `plan(previous, next)` returns `full`, `patch` or `noop`,
-the reason, changed cells, native output rectangles and conservative floor-input
-ranges. Only snapshots created by this module are trusted.
+effective floor classifications and canonical dependencies into an immutable
+snapshot. Only snapshots created by the module are trusted. `plan(previous,
+next)` returns `full`, `patch` or `noop`, a reason, changed cells, output regions,
+guarded redraw bounds, canvas geometry and floor-input ranges.
 
-Dependencies include walls, border, blocker styles, trees, mounted lamps,
-decor/pattern exclusions, room pattern, bridge topology, microtile size and
-objective kinds used by mounted-lamp substitution. Context includes native
-dimensions, source/renderer/art/atlas/material identities and exact serialized
-LUT and atlas metadata. In-place color or metadata changes are detected even
-when a theme name, array length or object identity remains unchanged.
+Dependencies include room identity/index/pattern, walls, border, blocker styles,
+trees, mounted lamps, decor/pattern exclusions, bridge topology, microtile size
+and objective kinds used by lamp substitution. Context includes native size,
+source/renderer/art/atlas/material identities and exact serialized LUT/atlas
+metadata. In-place edits are detected even if a name, length or identity remains
+unchanged.
 
-Room entry, resizing, renderer/source replacement, missing or stale rendered
-baselines, static dependency changes and excessive work use the full renderer.
-The wall dependency deliberately catches the vegetation overlap threshold:
-changing a row pair from three shared blockers to four can change its whole
-interstitial population. Replacing a blocker/tree with water also falls back.
+Room entry, resizing, source replacement, missing/stale rendered baselines,
+dependency changes, unsupported microtiles and excessive work use the full
+renderer. Wall authority catches the interstitial-vegetation threshold: crossing
+three-to-four shared blockers can change a whole row pair. Painting over a
+blocker/tree also falls back. Partial microtile sizes are 4, 8 and 16; other
+supported sizes retain the full painter.
 
-Fractional-scale eligibility also depends on the size of the origin-preserving
-raster. The same `raster-pixel-budget`, `raster-budget` and `scratch-budget`
-checks apply before allocation. Overlapping prefixes for distinct output regions
-count separately; their duplicated work cannot hide behind a union-area count.
-After those budget checks pass, the painter records the actual mounted-sprite
-draw footprints without allocating or drawing. At fractional native scales, an
-output intersecting one of those footprints uses `fractional-mounted-sprite`.
-The recorder runs the production `drawDecor` placement path, including sprite
-subrects, substitutions, scale, anchors, flips and rotations. It transforms all
-four destination corners and expands their native bounds by two pixels. Glows
-do not enter this rule. Invalid geometry uses `invalid-context`. Integer scales
-skip the recorder. Neither room names nor benchmark positions select eligibility.
+Geometry and budgets determine eligibility without room-name, benchmark-position
+or sprite-category exceptions. The earlier fractional mounted-sprite and prefix
+fallbacks are removed. Unchanged lamps, patterns and foliage must pass the native
+oracle with the reference target geometry.
 
-Generated decor, authored editor decor, recruitable robots, completed objectives,
-gates and bridge progression remain live presentation under PERF-002. Their
-ordinary changes do not rebake the static backing. Bridge topology is a static
-dependency; bridge completion stage is not.
+PERF-002 generated/authored decor, recruitable robots, completed objectives,
+gates and bridge-stage art remain live presentation. Their ordinary changes do
+not rebake the static backing. Bridge topology is static; completion stage is
+not. Unrelated actors and progression retain their existing ownership.
 
-## Material dependency proof
+## Why materials remain unchanged
 
-Issue #37 describes bounded color/normal/specular recomposition. The production
-painter permits a more precise contract: an eligible terrain edit changes color
-while preserving both material textures. All three complete textures must still
-equal a clean full build byte for byte.
+Issue #37 initially proposed recomposing all three maps. The production painter
+provides a stronger invariant: floor classifications paint only color, while
+every material-writing input is covered by the static snapshot.
 
-The proof follows the actual `StaticPainter.buildSurface` draw path:
-
-| Drawing stage | Color dependency | Normal/specular dependency |
+| Full drawing stage | Color dependency | Normal/specular dependency |
 | --- | --- | --- |
-| Sky and row-major `baseTile` calls | Floor classification, tile seed, microtile size and LUT values | None: `baseTile`, `px` and `dot` receive only the color context |
-| `patternDecor` | Room pattern, exclusions, art and objective roles | Its `sprite` calls use those same unchanged static inputs |
-| `drawBlockerSprites` | Border, walls, blocker styles, room seed and art | Its `sprite`/`spriteSubrect` calls use those same unchanged static inputs |
-| `drawVegetationInterstitials` | Walls, blocker styles, exclusions, room seed and art | Its sprite calls use those same unchanged static inputs |
-| `drawDecor` | Mounted lamps, objective-kind substitutions and art | Its sprite calls use those same unchanged static inputs |
-| Footer | UI LUT and art | None: material contexts are detached before this stage |
+| Sky and row-major floor primitives | Classification, seed, microtile size, LUT | None; floor rectangles/circles receive only the color context |
+| Patterns | Pattern, exclusions, art, objective roles | Same unchanged static inputs |
+| Sorted blockers | Border, walls, styles, room seed, art | Same unchanged static inputs |
+| Interstitial vegetation | Walls, styles, exclusions, seed | Same unchanged static inputs |
+| Mounted decor | Lamps, objective-kind substitutions, art | Same unchanged static inputs |
+| Footer | UI LUT and art | None; material contexts are detached first |
 
-Full builds start the normal and specular canvases transparent. Only `sprite` and
-`spriteSubrect` write into them through `HDArtSheet.drawMap`/`drawMapSubrect`;
-ground, path and water never do. Every input to those static sprite draws is
-covered by the snapshot's dependency, resource, identity and dimension checks.
-Thus changing only effective floor classifications leaves the material draw
-commands and their inputs unchanged. The bounded painter keeps both material
-contexts detached throughout the patch and allocates only a color canvas.
+Full builds initialize material maps transparently. Only `sprite` and
+`spriteSubrect` write into them through `drawMap`/`drawMapSubrect`. A floor-only
+delta leaves their entire draw commands and sources unchanged. Partial builds
+keep material contexts detached, create one color canvas and request no
+transformed-normal sources.
 
-The renderer must already hold a complete, current three-texture baseline before
-using this path. Missing or stale storage, changed material/art resources, LUTs,
-walls or other static dependencies still require a full three-map rebuild.
-Preservation adds no GPU layers or CPU backing and does not relax the whole-texture
-oracle. It also avoids resampling unchanged material sprites into a different
-Canvas2D destination, which native qualification found can alter individual bytes.
+A complete current three-texture GPU baseline is required. Missing/stale storage
+or changed material/art/LUT/static dependencies still rebuild all three maps.
+Preservation adds no GPU layer and does not relax whole-texture equality. It
+avoids resampling unchanged material sprites into another destination, which
+earlier native tests showed could alter individual bytes.
 
-## Bounded composition
+## Output, redraw and canvas geometry
 
-The full `StaticPainter.build` remains the clean reference and fallback.
-`buildPatch` shares its composition primitives through `buildSurface`, including
-the exact tile seeds, row-major floor order, sky, sorted blocker sprites,
-vegetation interstitials, room patterns, mounted lamps and footer.
+Outputs follow the real floor envelope. No accepted primitive extends left or
+above its tile. At microtile 4, the union of floor types reaches at most three
+logical pixels right and two down; sizes 8 and 16 stay inside the tile. Native
+minima use `floor`, maxima use `ceil`, and results are clipped to the frame.
+Only touching outputs merge. No extra native output border replaces unrelated
+pixels.
 
-Each region creates one small color canvas.
-The raster surface includes a 32-native-pixel guard around the output rectangle,
-aligned outward and clipped to the native canvas. Only its interior is uploaded.
-At integer scales its transform uses the full native scale and an integer
-native-pixel translation. At fractional scales its origin is `(0,0)` and the
-context uses the full renderer's save/scale sequence without translation.
-Floor cells covering the raster are replayed in their original order. Static color overlays are replayed into the
-clipped scratch surface to preserve sprite/glow blending with the changed floor.
-No material sprite is drawn during a terrain patch. Footer sprites affect color
-only, as they do in a full build.
+The genuine logical overhang remains: separately drawn opaque rectangles can
+both partially cover one fractional-scale pixel, leaving earlier marks visible.
+The production regression evaluates all 9,120 tile/type/microtile footprints,
+including playable-area edges.
 
-Output bounds follow the changed floor's actual drawing envelope. No accepted
-floor primitive extends left or above its owning tile. At microtile size 4, the
-union of ground/path/water marks extends at most three logical pixels right and
-two down; at sizes 8 and 16 it stays inside the tile. The native output minimum
-is `floor(logical minimum * native scale)`, and its maximum is
-`ceil(logical maximum * native scale)`, clipped to the surface. Floor rectangles
-and circles are filled without strokes, shadows or filters. Outward floor/ceil
-rounding covers pixel squares intersecting their drawing footprint, including
-partially covered edge pixels; an additional native-pixel border would upload
-unrelated pixels. The production primitive regression checks this envelope
-across all 9,120 tile/type/microtile footprints, including the playable area's
-edges.
+Each output receives a 32-native-pixel guard rounded outward to a 16-pixel grid
+and clipped to the frame. The existing four-logical-pixel plus two-native-pixel
+input halo selects neighboring floor marks reaching that area. Floor inputs
+replay in original row-major order. Alignment preserves device-coordinate
+gradient-dither phase in local integer-scale surfaces. Fractional surfaces retain
+both the target dimensions and origin of the full renderer.
 
-The genuine logical overhang is retained. Later opaque neighboring microtiles
-do not justify reducing damage to the owning tile: at fractional scales a pixel
-can receive partial coverage from two separately drawn rectangles, leaving some
-earlier stroke contribution between them. Actual path primitives cross the tile
-bottom at these microtile seams. This implementation therefore removes only the
-extra native output padding, without relying on an opaque-union occlusion claim.
+| Region fields | Meaning |
+| --- | --- |
+| `x`, `y`, `width`, `height` | Tight output uploaded into the existing texture |
+| `rasterX`, `rasterY`, `rasterWidth`, `rasterHeight` | Guarded, explicitly redrawn native area |
+| `tx0`, `ty0`, `tx1`, `ty1` | Floor inputs covering that area and its halo |
+| `canvasMode` | `local` or `native-clip` |
+| `canvasX`, `canvasY`, `canvasWidth`, `canvasHeight` | Actual temporary canvas origin and capacity |
 
-Only these affected output rectangles are merged. Output coordinates need no
-alignment: they crop pixels from an independently aligned raster. That raster
-adds the 32-native-pixel guard and rounds outward to a sixteen-pixel grid before
-clipping to the surface. If either native scale is fractional, its left and top
-edges remain zero; its right and bottom retain the same guarded, rounded bounds.
-Its floor-input range retains the symmetric
-four-logical-pixel plus two-native-pixel halo, replaying every neighboring floor
-mark that can reach the entire scratch. Other microtile sizes retain the full
-renderer until independently qualified.
-
-Raster alignment matters because Skia's gradient dither uses an
-[8x8 table at device coordinates](https://skia.googlesource.com/skia/+/5fdfc51ef3e8/src/gpu/ganesh/SkGr.cpp),
-and its [fragment coordinates use an upper-left origin](https://skia.googlesource.com/skia/+/89c0ddff982bf3383beeba6397d3236526fb4a76/src/sksl/README.md).
-Preserving that phase matters for overlapping lamp glows: the unaligned native
-rectangle `(170,90,28,28)` differed from the full color texture by one byte level
-in 209 pixels, while normal/specular maps and exterior pixels matched exactly
-([diagnostic run](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41563498272)).
-An earlier candidate expanded that rectangle to `(160,80,48,48)`, preserving the
-eight-pixel dither phase. The current implementation preserves the phase at the
-guarded raster origin without expanding the upload to that grid. Material
-sampling exposed a separate problem:
-at `(312,264,32,32)`, two specular-alpha bytes differed by one level, while the
-`(304,256,48,48)` diagnostic variant matched every color/normal/specular byte
-([native comparison](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41564327204)).
-The lower clip cut through a flipped sprite sampled from the large specular
-atlas; extending only its horizontal bounds did not resolve the error.
-Alignment alone was insufficient for a coalesced move: two pixels on the outermost
-scratch column had three differing normal bytes
-([boundary diagnostic](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41565413874)).
-Moving scratch clipping away from the uploaded interior did not reliably fix
-material sampling. In the
-[guarded native run](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41566897343),
-the border case with output `(304,256,48,48)` and raster `(272,224,112,112)`
-differed by one level in seven specular-alpha bytes at native row 293, while color
-and normals matched. A 16-pixel guard also differed in seven bytes, a 64-pixel
-guard differed in five, and the unguarded 48x48 surface matched. These results
-reject guard size as a general material correction. Retaining the already exact,
-unchanged material textures removes that resampling from eligible terrain edits.
-
-The [color-only candidate](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41568094642)
-passed the 640x360 matrix. At 997x563, its first
-water-to-ground edit at cell `(11,6)` exposed two one-level color differences at
-native pixels `(289,187)` and `(266,178)`. Both are outside the changed floor's
-drawing envelope; the earlier aligned upload `(256,128,64,64)` unnecessarily
-replaced them. An initial tightening still retained two extra native pixels on
-each output side. A subsequent path-to-ground edit at cell `(13,6)` differed in
-one color byte at `(348,149)` across every aligned guard variant; the floor's
-native top is approximately `150.133`, so row 149 cannot contain its drawing.
-Removing that output padding preserves these original pixels while retaining
-the complete logical overhang, raster alignment, guard and input replay:
-
-| Native surface, cell `(11,6)` | Output `(x,y,width,height)` | Guarded raster `(x,y,width,height)` |
-| --- | --- | --- |
-| 640x360 | `(176,96,19,18)` | `(144,64,96,96)` |
-| 997x563 | `(274,150,30,29)` | `(0,0,336,224)` |
-
-At 997x563, cell `(13,6)` uses output `(324,150,30,29)` and raster
-`(0,0,400,224)`. The two-native-pixel margin remains solely in the conservative
-raster input range, not in the color upload.
-
-All memory, pixel and work limits still account for the guarded bounds. The
-complete all-three-texture native oracle and unchanged-exterior checks remain
-exact; this change avoids writes outside the affected envelope and introduces
-no comparison tolerance. Native qualification must still establish color
-equality inside the tightened output; alignment and guard constants alone are
-not proof.
-
-### Why fractional rasters retain the full origin and check mounted sprites
-
-The next [native stage diagnostic](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41571669664)
-tested the required changed pixel, rather than an unrelated surrounding pixel.
-For a ground-to-path edit at `(10,7)` in the lamp fixture at 997x563, native color
-pixel `(266,178)` in top-left Canvas coordinates changed from `[85,114,83,255]`
-to the full reference `[103,120,92,255]`; translated scratch produced
-`[104,120,92,255]`. Normal/specular textures and every exterior pixel agreed.
-
-| Production composition prefix | Differing bytes in the complete output crop |
-| --- | ---: |
-| Floor only | 0 |
-| Floor and pattern | 0 |
-| Plus blockers | 0 |
-| Plus interstitials | 0 |
-| Plus mounted decor | 1 |
-| All overlays with glows disabled | 1 |
-| All overlays with sprites disabled | 0 |
-| Patch sprite translations rounded in global native coordinates | 1 |
-
-The translation experiment changed the lamp's local matrix as intended, but did
-not fix the sampled byte. It remains a failure-only diagnostic, not a production
-correction. The observed first divergence is a mounted sprite; the tests do not
-claim to establish the complete browser-internal filtering cause.
-
-A mounted-sprite-only fallback was tested next. It passed that case, but the
-[following native run](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41572947659)
-failed the ground-to-water edit at `(19,10)`: the final color crop differed in six
-required pixels, and the floor-only prefix already differed in 19 bytes before
-any overlay was drawn. Five final differences lay in native column 473, which
-partially covers the floor's left edge at 473.575; the remaining difference lay
-on a microtile boundary in native row 256. Normal/specular and exterior pixels
-again matched exactly. This rejects mounted-sprite classification as a sufficient
-rule for fractional patches.
-
-The implementation retains global native coordinates: a fractional scratch
-begins at `(0,0)`, uses the full scale without an offset, and replays the prefix
-of floor cells plus all static overlays. This preserves the original primitive
-coordinates and transform operations. A candidate using this origin rule alone
-passed the earlier fractional floor cases, then the
-[next native run](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41574605048)
-found one differing color byte during the original 40-event same-count move.
-Its output was `(249,150,55,29)` and its origin-preserving raster was
-`(0,0,336,224)`. At Canvas pixel `(266,178)`, the actual red channel was 104
-while both the previous backing and full reference were 103. All 1,320 pixels
-changed by the full reference matched; normal/specular and exterior bytes also
-matched. Floor, pattern, blocker and interstitial composition prefixes matched,
-and mounted decor introduced the single difference. Disabling glows retained
-it; disabling sprites removed it. This isolates an observed mounted-sprite
-sampling difference without claiming its browser-internal cause.
-
-The production eligibility rule therefore combines both protections: retain
-the global origin for fractional patches, and fall back when their output
-intersects a mounted-sprite footprint. The recorder runs only after prefix
-budgets pass; it performs no canvas allocation, tint/normal lookup, source-image
-sampling, GL call or drawing. The original lamp and same-count cases remain in
-acceptance with explicit full-fallback expectations. An additional near-origin
-edit under unchanged foliage must remain bounded at both sizes and must overlap
-nontransparent normal and specular material pixels. Native whole-texture
-comparison remains mandatory; neither geometry nor deterministic command traces
-substitute for a rendered pass.
-
-The prefix can exceed an unchanged work limit. In that case the original edit
-remains in native acceptance and uses the full renderer with the corresponding
-budget reason. Cases that fit, including the original benchmark actions, must
-still patch. No test fixture is relocated and no pixel tolerance or memory/work
-budget is relaxed. Farther edits and high-resolution fractional surfaces can
-therefore fall back more often than integer-scale edits.
-
-For example, at 997x563 a one-cell edit at `(11,6)` requires a 336x224 prefix
-(75,264 pixels) and 140 floor cells, within the 112,262.2-pixel and 266-cell
-limits. The edit at `(19,10)` would require 544x320 pixels and 322 floor cells,
-so it selects `raster-pixel-budget` before allocating a patch. The decision
-follows geometry and the same limits for every room and content type.
-
-Default planning limits are 16 changed cells, eight merged regions, at most 20%
-of native output pixels and guarded raster pixels, 35% of logical floor raster
-work, and 262,144 pixels in the largest scratch map. Overlapping guards are counted
-separately, including duplicate raster work. Color scratch capacity is at most
-1 MiB on the bounded path. Regions are processed sequentially and released
-immediately; no native CPU backing or multiroom canvas cache is retained.
-
-`GLRenderer.patchBackground` subuploads only color using the native output
-rectangle and vertical orientation. WebGL2's explicit-size `TexImageSource`
-overload crops directly from the guarded color canvas using unpack
-skips; no application-side crop canvas or readback is introduced. This follows the
+`GLRenderer.patchBackground` validates dimensions, mode and all containment
+before querying or changing GL state. The nine-argument WebGL2 DOM-source
+subupload crops directly from the actual canvas. With vertical flipping enabled,
+skip rows count from its bottom. Skips derive from canvas geometry, not the
+smaller redraw clip, following the
 [WebGL2 DOM-source pixel-store contract](https://registry.khronos.org/webgl/specs/latest/2.0/#PIXEL_STORE_PARAM_UPLOAD_DOM).
-With vertical flipping enabled, skipped rows count from the source bottom, as
-implemented by Chromium's `TexImageParams::GetSourceRect`. All three unpack
-settings are restored on success and failure. The renderer validates texture
-storage, output/raster containment, dimensions and the existing complete material
-baseline before the first write. A rendered
-revision and snapshot advance only after the entire update succeeds. Any patch
-failure triggers a synchronous full rebuild; a failed repair invalidates the
-baseline and background key for retry. Scratch and failed full-build canvases are
-released on both success and failure. Replacing an atlas/material source also
-discards derived tint/normal tile caches.
+There is no application crop canvas or readback and no zero-copy claim.
 
-Planner estimates count one upload and four bytes per output pixel for each
-patch region, with four bytes per guarded scratch pixel. Full-build estimates
-retain three uploads and twelve bytes per native pixel. Normal and specular GPU
-storage remains allocated and unchanged during the color-only update.
+Flip and both skip settings are restored on success and failure. Snapshot and
+rendered revision advance only after all regions commit coherently. A partial
+failure triggers synchronous full repair; failed repair invalidates the baseline
+and background key for retry. Scratch is released on success, raster/subupload
+failure and failed repair. Replacing source resources also discards and releases
+derived tint/normal canvases.
 
 ## Diagnostics and timing
 
-F10 runtime diagnostics include `renderer.staticRefresh`: mode/reason, changed
-cells, floor cells rastered, output pixels, guarded raster pixels, upload calls/bytes, scratch capacity,
-regions and retained scratch pixels. No-op refreshes report zero work. Upload
-counters include attempted calls when a failure requires repair.
+F10 exposes `renderer.staticRefresh`: mode/reason, changed cells, charged floor
+inputs, output/redraw area, actual upload calls/bytes, canvas mode/geometry,
+actual peak capacity, allocation attempts/successes/cumulative capacity and
+retained scratch. Noops report zero work. Constructor attempts that throw are
+distinct from successful allocations; failed uploads and repair remain visible.
 
-The opt-in probe separates `static.plan`, full/patch scratch allocation, floor
-raster, static overlays, footer and uploads. Full builds also raster and upload
-normal/specular maps; terrain patches perform only the color upload. The bounded
-renderer performs no full-canvas readback and does not request transformed-normal
-sources. Full material builds use the bounded source cache described below;
-their pixel-transform and small-tile readback behavior is unchanged.
+`scratchPixels` is the largest allocated canvas area; `scratchBytes` is peak
+simultaneous nominal capacity. Full builds retain three-map accounting.
+`scratchAllocationPixels` sums successfully allocated canvas areas, including
+all three full maps, and its byte count is four times that sum. `rasterPixels`
+charges guarded redraw areas independently of allocation capacity.
 
-The performance harness now includes editor path painting as well as editor
-water movement. Both must avoid `static.build`, raster fewer than 760 cells,
-upload bounded color data, preserve both material textures and retain no scratch.
-The existing PERF-003 rivet/editor-water assertions remain mandatory.
+The opt-in probe separates planning, allocation, floor, overlays/materials,
+footer and uploads. To summarize the complete static event, sum nonoverlapping
+parent phases: full `static.build` plus three uploads; or `static.plan`,
+`static.patch.build` and color subupload. Do not double-count scratch/floor/overlay
+children already included in the build parent.
 
-After each candidate water/path timing record and its first post-event frame are
-complete, the harness disables the timing probe and separately compares all
-three GPU textures against a full reference at the actual responsive native
-resolution. It records that size and the exact pixel results in `staticParity`.
-This check does not contribute to the measured event or frame interval; the next
-sample follows the existing reset and settling sequence. A mismatch fails the
-run and preserves pixel/region diagnostics beside the performance output.
+The original visible-water move and path-paint actions keep their coordinates,
+viewport and responsive native resolution. They must avoid a full build and
+texture replacement, obey redraw/floor/capacity limits, preserve materials and
+retain no scratch. Existing PERF-003 bounded-water gates remain mandatory.
 
-PR CI checks out the accepted base and measures both source trees sequentially
-on one host with identical scenarios, three samples and 1x/4x CPU throttling.
-Absolute software-rendered milliseconds remain diagnostic rather than a flaky
-universal latency gate. Raw results and source identities are retained in the
-validation artifact; the final qualification record is linked from the PR.
+After each event and its first post-event frame, timing is disabled and all three
+GPU textures are compared against a full reference at the actual native size.
+`staticParity` records the exact results. This oracle is outside the measured
+event/frame interval. A mismatch fails validation and retains raster diagnostics.
+PR CI measures accepted base then candidate on one host with identical scenarios,
+three samples and 1x/4x throttling. Software-rendered milliseconds are evidence,
+not a universal latency gate or physical-device guarantee.
 
-## Executable acceptance
+## Native investigation record
 
-- `static_terrain_regression_415.js`: exact classification/diff behavior,
-  same-count movement/history, immutable authority, all dependency/identity and
-  work-budget fallbacks, malformed/stale snapshots and all-grid native halo
-  coverage against actual production floor primitive footprints. Patch estimates
-  count color only; full estimates retain all three maps.
-- `static_terrain_runtime_regression_415.js`: production orchestration/upload
-  transactions, no-op behavior, bounded work, resource release and injected
-  raster/subupload/full-repair failures.
-- `static_terrain_browser_415.js`, loaded by the native browser suite: all three
-  complete GPU textures compared with independent clean full builds at 640x360
-  and 997x563, untouched exterior bytes, overlays/materials/footer, editor final
-  flush/history/cancel paths, fallback matrix, failure recovery and preserved
-  water/live-presentation behavior. A frozen accepted full-build body independently
-  checks that the shared composition refactor preserved all nine rooms.
-- The inherited self-test, real GLES shader/pixel suites, all-room native editor
-  suite, 1x/4x performance assertions and before/after source manifests remain
-  required on the final candidate and merged source.
+These failed candidates informed the design; none is successful qualification.
 
-Local Chromium launch is blocked by this execution environment's socket policy.
-Local deterministic/GLES results are distinct from the required hosted native
-browser qualification. A missing or failed native result is not a rendered pass.
+| Evidence | Finding |
+| --- | --- |
+| [Shared/cold sources](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41560857705) | Recreated normal-source canvases could sample differently despite equal source bytes. Full compatibility uses independent cold current/legacy builds; patch/full parity uses the same loaded sources. |
+| [Gradient alignment](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41563498272) | An unaligned local origin changed glow dithering; align guards without expanding output. |
+| [Material guards](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41566897343) | Larger guards did not reliably fix unchanged material resampling; preserve material authority instead. |
+| [Tight outputs](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41568094642) | Upload padding replaced unrelated pixels; retain only the real logical overhang. |
+| [Mounted stage](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41571669664) | A required color byte diverged at mounted decor; global translation rounding did not fix it. |
+| [Local floor divergence](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41572947659) | A fractional local patch differed in 19 floor bytes before overlays. |
+| [Origin-only divergence](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41574605048) | An untranslated prefix still changed a mounted-sprite byte during the original same-count move. |
+| [Origin plus mounted fallback](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41576567695) | The genuine foliage-overlap edit exposed two required floor bytes even with identical global origin. |
 
-### Native oracle inputs
+In the last case, tile `(8,6)` changed ground to path at 997×563. Output
+`(199,150,30,29)` came from a 272×224 prefix. Canvas pixels `(209,168)` and
+`(210,168)` had green 87 instead of 86; both changed in the reference. Material
+and exterior bytes matched. Their five contributors were identical: sky, an
+opaque path microtile, a translucent stripe, the next opaque microtile and its
+top stripe. No circle, neighbor or sprite contributed. The common logical seam
+`y=108` maps to native `168.9`.
 
-The clean full reference uses the actual loaded `HDArtSheet` and its derived
-sprite surfaces, as a normal full refresh does. Independent cold-cache
-current-versus-legacy builds separately qualify the composition refactor across
-all nine rooms and both native sizes. Resource-change cases also require removal
-and release of the old derived surfaces.
+Skia's
+[Ganesh target-state code](https://skia.googlesource.com/skia/+/refs/heads/main/src/gpu/ganesh/gl/GrGLProgram.cpp)
+derives device-to-clip adjustment from actual target dimensions. Its
+[compiler helper](https://skia.googlesource.com/skia/+/c5fb1f796056d9d6f7f72328d92f915fc6ca678d/src/sksl/SkSLCompiler.h)
+uses floating-point `2/width` and `2/height`. Equal Canvas2D coordinates on
+different targets therefore do not establish equal GPU projection arithmetic.
+Target-dependent coverage rounding is supported by these sources and the
+failures; it is not a captured trace of Chromium's exact shader.
 
-This distinction was established by a
-[hosted diagnostic run](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41560857705).
-At 640x360 in Quiet Nest, current and legacy full builders agreed in every
-color/normal/specular byte using shared loaded surfaces. Independent cold
-current/legacy builds also agreed, and all 49 shared transformed-normal cache
-entries had identical source RGBA bytes. Nevertheless, rendering the warm and
-recreated canvas objects into default Chromium destinations produced 3,897
-different normal-map bytes; isolated source sampling reproduced the discrepancy.
-CPU-backed destination comparisons agreed, while changing the entire renderer
-to CPU backing changed many other pixels. The production raster path therefore
-remains unchanged. Patch-versus-full acceptance still requires exact equality
-for every byte of all three textures, using the same loaded source surfaces.
+[Diagnostic run 41578077693](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41578077693)
+holds bounded floor inputs fixed while testing native targets with no clip,
+guard clip and output clip, and tests the small target with every floor cell.
+Both the full-native target without a clip and the full-native target with the
+guard clip matched the full floor-only crop exactly. Replaying all 760 cells on the small target still
+produced the same two green-byte differences, separating target size from
+omitted noncontributing commands. A clip tight to the output introduced 12 byte
+differences in four edge pixels, with maximum difference 5; the guard remains
+necessary. This is the prerequisite evidence for the native-clip design.
+Resolving this diagnostic does not replace the complete original matrix.
 
-### Stable normal-sprite sources
+## Stable transformed-normal sources
 
-The same-source qualification exposed a production cache issue during room
-transitions: the 64-entry FIFO transformed-normal cache could evict a source
-already drawn for the current room. Dawn needs 66 distinct normal transforms,
-so a repeated full draw recreated its entire working set. That source-identity
-churn also occurred during transitions into rooms with smaller working sets.
+The previous 64-entry FIFO cache could churn its own room working set: Dawn
+requires 66 distinct transforms. The cache now promotes hits and retains at most
+96 entries, releasing evicted backing immediately. Every shipped static room
+set fits. Normal-vector math, source pixels, tint-cache limits and draw order
+are unchanged.
 
-The transformed-normal cache now promotes hits and retains at most 96 entries,
-enough for every shipped room's static working set. Eviction still releases the
-old backing immediately. This is a bounded sprite-atlas cache; full-room CPU
-surfaces remain unretained. Normal-vector math, source pixels, tint-cache limits
-and drawing order are unchanged. A production-method regression replays the
-authored room requests, verifies repeated-full source identity and bounded eviction,
-and demonstrates the old FIFO failure with the same data.
+The production-method regression replays 2,958 authored full/repeat requests,
+checks source RGBA/alpha and repeated identity, verifies bounded eviction and
+rejects the old FIFO behavior. A generation counter exposes new normal sources.
+Terrain patches keep material contexts detached and do not advance it.
 
-Each newly created transformed source advances a generation counter, allowing
-the source-cache regression to distinguish hits from recreated canvases. Terrain
-patches keep material contexts detached, so they neither request transformed
-normals nor advance this counter. Their material authority is the complete
-existing GPU baseline, validated against static dependencies and resources.
-No patch-time normal-cache generation repair is required. Full builds still
-benefit from stable source identities, and cache eviction remains bounded for
-authored rooms with larger working sets.
+## Executable acceptance and limits
 
-## Practical limits
+- Planner: immutable authority, same-count/history, dependencies/identities,
+  full-grid floor envelopes, separate clip/canvas geometry, single-axis fractional
+  scales, peak/cumulative budgets, and malformed/stale inputs.
+- Runtime: real Game/StaticPainter/GLRenderer methods; full/partial command
+  traces; independent allocation, clip, crop and material observations; unpack
+  restoration, partial failure, full repair and cleanup.
+- Native browser: every color/normal/specular byte at 640×360 and 997×563;
+  independent accepted full-build compatibility across nine rooms; exterior
+  invariance, overlays/materials/footer, history/final flush/cancel/coalescing,
+  every fallback, water and live ownership.
+- Existing deterministic/GLES suites, unchanged 1x/4x benchmark actions and
+  before/after tracked-source manifests remain mandatory on the final head.
 
-Large strokes and edits to static overlay dependencies intentionally rebuild the
-room. At fractional scales the origin-preserving prefix can exceed a work or
-scratch limit even for one changed cell; those edits use the full renderer.
-Fractional outputs beneath mounted sprites also rebuild, while unchanged foliage
-and glow-only overlaps remain eligible when the geometry fits the same limits.
-Replaying overlay draw commands still has CPU cost, although native raster
-and texture-transfer work is bounded. Linux software-rendered evidence does not
-certify Windows/Firefox drivers or physical low-end frame times. No gameplay,
-campaign data, art, schema or material appearance change is intended.
+Local Chromium is blocked by this environment's socket policy. Local
+deterministic/GLES results do not replace hosted browser qualification. A missing
+or failed native result is not a rendered pass.
+
+Large strokes, structural changes, fragmentation and fractional targets over the
+fixed capacity ceiling intentionally rebuild. Overlay command replay and native
+allocation/initialization still have cost. Linux software rendering does not
+certify Windows/Firefox drivers, high-DPI performance or physical low-end frame
+times. No gameplay, campaign, art, schema, wave or material-appearance change is
+intended.

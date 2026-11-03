@@ -12,7 +12,7 @@
 
   const VERSION=1;
   const CELL_TYPES=Object.freeze({ground:0,path:1,water:2,blocker:3});
-  const DEFAULT_LIMITS=Object.freeze({maxChangedCells:16,maxRegions:8,maxPixelRatio:.20,maxRasterRatio:.35,maxScratchPixels:262144});
+  const DEFAULT_LIMITS=Object.freeze({maxChangedCells:16,maxRegions:8,maxPixelRatio:.20,maxRasterRatio:.35,maxScratchPixels:262144,maxNativeScratchPixels:1048576,maxScratchAllocationPixels:2097152});
   const GEOMETRY_KEYS=['renderWidth','renderHeight','logicalWidth','logicalHeight','tileSize','columns','rows'];
   const REFERENCE_KEYS=['sourceRef','rendererRef','artRef','atlasRef','normalRef','specularRef'];
   const MAX_CELLS=65536,MAX_VALUE_NODES=65536,MAX_VALUE_DEPTH=32;
@@ -130,15 +130,18 @@
     const pixelCount=full?(geometry?geometry.renderWidth*geometry.renderHeight:0):regions.reduce((n,r)=>n+r.width*r.height,0);
     const rasterPixels=full?pixelCount:regions.reduce((n,r)=>n+r.rasterWidth*r.rasterHeight,0);
     const rasterCellCount=full?(geometry?geometry.columns*geometry.rows:0):regions.reduce((n,r)=>n+(r.tx1-r.tx0)*(r.ty1-r.ty0),0);
-    const scratchPixels=full?pixelCount:regions.reduce((n,r)=>Math.max(n,r.rasterWidth*r.rasterHeight),0);
+    const scratchMode=full?'full':regions.length?regions[0].canvasMode:'none';
+    const scratchPixels=full?pixelCount:regions.reduce((n,r)=>Math.max(n,r.canvasWidth*r.canvasHeight),0);
+    const scratchAllocations=full?3:regions.length;
+    const scratchAllocationPixels=full?pixelCount*3:regions.reduce((n,r)=>n+r.canvasWidth*r.canvasHeight,0);
     const bytesPerPixel=full?12:4;
-    return Object.freeze({kind,reason,changedCells:freezeArray(changedCells),changedCellCount:changedCells.length,regions:freezeArray(regions.map(Object.freeze)),pixelCount,rasterPixels,rasterCellCount,scratchPixels,scratchBytes:scratchPixels*bytesPerPixel,uploadCalls:full?3:regions.length,uploadBytes:pixelCount*bytesPerPixel,logicalHalo:LOGICAL_HALO,nativeHalo:NATIVE_HALO,nativeAlignment:NATIVE_ALIGNMENT,rasterGuard:NATIVE_RASTER_GUARD});
+    return Object.freeze({kind,reason,changedCells:freezeArray(changedCells),changedCellCount:changedCells.length,regions:freezeArray(regions.map(Object.freeze)),pixelCount,rasterPixels,rasterCellCount,scratchMode,scratchPixels,scratchBytes:scratchPixels*bytesPerPixel,scratchAllocationAttempts:scratchAllocations,scratchAllocations,scratchAllocationPixels,scratchAllocationBytes:scratchAllocationPixels*4,uploadCalls:full?3:regions.length,uploadBytes:pixelCount*bytesPerPixel,logicalHalo:LOGICAL_HALO,nativeHalo:NATIVE_HALO,nativeAlignment:NATIVE_ALIGNMENT,rasterGuard:NATIVE_RASTER_GUARD});
   }
 
   function limits(options){
     if(!options||typeof options!=='object')return null;
     const out={...DEFAULT_LIMITS,...options};
-    for(const name of ['maxChangedCells','maxRegions','maxScratchPixels'])if(!Number.isSafeInteger(out[name])||out[name]<0)return null;
+    for(const name of ['maxChangedCells','maxRegions','maxScratchPixels','maxNativeScratchPixels','maxScratchAllocationPixels'])if(!Number.isSafeInteger(out[name])||out[name]<0)return null;
     if(out.maxChangedCells>MAX_CELLS||out.maxRegions>MAX_CELLS)return null;
     for(const name of ['maxPixelRatio','maxRasterRatio'])if(!Number.isFinite(out[name])||out[name]<0||out[name]>1)return null;
     return out;
@@ -199,19 +202,21 @@
     const merged=merge(raw);
     if(merged.length>budget.maxRegions)return full('fragmentation',changes);
     const regions=merged.map(rect=>{
-      // Fractional scale must retain the full painter's device origin: even an
-      // integer translation can change floor rasterization. Repaint the entire
-      // bounded prefix, with the same save/scale sequence as a full build.
-      // Integer scales retain local, 16px-aligned guards. Each prefix/guard is
-      // charged separately, including overlaps, against the unchanged limits.
-      const rasterX=fractionalScale?0:Math.max(0,Math.floor((rect.x0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
-      const rasterY=fractionalScale?0:Math.max(0,Math.floor((rect.y0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      // Every patch redraws only its local, aligned guard. Fractional scales
+      // retain the full target size and global device origin separately: the
+      // painter clips that native canvas to these guarded raster bounds.
+      const rasterX=Math.max(0,Math.floor((rect.x0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      const rasterY=Math.max(0,Math.floor((rect.y0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       const rasterX1=Math.min(g.renderWidth,Math.ceil((rect.x1+NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       const rasterY1=Math.min(g.renderHeight,Math.ceil((rect.y1+NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       return{x:rect.x0,y:rect.y0,width:rect.x1-rect.x0,height:rect.y1-rect.y0,
         rasterX,rasterY,rasterWidth:rasterX1-rasterX,rasterHeight:rasterY1-rasterY,
-        // Replay every floor predecessor contributing to the entire scratch,
-        // including its guard. The original logical/native input halo remains.
+        canvasMode:fractionalScale?'native-clip':'local',
+        canvasX:fractionalScale?0:rasterX,canvasY:fractionalScale?0:rasterY,
+        canvasWidth:fractionalScale?g.renderWidth:rasterX1-rasterX,
+        canvasHeight:fractionalScale?g.renderHeight:rasterY1-rasterY,
+        // Replay every floor predecessor contributing to the guarded clip.
+        // Source work and canvas capacity are accounted for independently.
         tx0:Math.max(0,Math.floor((rasterX/sx-LOGICAL_HALO-NATIVE_HALO/sx)/g.tileSize)),
         ty0:Math.max(0,Math.floor((rasterY/sy-LOGICAL_HALO-NATIVE_HALO/sy)/g.tileSize)),
         tx1:Math.min(g.columns,Math.ceil((rasterX1/sx+LOGICAL_HALO+NATIVE_HALO/sx)/g.tileSize)),
@@ -222,7 +227,8 @@
     if(patch.pixelCount>g.renderWidth*g.renderHeight*budget.maxPixelRatio)return full('pixel-budget',changes);
     if(patch.rasterPixels>g.renderWidth*g.renderHeight*budget.maxPixelRatio)return full('raster-pixel-budget',changes);
     if(patch.rasterCellCount>g.columns*g.rows*budget.maxRasterRatio)return full('raster-budget',changes);
-    if(patch.scratchPixels>budget.maxScratchPixels)return full('scratch-budget',changes);
+    if(patch.scratchPixels>(fractionalScale?budget.maxNativeScratchPixels:budget.maxScratchPixels))return full('scratch-budget',changes);
+    if(patch.scratchAllocationPixels>budget.maxScratchAllocationPixels)return full('scratch-allocation-budget',changes);
     return patch;
   }
 

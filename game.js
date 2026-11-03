@@ -335,44 +335,6 @@ class StaticPainter{
     // Explicit mounted lamps: every luminous head has a believable post/root base.
     const mounts=room.decorLamps||[],safeLamps=(this.art.roles.lamps||['lamp_blue']).filter(n=>!objectiveSprites.has(n)&&n.startsWith('lamp_'));for(let mi=0;mi<mounts.length;mi++){const m=mounts[mi],[x,y]=room.center(m.tile),wanted=m.lamp||'lamp_blue',lamp=objectiveSprites.has(wanted)?(safeLamps[mi%Math.max(1,safeLamps.length)]||'lamp_blue'):wanted;this.sprite(ctx,'orb_pillar',x,y+11,{alpha:.96,element:'blockers',scale:.92});this.px(ctx,x-1,y-25,2,28,this.col('tree_shadow',145),.42);this.sprite(ctx,lamp,x,y-18,{alpha:.98,element:'tree_lights',scale:.66});this.glow(ctx,x,y-29,'tree_lights',215,30,.24)}
   }
-  mountedSpriteFootprints(room,renderW,renderH){
-    const invalid=()=>{throw new Error('Invalid mounted sprite footprint context')};
-    if(![renderW,renderH].every(n=>Number.isSafeInteger(n)&&n>0))invalid();
-    const sx=renderW/W,sy=renderH/H;
-    if(Number.isInteger(sx)&&Number.isInteger(sy))return[];
-    if(!room||!this.art?.regions||typeof this.art.worldSize!=='function')invalid();
-    const footprints=[],recorder=Object.create(this);
-    const record=(x,y,w,h,opts={})=>{
-      const rot=opts.rot??0,anchor=opts.anchor||'bottom',alpha=opts.alpha??1;
-      if(![x,y,w,h,rot,alpha].every(Number.isFinite)||w<=0||h<=0||alpha<0||alpha>1||typeof anchor!=='string')invalid();
-      const top=anchor==='bottom'?-h:anchor==='top'?0:-h/2,flip=opts.flip?-1:1,co=Math.cos(rot),si=Math.sin(rot);
-      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-      for(const [u,v] of [[-w/2,top],[w/2,top],[-w/2,top+h],[w/2,top+h]]){
-        const px=(x+u*flip*co-v*si)*sx,py=(y+u*flip*si+v*co)*sy;
-        minX=Math.min(minX,px);minY=Math.min(minY,py);maxX=Math.max(maxX,px);maxY=Math.max(maxY,py);
-      }
-      const x0=Math.floor(minX)-2,y0=Math.floor(minY)-2,x1=Math.ceil(maxX)+2,y1=Math.ceil(maxY)+2;
-      if(![x0,y0,x1,y1,x1-x0,y1-y0].every(Number.isSafeInteger))invalid();
-      if(alpha>0)footprints.push({x:x0,y:y0,width:x1-x0,height:y1-y0});
-      return[w,h];
-    };
-    recorder.sprite=(_ctx,name,x,y,opts={})=>{
-      if(!name||!recorder.art.regions[name])return[0,0];
-      const scale=recorder.spriteScale(name,opts.scale??1);
-      if(!Number.isFinite(scale)||scale<=0)invalid();
-      const [w,h]=recorder.art.worldSize(name,scale);return record(x,y,w,h,opts);
-    };
-    recorder.spriteSubrect=(_ctx,name,sourceX,sourceY,sourceW,sourceH,x,y,w,h,opts={})=>{
-      if(!name||!recorder.art.regions[name])return[0,0];
-      if(![sourceX,sourceY,sourceW,sourceH].every(Number.isFinite)||sourceW<=0||sourceH<=0)invalid();
-      return record(x,y,w,h,opts);
-    };
-    // Replay the placement/substitution authority without tint, Canvas2D,
-    // material-source or cache work. Glows and posts remain patch eligible.
-    recorder.px=recorder.glow=()=>{};recorder.col=()=>'';
-    recorder.materialNormalCtx=null;recorder.materialSpecCtx=null;
-    recorder.drawDecor(null,room);return footprints;
-  }
   drawRobots(ctx,room,state){const entries=room.decorRobots||[];for(let i=0;i<entries.length;i++){const d=entries[i];if(d.id&&state?.hasRobot(d.id))continue;const [x,y]=room.center(d.tile),name=this.robotFrame(d.variant||'cream','idle');this.sprite(ctx,name,x,y+10,{alpha:.96,element:'robot_faces',tintIndex:175+((i*19)%45),scale:.84});const [ow,oh]=this.art.worldSize(name),w=ow*.84,h=oh*.84;this.glow(ctx,x,y+8-h*.5,'robot_faces',205+(i*17)%38,16,.10)}}
   drawEditorDecor(ctx,room){for(const d of room.editorDecor||[]){const name=d.sprite;if(!name||!this.art.regions[name])continue;const meta=this.art.regionMeta(name),element=d.element||meta.element||'far_forest',scale=clamp(Number(d.scale??1),.25,4),alpha=clamp(Number(d.alpha??1),0,1),x=Number(d.x)||0,y=Number(d.y)||0;this.sprite(ctx,name,x,y,{anchor:'bottom',element,scale,alpha,flip:!!d.flip,rot:Number(d.rot)||0,tintIndex:d.tint_index??156,tintStrength:d.tint_strength??meta.tint_strength??.07});const g=d.glow;if(g)this.glow(ctx,x+Number(g.dx||0),y+Number(g.dy||0),g.element||element,Number(g.index??180),Number(g.radius??18),Number(g.alpha??.18))}}
   drawGates(ctx,room,state){const draw=(side,f,open)=>{if(!side)return;const t=room.doorTile(side,f,1),[x,y]=room.center(t),[gw,gh]=this.art.worldSize('gate');if(open){this.glow(ctx,x,y,'tree_lights',238,44,.31);this.sprite(ctx,'gate',x,y+gh*.42,{alpha:1,element:'blockers',tintStrength:.055});}else{this.sprite(ctx,'gate',x,y+gh*.42,{alpha:.82,element:'tree_shadow',tintIndex:138,tintStrength:.34});this.glow(ctx,x,y,'blockers',86,20,.10);}};draw(room.spec.previous_side,room.spec.previous_fraction,true);draw(room.spec.next_side,room.spec.next_fraction,state.roomComplete(room.spec))}
@@ -394,22 +356,31 @@ class StaticPainter{
     return this.buildSurface(room,state,renderW,renderH,raster);
   }
   buildSurface(room,state,renderW,renderH,region){
-    // Full reference and bounded patches share one composition path. Fractional
-    // rasters preserve its global origin; integer scales can use local scratch.
+    // Full and partial draws share primitives. Fractional partial draws retain
+    // the full native target dimensions as well as its origin: the GPU's device
+    // projection depends on the target, independently of the Canvas2D matrix.
     const r=region||{x:0,y:0,width:renderW,height:renderH,tx0:0,ty0:0,tx1:GRID_W,ty1:GRID_H},phase=region?'static.patch':'static.full';
+    const canvasX=region?(r.canvasX??r.x):0,canvasY=region?(r.canvasY??r.y):0,canvasWidth=r.canvasWidth??r.width,canvasHeight=r.canvasHeight??r.height;
+    const allocation=this.lastScratchAllocation={attempts:0,count:0,pixels:0,maxMapPixels:0,peakBytes:0};
+    const allocate=()=>{allocation.attempts++;const canvas=new OffscreenCanvas(canvasWidth,canvasHeight),pixels=canvasWidth*canvasHeight;allocation.count++;allocation.pixels+=pixels;allocation.maxMapPixels=Math.max(allocation.maxMapPixels,pixels);allocation.peakBytes=allocation.pixels*4;return canvas};
     let c=null,normalCanvas=null,specCanvas=null,ctx,bctx,sctx;this.lastMaterialMaps=null;this.microtile=room.floorMicrotile||FLOOR_TILE;
     try{
       perfMeasure(phase+'.scratch',()=>{
-        c=new OffscreenCanvas(r.width,r.height);ctx=c.getContext('2d',{alpha:false});
+        c=allocate();ctx=c.getContext('2d',{alpha:false});
         // Terrain-only deltas cannot change material pixels: baseTile, sky and
         // footer paint color only, and the planner verifies every static sprite
         // dependency. Keep the already qualified normal/specular GPU textures.
         // Repainting unchanged atlas sprites on a translated canvas can change
         // subpixel filtering, even when the source and logical transform agree.
-        if(!region){normalCanvas=new OffscreenCanvas(r.width,r.height);specCanvas=new OffscreenCanvas(r.width,r.height);bctx=normalCanvas.getContext('2d',{alpha:true});sctx=specCanvas.getContext('2d',{alpha:true})}
-        // Fractional patches use the full renderer's global-origin save/scale
-        // sequence. Only local integer-scale rasters need a native translation.
-        for(const x of [ctx,bctx,sctx].filter(Boolean)){x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.save();if(region&&(r.x||r.y))x.translate(-r.x,-r.y);x.scale(renderW/W,renderH/H)}
+        if(!region){normalCanvas=allocate();specCanvas=allocate();bctx=normalCanvas.getContext('2d',{alpha:true});sctx=specCanvas.getContext('2d',{alpha:true})}
+        // The native clip bounds explicit redraw work. Allocation/initialization
+        // can touch the full color capacity and is accounted separately.
+        for(const x of [ctx,bctx,sctx].filter(Boolean)){
+          x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.save();
+          if(region?.canvasMode==='native-clip'){x.beginPath();x.rect(r.x,r.y,r.width,r.height);x.clip()}
+          if(region&&(canvasX||canvasY))x.translate(-canvasX,-canvasY);
+          x.scale(renderW/W,renderH/H);
+        }
       });
       this.materialNormalCtx=bctx;this.materialSpecCtx=sctx;
       perfMeasure(phase+'.floor',()=>{
@@ -591,15 +562,21 @@ class GLRenderer{
     if(!this.backgroundReady||this.backgroundSize?.[0]!==this.nativeW||this.backgroundSize?.[1]!==this.nativeH||![x,y,width,height].every(Number.isInteger)||x<0||y<0||width<=0||height<=0||x+width>this.nativeW||y+height>this.nativeH)throw new Error('Stale or invalid static background patch');
     const rasterX=region.rasterX??x,rasterY=region.rasterY??y,rasterWidth=region.rasterWidth??width,rasterHeight=region.rasterHeight??height;
     if(![rasterX,rasterY,rasterWidth,rasterHeight].every(Number.isInteger)||rasterX<0||rasterY<0||rasterWidth<=0||rasterHeight<=0||rasterX+rasterWidth>this.nativeW||rasterY+rasterHeight>this.nativeH||rasterX>x||rasterY>y||rasterX+rasterWidth<x+width||rasterY+rasterHeight<y+height)throw new Error('Stale or invalid static background patch crop');
-    if(!canvas||canvas.width!==rasterWidth||canvas.height!==rasterHeight)throw new Error('Incomplete static color patch');
+    const canvasX=region.canvasX??rasterX,canvasY=region.canvasY??rasterY,canvasWidth=region.canvasWidth??rasterWidth,canvasHeight=region.canvasHeight??rasterHeight;
+    if(region.canvasMode!==undefined&&!['local','native-clip'].includes(region.canvasMode))throw new Error('Invalid static background canvas mode');
+    if(![canvasX,canvasY,canvasWidth,canvasHeight].every(Number.isInteger)||canvasX<0||canvasY<0||canvasWidth<=0||canvasHeight<=0||canvasX+canvasWidth>this.nativeW||canvasY+canvasHeight>this.nativeH||canvasX>rasterX||canvasY>rasterY||canvasX+canvasWidth<rasterX+rasterWidth||canvasY+canvasHeight<rasterY+rasterHeight)throw new Error('Stale or invalid static background canvas');
+    if(region.canvasMode==='local'&&(canvasX!==rasterX||canvasY!==rasterY||canvasWidth!==rasterWidth||canvasHeight!==rasterHeight))throw new Error('Incomplete local static raster');
+    if(region.canvasMode==='native-clip'&&(canvasX!==0||canvasY!==0||canvasWidth!==this.nativeW||canvasHeight!==this.nativeH))throw new Error('Incomplete native static projection');
+    if(!canvas||canvas.width!==canvasWidth||canvas.height!==canvasHeight)throw new Error('Incomplete static color patch');
     const flip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels=g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows=g.getParameter(g.UNPACK_SKIP_ROWS);
     const upload=(tex,src,label)=>perfMeasure(label,()=>{g.bindTexture(g.TEXTURE_2D,tex);this.backgroundUploadCalls=(this.backgroundUploadCalls||0)+1;this.backgroundUploadBytes=(this.backgroundUploadBytes||0)+width*height*4;g.texSubImage2D(g.TEXTURE_2D,0,x,this.nativeH-y-height,width,height,g.RGBA,g.UNSIGNED_BYTE,src)});
     this.backgroundReady=false;
     try{
       // Draw filtering away from the uploaded interior. WebGL2 selects the crop
-      // directly from the guarded canvas; with flip enabled, skipped rows count
-      // from its bottom. No intermediate crop canvas or readback is required.
-      g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);g.pixelStorei(g.UNPACK_SKIP_PIXELS,x-rasterX);g.pixelStorei(g.UNPACK_SKIP_ROWS,rasterHeight-(y-rasterY)-height);
+      // directly from the actual canvas; its capacity can exceed the clip. With
+      // flip enabled, skipped rows count from the source canvas's bottom.
+      // No intermediate crop canvas or readback is required.
+      g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);g.pixelStorei(g.UNPACK_SKIP_PIXELS,x-canvasX);g.pixelStorei(g.UNPACK_SKIP_ROWS,canvasHeight-(y-canvasY)-height);
       // Only a dependency-qualified terrain delta reaches this method. Both
       // material textures remain byte-for-byte identical to the full baseline.
       upload(this.bgTex,canvas,'static.patch.upload.color');
@@ -922,23 +899,25 @@ class Game{
       catch(_err){plan={kind:'full',reason:'invalid-context'}}
       if(force)plan={...plan,kind:'full',reason:'forced'};
       else if(previous&&(!renderer.backgroundReady||this.staticBackgroundRevision!==renderer.backgroundRevision))plan={...plan,kind:'full',reason:'stale-background'};
-      else if(plan.kind==='patch'){
-        try{
-          const footprints=this.painter.mountedSpriteFootprints(this.room,renderer.nativeW,renderer.nativeH);
-          if(footprints.some(s=>plan.regions.some(r=>r.x<s.x+s.width&&s.x<r.x+r.width&&r.y<s.y+s.height&&s.y<r.y+r.height)))plan={...plan,kind:'full',reason:'fractional-mounted-sprite'};
-        }catch(_err){plan={...plan,kind:'full',reason:'invalid-context'}}
-      }
     });
     // Asset replacement on an existing HDArtSheet must also discard derived
     // tint/normal tiles; their historical keys identify sprite names, not images.
     if(previous?.valid&&snapshot?.valid&&previous.references[2]===this.art&&(previous.resourceSignature!==snapshot.resourceSignature||previous.references.slice(3).some((ref,i)=>ref!==snapshot.references[i+3]))){
       for(const cache of [this.art.tintCache,this.art.normalTransformCache]){if(cache){for(const canvas of cache.values())releaseCanvasBacking(canvas);cache.clear()}}
     }
-    const stats={mode:plan.kind,reason:plan.reason,changedCells:plan.changedCellCount||0,rasterCells:0,rasterPixels:0,pixels:0,uploadCalls:0,uploadBytes:0,scratchPixels:0,scratchBytes:0,readbackPixels:0,regions:[],retainedScratchPixels:0};
+    const stats={mode:plan.kind,reason:plan.reason,changedCells:plan.changedCellCount||0,rasterCells:0,rasterPixels:0,pixels:0,uploadCalls:0,uploadBytes:0,scratchMode:plan.kind==='patch'?plan.scratchMode:plan.kind==='noop'?'none':'full',scratchPixels:0,scratchBytes:0,scratchAllocationAttempts:0,scratchAllocations:0,scratchAllocationPixels:0,scratchAllocationBytes:0,readbackPixels:0,regions:[],retainedScratchPixels:0};
     this.staticRefreshStats=stats;
+    const paint=build=>{
+      this.painter.lastScratchAllocation=null;
+      try{return build()}
+      finally{
+        const a=this.painter.lastScratchAllocation;
+        if(a){stats.scratchAllocationAttempts+=a.attempts;stats.scratchAllocations+=a.count;stats.scratchAllocationPixels+=a.pixels;stats.scratchAllocationBytes+=a.pixels*4;stats.scratchPixels=Math.max(stats.scratchPixels,a.maxMapPixels);stats.scratchBytes=Math.max(stats.scratchBytes,a.peakBytes)}
+      }
+    };
     const full=()=>{
-      stats.mode='full';stats.rasterCells+=GRID_W*GRID_H;stats.pixels+=renderer.nativeW*renderer.nativeH;stats.rasterPixels+=renderer.nativeW*renderer.nativeH;stats.scratchPixels=Math.max(stats.scratchPixels,renderer.nativeW*renderer.nativeH);stats.scratchBytes=Math.max(stats.scratchBytes,renderer.nativeW*renderer.nativeH*12);
-      const staticCanvas=perfMeasure('static.build',()=>this.painter.build(this.room,this.state,renderer.nativeW,renderer.nativeH)),materialMaps=this.painter.lastMaterialMaps;
+      stats.mode='full';stats.scratchMode='full';stats.rasterCells+=GRID_W*GRID_H;stats.pixels+=renderer.nativeW*renderer.nativeH;stats.rasterPixels+=renderer.nativeW*renderer.nativeH;
+      const staticCanvas=paint(()=>perfMeasure('static.build',()=>this.painter.build(this.room,this.state,renderer.nativeW,renderer.nativeH))),materialMaps=this.painter.lastMaterialMaps;
       try{renderer.setBackground(staticCanvas,materialMaps)}finally{releaseCanvasBacking(staticCanvas);releaseCanvasBacking(materialMaps?.normal);releaseCanvasBacking(materialMaps?.spec);this.painter.lastMaterialMaps=null}
     };
     try{
@@ -949,8 +928,8 @@ class Game{
         try{
           for(const region of plan.regions){
             const rasterPixels=(region.rasterWidth??region.width)*(region.rasterHeight??region.height);
-            stats.rasterCells+=(region.tx1-region.tx0)*(region.ty1-region.ty0);stats.pixels+=region.width*region.height;stats.rasterPixels+=rasterPixels;stats.scratchPixels=Math.max(stats.scratchPixels,rasterPixels);stats.scratchBytes=Math.max(stats.scratchBytes,rasterPixels*4);stats.regions.push({...region});
-            const staticCanvas=perfMeasure('static.patch.build',()=>this.painter.buildPatch(this.room,this.state,renderer.nativeW,renderer.nativeH,region));
+            stats.rasterCells+=(region.tx1-region.tx0)*(region.ty1-region.ty0);stats.pixels+=region.width*region.height;stats.rasterPixels+=rasterPixels;stats.regions.push({...region});
+            const staticCanvas=paint(()=>perfMeasure('static.patch.build',()=>this.painter.buildPatch(this.room,this.state,renderer.nativeW,renderer.nativeH,region)));
             try{renderer.patchBackground(region,staticCanvas)}finally{releaseCanvasBacking(staticCanvas);this.painter.lastMaterialMaps=null}
           }
         }catch(err){stats.reason='patch-failed';stats.repairError=String(err?.message||err);full()}
