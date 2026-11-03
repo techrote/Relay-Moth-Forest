@@ -323,6 +323,94 @@
     return out;
   }
 
+  // Diagnostic hypotheses only: isolate the first composition stage which
+  // differs without changing the production renderer or the exact pixel gate.
+  function compositionStageDiagnostics(actual,uploads,failurePixels){
+    const width=actual.width,height=actual.height,first=failurePixels[0];
+    const upload=uploads.find(u=>u.channel==='color'&&first&&first.x>=u.x&&first.x<u.x+u.width&&first.y>=u.y&&first.y<u.y+u.height)||uploads.find(u=>u.channel==='color');
+    if(!upload)return[];
+    const region=game.staticRefreshStats?.regions?.find(r=>r.x===upload.x&&r.y===height-upload.y-upload.height&&r.width===upload.width&&r.height===upload.height);
+    check(region,'composition diagnostic has no matching planned raster');
+    const points=failurePixels.filter(p=>p.x>=upload.x&&p.x<upload.x+upload.width&&p.y>=upload.y&&p.y<upload.y+upload.height);
+    const overlays=['patternDecor','drawBlockerSprites','drawVegetationInterstitials','drawDecor'];
+    const stages=[
+      {name:'floor-only',prefix:0},{name:'floor+pattern',prefix:1},{name:'floor+pattern+blockers',prefix:2},
+      {name:'floor+pattern+blockers+interstitials',prefix:3},{name:'all-overlays',prefix:4},
+      {name:'all-overlays-no-glow',prefix:4,noGlow:true},{name:'all-overlays-no-sprites',prefix:4,noSprites:true},
+      {name:'hypothesis-global-native-sprite-translation',prefix:4,quantizeSprites:true}
+    ];
+    const art=game.art,cache=art.normalTransformCache,entries=[...cache],generation=art.normalTransformGeneration;
+    const cachedSources=new Map(entries),sourceSizes=entries.map(([key,canvas])=>[key,canvas.width,canvas.height]);
+    const normalOwn=Object.prototype.hasOwnProperty.call(art,'transformedNormal'),normal=art.transformedNormal;
+    // Full color prefixes still use the production full builder. Every normal
+    // source was warmed by the preceding full oracle; prohibit a new source so
+    // these diagnostic builds cannot evict or resize production normal inputs.
+    art.transformedNormal=function(name,flip=false,rot=0){
+      if(this===art&&this.normalImg&&(flip||rot)){
+        const key=name+'|'+(flip?1:0)+'|'+rot.toFixed(6);
+        check(cachedSources.has(key)&&cache.get(key)===cachedSources.get(key),'composition diagnostic would replace normal source '+key);
+      }
+      return normal.call(this,name,flip,rot);
+    };
+    const cropFull=bytes=>{
+      const out=new Uint8Array(upload.width*upload.height*4);
+      for(let y=0;y<upload.height;y++)out.set(bytes.subarray(((upload.y+y)*width+upload.x)*4,((upload.y+y)*width+upload.x+upload.width)*4),y*upload.width*4);
+      return out;
+    };
+    const configure=(painter,stage,patch,corrections)=>{
+      for(let i=stage.prefix;i<overlays.length;i++)painter[overlays[i]]=()=>{};
+      if(stage.noGlow)painter.glow=()=>{};
+      if(stage.noSprites){painter.sprite=()=>[0,0];painter.spriteSubrect=()=>[0,0]}
+      if(stage.quantizeSprites&&patch)for(const method of ['sprite','spriteSubrect']){
+        const draw=painter[method];
+        painter[method]=function(ctx,...args){
+          check(ctx.canvas.width===region.rasterWidth&&ctx.canvas.height===region.rasterHeight&&ctx.getContextAttributes().alpha===false,'translation hypothesis received a non-patch color context');
+          const ownTranslate=Object.prototype.hasOwnProperty.call(ctx,'translate'),translate=ctx.translate;
+          ctx.translate=function(x,y){
+            translate.call(this,x,y);
+            const m=this.getTransform(),e=Math.fround(m.e+region.rasterX)-region.rasterX,f=Math.fround(m.f+region.rasterY)-region.rasterY;
+            this.setTransform(m.a,m.b,m.c,m.d,e,f);
+            const applied=this.getTransform();
+            corrections.push({method,sprite:args[0],anchor:[x,y],before:[m.e,m.f],requested:[e,f],applied:[applied.e,applied.f],delta:[applied.e-m.e,applied.f-m.f]});
+          };
+          try{return draw.call(this,ctx,...args)}finally{if(ownTranslate)ctx.translate=translate;else delete ctx.translate}
+        };
+      }
+    };
+    const results=[];
+    try{
+      for(const stage of stages){
+        const fullPainter=new StaticPainter(art,game.luts),patchPainter=new StaticPainter(art,game.luts),corrections=[];
+        const entry={name:stage.name,diagnosticOnly:true,region,footerRetained:true,normalGenerationBefore:art.normalTransformGeneration};
+        let fullColor=null,fullMaps=null,patchColor=null,patchMaps=null;
+        try{
+          configure(fullPainter,stage,false,corrections);configure(patchPainter,stage,true,corrections);
+          fullColor=fullPainter.build(game.room,game.state,width,height);fullMaps=fullPainter.lastMaterialMaps;
+          const fullBytes=uploadReference(game.renderer.gl,fullColor,width,height),fullCrop=cropFull(fullBytes);
+          patchColor=patchPainter.buildPatch(game.room,game.state,width,height,region);patchMaps=patchPainter.lastMaterialMaps;
+          const patchBytes=uploadCroppedReference(game.renderer.gl,patchColor,region);
+          entry.color=differences(patchBytes,fullCrop,upload.width);
+          entry.failurePixels=points.map(p=>{
+            const f=(p.y*width+p.x)*4,l=((p.y-upload.y)*upload.width+p.x-upload.x)*4;
+            return{x:p.x,y:p.y,canvasY:height-1-p.y,full:Array.from(fullBytes.subarray(f,f+4)),patch:Array.from(patchBytes.subarray(l,l+4))};
+          });
+          entry.normalGenerationAfter=art.normalTransformGeneration;
+          if(stage.quantizeSprites){entry.rasterOrigin=[region.rasterX,region.rasterY];entry.translationCorrections=corrections}
+        }catch(error){entry.error=String(error);entry.stack=error?.stack}
+        finally{release(fullColor);release(fullMaps?.normal);release(fullMaps?.spec);release(patchColor);release(patchMaps?.normal);release(patchMaps?.spec)}
+        results.push(entry);
+      }
+    }finally{
+      if(normalOwn)art.transformedNormal=normal;else delete art.transformedNormal;
+      const stable=art.normalTransformCache===cache&&art.normalTransformGeneration===generation&&cache.size===entries.length&&
+        sourceSizes.every(([key,w,h])=>cache.get(key)===cachedSources.get(key)&&cache.get(key).width===w&&cache.get(key).height===h);
+      // Restore the pre-diagnostic LRU order as well as retaining every source.
+      cache.clear();for(const [key,canvas] of entries)cache.set(key,canvas);
+      check(stable,'composition diagnostic changed production normal cache');
+    }
+    return results;
+  }
+
   function parity(label,before=null,uploads=[]){
     const actual=capture(),expected=reference(),result={};let firstFailure=null;
     for(let c=0;c<channels.length;c++){
@@ -369,6 +457,7 @@
         native:[actual.width,actual.height],beforeNative:before?[before.width,before.height]:null,maps:result,glError,
         pixelCoordinates:'WebGL bottom-left',uploadCoordinates:'WebGL bottom-left',subUploads:uploads.map(rect=>({...rect})),staticRefreshStats:JSON.parse(JSON.stringify(game.staticRefreshStats||{}))};
       if(before&&uploads.length)try{root.__staticRasterDiagnostics.patchVariants=patchRasterDiagnostics(actual,expected,uploads)}catch(error){root.__staticRasterDiagnostics.patchVariantError=String(error)}
+      if(before&&uploads.length)try{root.__staticRasterDiagnostics.compositionStages=compositionStageDiagnostics(actual,uploads,result.color.examples)}catch(error){root.__staticRasterDiagnostics.compositionStageError=String(error)}
       check(false,(firstFailure||label+' WebGL error '+glError)+'\nPERF-004 raster diagnostics '+JSON.stringify(root.__staticRasterDiagnostics));
     }
     return result;
