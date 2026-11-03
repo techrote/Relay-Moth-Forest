@@ -6,12 +6,15 @@ From the repository root:
 
 ```text
 python -m pip install -r tools/requirements-authoring.txt
+python tools/source_manifest.py --check
 python self_test.py
 ```
 
 The launcher itself uses Python's standard library. Authoring/tests use Pillow, NumPy and Node; direct pixel tests also need a usable GLES3/EGL environment. Preserve the repository's established suite rather than substituting source-string checks for executable behavior.
 
 The self-test covers map/story/LUT/effect contracts, atlas roles/bounds, 27 staged objective/exit routes, Tin Stream bridge progression, movement/collision/input, follower recovery, ambient actors, resource bounds, editor/save isolation, foliage depth/order and sprite/material/shader/pixel contracts. The exact command list is in `self_test.py`.
+
+In a Git checkout, the separate manifest check verifies both the tracked file inventory and its bytes. Expected failures while editing are resolved by staging intended additions/removals and regenerating the manifest after the source is final; see [Development](DEVELOPMENT.md#v415-consolidation-and-reproducible-checksums). A source archive without `.git` uses `sha256sum -c SHA256SUMS.txt` instead.
 
 ## v4.15 editor release gates
 
@@ -62,9 +65,25 @@ Run:
 python tests/current/state_change_performance_415.py --out /tmp/perf-001a.json --samples 3
 ```
 
-Repeat `--cpu-throttle` to compare controlled Chromium CPU-throttling rates, for example `--cpu-throttle 1 --cpu-throttle 4 --cpu-throttle 6`. The JSON retains raw samples plus median/p95/max phase and frame-gap summaries. See [PERF-001A measurement record](validation/performance/PERF-001A.md) for the baseline methodology and [PERF-002 validation](validation/performance/PERF-002.md) for the mutable-presentation before/after result.
+Repeat `--cpu-throttle` to compare controlled Chromium CPU-throttling rates, for example `--cpu-throttle 1 --cpu-throttle 4 --cpu-throttle 6`. The JSON retains raw samples plus median/p95/max phase and frame-gap summaries. See [PERF-001A measurement record](validation/performance/PERF-001A.md) for the baseline methodology, [PERF-002 validation](validation/performance/PERF-002.md) for the mutable-presentation result, and [PERF-003 validation](validation/performance/PERF-003.md) for bounded water updates and the measured canvas-readback fix.
 
 Do not use one absolute CI millisecond value as a universal pass/fail target. The harness is intended to establish which synchronous phase dominates and how that work scales; physical low-end hardware evidence remains valuable.
+
+PERF-003 adds complete-field bounded-vs-full comparisons to the ordinary self-test. The native browser suite checks the uploaded water textures against full-rebuild references. The timing harness requires bounded SurfaceFX and legacy-mask paths for the representative rivet/editor-water scenarios and a field upload smaller than the full texture. Its diagnostic timings must still be inspected for remaining synchronous stalls; passing the bounded-work assertions alone does not certify smooth hardware frame times.
+
+## Continuous integration
+
+[Validate source and runtime](../.github/workflows/validate.yml) uses one GitHub-hosted Ubuntu 24.04 job with Python 3.12 and Node 22. It runs for PRs targeting `main`, main pushes and manual dispatch. It checks the exact PR head, records the actual tested commit/tree separately from the event SHA and cancels stale runs for the same PR/ref. There is no parallel test matrix or duplicate feature-branch push run.
+
+The job runs these gates once in order:
+
+1. Complete tracked-source manifest check.
+2. Required surfaceless GLES3 context, followed by `python self_test.py`, including genuine production shader/pixel tests. Missing GLES support fails CI instead of being accepted as rendered coverage.
+3. `browser_render_regression_414.py` against real Chromium/WebGL2, including editor interactions and bounded texture parity.
+4. `state_change_performance_415.py --samples 3 --cpu-throttle 1 --cpu-throttle 4`, preserving measurements and enforcing the bounded-work assertions.
+5. A second manifest check to detect any shipped-source changes made by tests.
+
+The artifact `relay-moth-validation-<run-id>-<attempt>` is uploaded even after a test failure and retained for 30 days. It contains source identity, installed Python package versions, stage logs, browser JSON/screenshots and raw performance JSON for stages that ran. A missing result indicates that its stage did not complete; it is not a passing result. Preserve release/acceptance evidence beyond the artifact retention window when required.
 
 ## Documentation and packaging
 

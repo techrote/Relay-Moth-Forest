@@ -1,0 +1,1294 @@
+{
+  "schema": "relay-moth-perf-001a/v1",
+  "note": "Diagnostic relative evidence; absolute CI milliseconds are not a universal performance target.",
+  "samplesPerScenario": 3,
+  "runs": [
+    {
+      "cpuThrottle": 1.0,
+      "environment": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+        "dpr": 1,
+        "viewport": [
+          1280,
+          800
+        ],
+        "canvas": [
+          1278,
+          718
+        ],
+        "requestedNative": [
+          1278,
+          718
+        ],
+        "native": [
+          1278,
+          718
+        ],
+        "renderScale": 1,
+        "graphics": {
+          "maxFPS": 60,
+          "bloom": true,
+          "bloomIntensity": 0.28,
+          "bloomThreshold": 0.74,
+          "saturation": 1.05,
+          "gradeMix": 0.03,
+          "vignette": 0.065,
+          "grain": 0.0006,
+          "exposure": 1,
+          "brightness": 0,
+          "contrast": 1,
+          "gamma": 1,
+          "gradeTemperature": 0,
+          "gradeTint": 0,
+          "shadowLift": 0,
+          "highlightGain": 0,
+          "lighting": true,
+          "ambientInitial": 0.68,
+          "ambientComplete": 0.94,
+          "forceCompleteLight": false,
+          "emissive": 1,
+          "lightRadius": 1.78,
+          "shadows": true,
+          "shadowStrength": 0.2,
+          "shadowLength": 0.92,
+          "shadowSoftness": 1.05,
+          "shadowWidthRobots": 0.96,
+          "shadowWidthLargeDecor": 1.12,
+          "shadowWidthSmallDecor": 0.8,
+          "ao": true,
+          "aoStrength": 0.16,
+          "bump": true,
+          "bumpStrength": 1.15,
+          "specular": 0.28,
+          "waterFX": true,
+          "waterStrength": 1.05,
+          "magicFX": true,
+          "fxIntensity": 0.92,
+          "portalFX": true,
+          "surfaceFX": true,
+          "waterQuality": 3,
+          "waterWaveScale": 1,
+          "waterWaveSpeed": 0.9,
+          "shoreFoamStrength": 1.08,
+          "waterRippleStrength": 1.18,
+          "waterRippleBudget": 10,
+          "waterNormalStrength": 1.34,
+          "waterDetailStrength": 1.12,
+          "waterHighlightStrength": 1.42,
+          "waterEdgeStrength": 1.18,
+          "waterRefractionStrength": 1.05,
+          "grassFX": true,
+          "grassFineFX": false,
+          "grassQuality": 3,
+          "grassDensity": 2.15,
+          "grassWindStrength": 0.82,
+          "grassWindSpeed": 0.82,
+          "grassPushStrength": 0.95,
+          "grassHeroStrength": 1,
+          "foliageFX": true,
+          "foliageQuality": 3,
+          "foliageWindStrength": 0.78,
+          "foliageWindSpeed": 0.82,
+          "foliageInteractionStrength": 1,
+          "foliageShadingStrength": 0.9,
+          "foliageBendAmount": 1,
+          "foliageShowRoots": false,
+          "foliageShowInteractionRadii": false,
+          "foliageFreezeWind": false,
+          "foliageCategoryView": false,
+          "floaterFX": false,
+          "floaterStrength": 1,
+          "mothOrbitSpeed": 1,
+          "mothOrbitDistance": 1,
+          "mothChaos": 0.55
+        },
+        "driver": {
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+          "renderer": "ANGLE (Mesa, llvmpipe (LLVM 20.1.2 256 bits), OpenGL ES 3.2)"
+        }
+      },
+      "scenarios": {
+        "objective-rivet": {
+          "summary": {
+            "syncMs": {
+              "median": 128.39999999850988,
+              "p95": 293.54999999850986,
+              "max": 311.8999999985099,
+              "samples": [
+                311.8999999985099,
+                128.39999999850988,
+                60.900000002235174
+              ]
+            },
+            "frameGapMs": {
+              "median": 136.0,
+              "p95": 305.10999999865885,
+              "max": 323.8999999985099,
+              "samples": [
+                323.8999999985099,
+                136.0,
+                67.0
+              ]
+            },
+            "firstFrameAfterMs": {
+              "median": 136.0,
+              "p95": 302.6799999993294,
+              "max": 321.19999999925494,
+              "samples": [
+                321.19999999925494,
+                136.0,
+                66.90000000223517
+              ]
+            },
+            "phases": {
+              "progress.localStorage": {
+                "median": 0.0,
+                "p95": 0.0,
+                "max": 0.0,
+                "samples": [
+                  0.0,
+                  0.0,
+                  0.0
+                ]
+              },
+              "progress.serialize": {
+                "median": 0.0,
+                "p95": 0.08999999798834322,
+                "max": 0.09999999776482582,
+                "samples": [
+                  0.0,
+                  0.09999999776482582,
+                  0.0
+                ]
+              },
+              "surface.water.acquire.downsample": {
+                "median": 0.10000000149011612,
+                "p95": 0.10000000149011612,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.10000000149011612,
+                  0.0,
+                  0.10000000149011612
+                ]
+              },
+              "surface.water.acquire.read-mask": {
+                "median": 0.6000000014901161,
+                "p95": 0.869999998807907,
+                "max": 0.8999999985098839,
+                "samples": [
+                  0.8999999985098839,
+                  0.6000000014901161,
+                  0.5
+                ]
+              },
+              "surface.water.distance": {
+                "median": 0.6999999992549419,
+                "p95": 1.330000001937151,
+                "max": 1.4000000022351742,
+                "samples": [
+                  0.6999999992549419,
+                  1.4000000022351742,
+                  0.10000000149011612
+                ]
+              },
+              "surface.water.encode": {
+                "median": 0.19999999925494194,
+                "p95": 1.5499999992549418,
+                "max": 1.699999999254942,
+                "samples": [
+                  1.699999999254942,
+                  0.19999999925494194,
+                  0.19999999925494194
+                ]
+              },
+              "surface.water.plan": {
+                "median": 0.3999999985098839,
+                "p95": 0.5799999978393316,
+                "max": 0.5999999977648258,
+                "samples": [
+                  0.5999999977648258,
+                  0.3999999985098839,
+                  0.19999999925494194
+                ]
+              },
+              "surface.water.total": {
+                "median": 2.900000002235174,
+                "p95": 4.340000000223517,
+                "max": 4.5,
+                "samples": [
+                  4.5,
+                  2.900000002235174,
+                  1.300000000745058
+                ]
+              },
+              "surface.water.upload": {
+                "median": 0.0,
+                "p95": 0.0900000013411045,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.0,
+                  0.0,
+                  0.10000000149011612
+                ]
+              },
+              "ui.update.trigger": {
+                "median": 0.09999999776482582,
+                "p95": 0.10000000111758708,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.09999999776482582,
+                  0.09999999776482582,
+                  0.10000000149011612
+                ]
+              },
+              "water.acquire.read-mask": {
+                "median": 124.99999999627471,
+                "p95": 287.8100000016391,
+                "max": 305.9000000022352,
+                "samples": [
+                  305.9000000022352,
+                  124.99999999627471,
+                  58.900000002235174
+                ]
+              },
+              "water.authority.diff": {
+                "median": 0.0,
+                "p95": 0.17999999932944774,
+                "max": 0.19999999925494194,
+                "samples": [
+                  0.19999999925494194,
+                  0.0,
+                  0.0
+                ]
+              },
+              "water.bridge.commit.total": {
+                "median": 128.10000000149012,
+                "p95": 292.71000000014897,
+                "max": 311.0,
+                "samples": [
+                  311.0,
+                  128.10000000149012,
+                  60.599999997764826
+                ]
+              },
+              "water.mask.patch": {
+                "median": 0.09999999776482582,
+                "p95": 0.10000000111758708,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.09999999776482582,
+                  0.10000000149011612,
+                  0.0
+                ]
+              },
+              "water.refresh.total": {
+                "median": 128.0,
+                "p95": 292.3400000013411,
+                "max": 310.6000000014901,
+                "samples": [
+                  310.6000000014901,
+                  128.0,
+                  60.5
+                ]
+              },
+              "water.upload": {
+                "median": 125.09999999776483,
+                "p95": 287.90999999977646,
+                "max": 306.0,
+                "samples": [
+                  306.0,
+                  125.09999999776483,
+                  59.0
+                ]
+              },
+              "water.upload.texture": {
+                "median": 0.09999999776482582,
+                "p95": 0.10000000111758708,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.09999999776482582,
+                  0.10000000149011612,
+                  0.0
+                ]
+              }
+            },
+            "dominantMedianPhase": {
+              "name": "water.upload",
+              "ms": 125.09999999776483
+            }
+          },
+          "records": [
+            {
+              "id": 1,
+              "name": "objective-complete",
+              "meta": {
+                "room": "tin_stream",
+                "objectId": "rivet_a",
+                "kind": "rivet"
+              },
+              "startedAt": 8768.5,
+              "syncMs": 311.8999999985099,
+              "frameGapMs": 323.8999999985099,
+              "firstFrameAfterMs": 321.19999999925494,
+              "phases": {
+                "progress.serialize": 0,
+                "progress.localStorage": 0,
+                "water.authority.diff": 0.19999999925494194,
+                "water.mask.patch": 0.09999999776482582,
+                "water.acquire.read-mask": 305.9000000022352,
+                "water.upload.texture": 0.09999999776482582,
+                "water.upload": 306,
+                "surface.water.plan": 0.5999999977648258,
+                "surface.water.acquire.downsample": 0.10000000149011612,
+                "surface.water.acquire.read-mask": 0.8999999985098839,
+                "surface.water.distance": 0.6999999992549419,
+                "surface.water.encode": 1.699999999254942,
+                "surface.water.upload": 0,
+                "surface.water.total": 4.5,
+                "water.refresh.total": 310.6000000014901,
+                "water.bridge.commit.total": 311,
+                "ui.update.trigger": 0.09999999776482582
+              },
+              "phaseCalls": {
+                "progress.serialize": 1,
+                "progress.localStorage": 1,
+                "water.authority.diff": 1,
+                "water.mask.patch": 1,
+                "water.acquire.read-mask": 4,
+                "water.upload.texture": 4,
+                "water.upload": 1,
+                "surface.water.plan": 2,
+                "surface.water.acquire.downsample": 1,
+                "surface.water.acquire.read-mask": 1,
+                "surface.water.distance": 1,
+                "surface.water.encode": 1,
+                "surface.water.upload": 1,
+                "surface.water.total": 1,
+                "water.refresh.total": 1,
+                "water.bridge.commit.total": 1,
+                "ui.update.trigger": 1
+              },
+              "extra": {},
+              "pendingFrame": false,
+              "waterDiagnostics": {
+                "ready": true,
+                "error": "",
+                "quality": 3,
+                "field": [
+                  320,
+                  180
+                ],
+                "fieldBytes": 230400,
+                "rebuilds": 2,
+                "boundedUpdates": 1,
+                "noopUpdates": 0,
+                "fallbacks": 0,
+                "lastUploadBytes": 2496,
+                "totalUploadBytes": 463296,
+                "lastUpdate": {
+                  "mode": "bounded",
+                  "reason": null,
+                  "quality": 3,
+                  "field": [
+                    320,
+                    180
+                  ],
+                  "maxDistance": 22,
+                  "logicalChangedCells": 4,
+                  "changedMaskCells": 256,
+                  "changedCells": 512,
+                  "regions": 1,
+                  "acquireRects": 1,
+                  "acquirePixels": 340,
+                  "distanceCells": 11520,
+                  "scanVisits": 23040,
+                  "encodedCells": 3952,
+                  "uploadBytes": 2496,
+                  "uploadCalls": 1
+                },
+                "gateRebuilds": 2,
+                "ripples": 1,
+                "rippleCap": 12
+              },
+              "legacyWater": {
+                "mode": "bounded",
+                "revision": "[\"tin_stream\",1,[\"16,1\",\"16,10\",\"16,11\",\"16,12\",\"16,13\",\"16,14\",\"16,15\",\"16,16\",\"16,17\",\"16,2\",\"16,3\",\"16,4\",\"16,5\",\"16,6\",\"16,7\",\"16,8\",\"16,9\",\"17,1\",\"17,10\",\"17,11\",\"17,12\",\"17,13\",\"17,14\",\"17,15\",\"17,16\",\"17,17\",\"17,2\",\"17,3\",\"17,4\",\"17,5\",\"17,6\",\"17,7\",\"17,8\",\"17,9\",\"18,1\",\"18,12\",\"18,13\",\"18,14\",\"18,15\",\"18,16\",\"18,17\",\"18,2\",\"18,3\",\"18,4\",\"18,5\",\"18,6\",\"18,7\",\"19,1\",\"19,12\",\"19,13\",\"19,14\",\"19,15\",\"19,16\",\"19,17\",\"19,2\",\"19,3\",\"19,4\",\"19,5\",\"19,6\",\"19,7\",\"20,1\",\"20,12\",\"20,13\",\"20,14\",\"20,15\",\"20,16\",\"20,17\",\"20,2\",\"20,3\",\"20,4\",\"20,5\",\"20,6\",\"20,7\",\"21,1\",\"21,12\",\"21,13\",\"21,14\",\"21,15\",\"21,16\",\"21,17\",\"21,2\",\"21,3\",\"21,4\",\"21,5\",\"21,6\",\"21,7\",\"22,1\",\"22,10\",\"22,11\",\"22,12\",\"22,13\",\"22,14\",\"22,15\",\"22,16\",\"22,17\",\"22,2\",\"22,3\",\"22,4\",\"22,5\",\"22,6\",\"22,7\",\"22,8\",\"22,9\",\"23,1\",\"23,10\",\"23,11\",\"23,12\",\"23,13\",\"23,14\",\"23,15\",\"23,16\",\"23,17\",\"23,2\",\"23,3\",\"23,4\",\"23,5\",\"23,6\",\"23,7\",\"23,8\",\"23,9\"]]",
+                "uploadBytes": 4096,
+                "uploadCalls": 4,
+                "surfaceMode": "bounded",
+                "surfaceReason": null
+              }
+            },
+            {
+              "id": 2,
+              "name": "objective-complete",
+              "meta": {
+                "room": "tin_stream",
+                "objectId": "rivet_a",
+                "kind": "rivet"
+              },
+              "startedAt": 9990.800000000745,
+              "syncMs": 128.39999999850988,
+              "frameGapMs": 136,
+              "firstFrameAfterMs": 136,
+              "phases": {
+                "progress.serialize": 0.09999999776482582,
+                "progress.localStorage": 0,
+                "water.authority.diff": 0,
+                "water.mask.patch": 0.10000000149011612,
+                "water.acquire.read-mask": 124.99999999627471,
+                "water.upload.texture": 0.10000000149011612,
+                "water.upload": 125.09999999776483,
+                "surface.water.plan": 0.3999999985098839,
+                "surface.water.acquire.downsample": 0,
+                "surface.water.acquire.read-mask": 0.6000000014901161,
+                "surface.water.distance": 1.4000000022351742,
+                "surface.water.encode": 0.19999999925494194,
+                "surface.water.upload": 0,
+                "surface.water.total": 2.900000002235174,
+                "water.refresh.total": 128,
+                "water.bridge.commit.total": 128.10000000149012,
+                "ui.update.trigger": 0.09999999776482582
+              },
+              "phaseCalls": {
+                "progress.serialize": 1,
+                "progress.localStorage": 1,
+                "water.authority.diff": 1,
+                "water.mask.patch": 1,
+                "water.acquire.read-mask": 4,
+                "water.upload.texture": 4,
+                "water.upload": 1,
+                "surface.water.plan": 2,
+                "surface.water.acquire.downsample": 1,
+                "surface.water.acquire.read-mask": 1,
+                "surface.water.distance": 1,
+                "surface.water.encode": 1,
+                "surface.water.upload": 1,
+                "surface.water.total": 1,
+                "water.refresh.total": 1,
+                "water.bridge.commit.total": 1,
+                "ui.update.trigger": 1
+              },
+              "extra": {},
+              "pendingFrame": false,
+              "waterDiagnostics": {
+                "ready": true,
+                "error": "",
+                "quality": 3,
+                "field": [
+                  320,
+                  180
+                ],
+                "fieldBytes": 230400,
+                "rebuilds": 2,
+                "boundedUpdates": 3,
+                "noopUpdates": 0,
+                "fallbacks": 0,
+                "lastUploadBytes": 2496,
+                "totalUploadBytes": 468288,
+                "lastUpdate": {
+                  "mode": "bounded",
+                  "reason": null,
+                  "quality": 3,
+                  "field": [
+                    320,
+                    180
+                  ],
+                  "maxDistance": 22,
+                  "logicalChangedCells": 4,
+                  "changedMaskCells": 256,
+                  "changedCells": 512,
+                  "regions": 1,
+                  "acquireRects": 1,
+                  "acquirePixels": 340,
+                  "distanceCells": 11520,
+                  "scanVisits": 23040,
+                  "encodedCells": 3952,
+                  "uploadBytes": 2496,
+                  "uploadCalls": 1
+                },
+                "gateRebuilds": 2,
+                "ripples": 2,
+                "rippleCap": 12
+              },
+              "legacyWater": {
+                "mode": "bounded",
+                "revision": "[\"tin_stream\",1,[\"16,1\",\"16,10\",\"16,11\",\"16,12\",\"16,13\",\"16,14\",\"16,15\",\"16,16\",\"16,17\",\"16,2\",\"16,3\",\"16,4\",\"16,5\",\"16,6\",\"16,7\",\"16,8\",\"16,9\",\"17,1\",\"17,10\",\"17,11\",\"17,12\",\"17,13\",\"17,14\",\"17,15\",\"17,16\",\"17,17\",\"17,2\",\"17,3\",\"17,4\",\"17,5\",\"17,6\",\"17,7\",\"17,8\",\"17,9\",\"18,1\",\"18,12\",\"18,13\",\"18,14\",\"18,15\",\"18,16\",\"18,17\",\"18,2\",\"18,3\",\"18,4\",\"18,5\",\"18,6\",\"18,7\",\"19,1\",\"19,12\",\"19,13\",\"19,14\",\"19,15\",\"19,16\",\"19,17\",\"19,2\",\"19,3\",\"19,4\",\"19,5\",\"19,6\",\"19,7\",\"20,1\",\"20,12\",\"20,13\",\"20,14\",\"20,15\",\"20,16\",\"20,17\",\"20,2\",\"20,3\",\"20,4\",\"20,5\",\"20,6\",\"20,7\",\"21,1\",\"21,12\",\"21,13\",\"21,14\",\"21,15\",\"21,16\",\"21,17\",\"21,2\",\"21,3\",\"21,4\",\"21,5\",\"21,6\",\"21,7\",\"22,1\",\"22,10\",\"22,11\",\"22,12\",\"22,13\",\"22,14\",\"22,15\",\"22,16\",\"22,17\",\"22,2\",\"22,3\",\"22,4\",\"22,5\",\"22,6\",\"22,7\",\"22,8\",\"22,9\",\"23,1\",\"23,10\",\"23,11\",\"23,12\",\"23,13\",\"23,14\",\"23,15\",\"23,16\",\"23,17\",\"23,2\",\"23,3\",\"23,4\",\"23,5\",\"23,6\",\"23,7\",\"23,8\",\"23,9\"]]",
+                "uploadBytes": 4096,
+                "uploadCalls": 4,
+                "surfaceMode": "bounded",
+                "surfaceReason": null
+              }
+            },
+            {
+              "id": 3,
+              "name": "objective-complete",
+              "meta": {
+                "room": "tin_stream",
+                "objectId": "rivet_a",
+                "kind": "rivet"
+              },
+              "startedAt": 11039.89999999851,
+              "syncMs": 60.900000002235174,
+              "frameGapMs": 67,
+              "firstFrameAfterMs": 66.90000000223517,
+              "phases": {
+                "progress.serialize": 0,
+                "progress.localStorage": 0,
+                "water.authority.diff": 0,
+                "water.mask.patch": 0,
+                "water.acquire.read-mask": 58.900000002235174,
+                "water.upload.texture": 0,
+                "water.upload": 59,
+                "surface.water.plan": 0.19999999925494194,
+                "surface.water.acquire.downsample": 0.10000000149011612,
+                "surface.water.acquire.read-mask": 0.5,
+                "surface.water.distance": 0.10000000149011612,
+                "surface.water.encode": 0.19999999925494194,
+                "surface.water.upload": 0.10000000149011612,
+                "surface.water.total": 1.300000000745058,
+                "water.refresh.total": 60.5,
+                "water.bridge.commit.total": 60.599999997764826,
+                "ui.update.trigger": 0.10000000149011612
+              },
+              "phaseCalls": {
+                "progress.serialize": 1,
+                "progress.localStorage": 1,
+                "water.authority.diff": 1,
+                "water.mask.patch": 1,
+                "water.acquire.read-mask": 4,
+                "water.upload.texture": 4,
+                "water.upload": 1,
+                "surface.water.plan": 2,
+                "surface.water.acquire.downsample": 1,
+                "surface.water.acquire.read-mask": 1,
+                "surface.water.distance": 1,
+                "surface.water.encode": 1,
+                "surface.water.upload": 1,
+                "surface.water.total": 1,
+                "water.refresh.total": 1,
+                "water.bridge.commit.total": 1,
+                "ui.update.trigger": 1
+              },
+              "extra": {},
+              "pendingFrame": false,
+              "waterDiagnostics": {
+                "ready": true,
+                "error": "",
+                "quality": 3,
+                "field": [
+                  320,
+                  180
+                ],
+                "fieldBytes": 230400,
+                "rebuilds": 2,
+                "boundedUpdates": 5,
+                "noopUpdates": 0,
+                "fallbacks": 0,
+                "lastUploadBytes": 2496,
+                "totalUploadBytes": 473280,
+                "lastUpdate": {
+                  "mode": "bounded",
+                  "reason": null,
+                  "quality": 3,
+                  "field": [
+                    320,
+                    180
+                  ],
+                  "maxDistance": 22,
+                  "logicalChangedCells": 4,
+                  "changedMaskCells": 256,
+                  "changedCells": 512,
+                  "regions": 1,
+                  "acquireRects": 1,
+                  "acquirePixels": 340,
+                  "distanceCells": 11520,
+                  "scanVisits": 23040,
+                  "encodedCells": 3952,
+                  "uploadBytes": 2496,
+                  "uploadCalls": 1
+                },
+                "gateRebuilds": 2,
+                "ripples": 3,
+                "rippleCap": 12
+              },
+              "legacyWater": {
+                "mode": "bounded",
+                "revision": "[\"tin_stream\",1,[\"16,1\",\"16,10\",\"16,11\",\"16,12\",\"16,13\",\"16,14\",\"16,15\",\"16,16\",\"16,17\",\"16,2\",\"16,3\",\"16,4\",\"16,5\",\"16,6\",\"16,7\",\"16,8\",\"16,9\",\"17,1\",\"17,10\",\"17,11\",\"17,12\",\"17,13\",\"17,14\",\"17,15\",\"17,16\",\"17,17\",\"17,2\",\"17,3\",\"17,4\",\"17,5\",\"17,6\",\"17,7\",\"17,8\",\"17,9\",\"18,1\",\"18,12\",\"18,13\",\"18,14\",\"18,15\",\"18,16\",\"18,17\",\"18,2\",\"18,3\",\"18,4\",\"18,5\",\"18,6\",\"18,7\",\"19,1\",\"19,12\",\"19,13\",\"19,14\",\"19,15\",\"19,16\",\"19,17\",\"19,2\",\"19,3\",\"19,4\",\"19,5\",\"19,6\",\"19,7\",\"20,1\",\"20,12\",\"20,13\",\"20,14\",\"20,15\",\"20,16\",\"20,17\",\"20,2\",\"20,3\",\"20,4\",\"20,5\",\"20,6\",\"20,7\",\"21,1\",\"21,12\",\"21,13\",\"21,14\",\"21,15\",\"21,16\",\"21,17\",\"21,2\",\"21,3\",\"21,4\",\"21,5\",\"21,6\",\"21,7\",\"22,1\",\"22,10\",\"22,11\",\"22,12\",\"22,13\",\"22,14\",\"22,15\",\"22,16\",\"22,17\",\"22,2\",\"22,3\",\"22,4\",\"22,5\",\"22,6\",\"22,7\",\"22,8\",\"22,9\",\"23,1\",\"23,10\",\"23,11\",\"23,12\",\"23,13\",\"23,14\",\"23,15\",\"23,16\",\"23,17\",\"23,2\",\"23,3\",\"23,4\",\"23,5\",\"23,6\",\"23,7\",\"23,8\",\"23,9\"]]",
+                "uploadBytes": 4096,
+                "uploadCalls": 4,
+                "surfaceMode": "bounded",
+                "surfaceReason": null
+              }
+            }
+          ]
+        },
+        "editor-water": {
+          "summary": {
+            "syncMs": {
+              "median": 1028.0999999977648,
+              "p95": 1035.7500000011175,
+              "max": 1036.6000000014901,
+              "samples": [
+                1028.0999999977648,
+                922.8999999985099,
+                1036.6000000014901
+              ]
+            },
+            "frameGapMs": {
+              "median": 1033.800000000745,
+              "p95": 1039.9199999980628,
+              "max": 1040.5999999977648,
+              "samples": [
+                1033.800000000745,
+                927.5,
+                1040.5999999977648
+              ]
+            },
+            "firstFrameAfterMs": {
+              "median": 1033.5999999977648,
+              "p95": 1039.8099999997764,
+              "max": 1040.5,
+              "samples": [
+                1033.5999999977648,
+                927.5,
+                1040.5
+              ]
+            },
+            "phases": {
+              "editor.overlay.render": {
+                "median": 0.0,
+                "p95": 0.17999999932944774,
+                "max": 0.19999999925494194,
+                "samples": [
+                  0.19999999925494194,
+                  0.0,
+                  0.0
+                ]
+              },
+              "editor.room.rebind": {
+                "median": 0.19999999925494194,
+                "p95": 0.29000000059604647,
+                "max": 0.30000000074505806,
+                "samples": [
+                  0.30000000074505806,
+                  0.19999999925494194,
+                  0.19999999925494194
+                ]
+              },
+              "editor.selection.refresh": {
+                "median": 0.0,
+                "p95": 0.0900000013411045,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.10000000149011612,
+                  0.0,
+                  0.0
+                ]
+              },
+              "editor.status.update": {
+                "median": 12.0,
+                "p95": 12.270000000670553,
+                "max": 12.300000000745058,
+                "samples": [
+                  12.300000000745058,
+                  9.600000001490116,
+                  12.0
+                ]
+              },
+              "foliage.descriptor.build": {
+                "median": 0.0,
+                "p95": 0.0900000013411045,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.0,
+                  0.0,
+                  0.10000000149011612
+                ]
+              },
+              "foliage.descriptor.refresh": {
+                "median": 0.0,
+                "p95": 0.0900000013411045,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.0,
+                  0.0,
+                  0.10000000149011612
+                ]
+              },
+              "foliage.grass-descriptor.build": {
+                "median": 0.0,
+                "p95": 0.0900000013411045,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.10000000149011612,
+                  0.0,
+                  0.0
+                ]
+              },
+              "static.build": {
+                "median": 172.0,
+                "p95": 183.87999999932944,
+                "max": 185.19999999925494,
+                "samples": [
+                  185.19999999925494,
+                  172.0,
+                  165.80000000074506
+                ]
+              },
+              "static.upload.color": {
+                "median": 4.900000002235174,
+                "p95": 6.61000000089407,
+                "max": 6.800000000745058,
+                "samples": [
+                  4.900000002235174,
+                  6.800000000745058,
+                  3.099999997764826
+                ]
+              },
+              "static.upload.normal": {
+                "median": 0.0,
+                "p95": 0.0900000013411045,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.0,
+                  0.10000000149011612,
+                  0.0
+                ]
+              },
+              "static.upload.specular": {
+                "median": 0.10000000149011612,
+                "p95": 0.19000000283122062,
+                "max": 0.20000000298023224,
+                "samples": [
+                  0.20000000298023224,
+                  0.0,
+                  0.10000000149011612
+                ]
+              },
+              "surface.grass.refresh": {
+                "median": 0.0,
+                "p95": 0.08999999798834322,
+                "max": 0.09999999776482582,
+                "samples": [
+                  0.0,
+                  0.09999999776482582,
+                  0.0
+                ]
+              },
+              "surface.water.acquire.downsample": {
+                "median": 0.0,
+                "p95": 0.0,
+                "max": 0.0,
+                "samples": [
+                  0.0,
+                  0.0,
+                  0.0
+                ]
+              },
+              "surface.water.acquire.read-mask": {
+                "median": 0.6999999992549419,
+                "p95": 0.7900000005960465,
+                "max": 0.8000000007450581,
+                "samples": [
+                  0.5,
+                  0.8000000007450581,
+                  0.6999999992549419
+                ]
+              },
+              "surface.water.distance": {
+                "median": 0.09999999776482582,
+                "p95": 0.10000000111758708,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.0,
+                  0.09999999776482582,
+                  0.10000000149011612
+                ]
+              },
+              "surface.water.encode": {
+                "median": 0.19999999925494194,
+                "p95": 0.29000000059604647,
+                "max": 0.30000000074505806,
+                "samples": [
+                  0.19999999925494194,
+                  0.30000000074505806,
+                  0.0
+                ]
+              },
+              "surface.water.plan": {
+                "median": 0.10000000149011612,
+                "p95": 0.19000000283122062,
+                "max": 0.20000000298023224,
+                "samples": [
+                  0.09999999776482582,
+                  0.20000000298023224,
+                  0.10000000149011612
+                ]
+              },
+              "surface.water.total": {
+                "median": 1.1000000014901161,
+                "p95": 1.4600000001490117,
+                "max": 1.5,
+                "samples": [
+                  1.0,
+                  1.5,
+                  1.1000000014901161
+                ]
+              },
+              "surface.water.upload": {
+                "median": 0.0,
+                "p95": 0.0900000013411045,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.0,
+                  0.0,
+                  0.10000000149011612
+                ]
+              },
+              "ui.update": {
+                "median": 0.09999999776482582,
+                "p95": 0.09999999776482582,
+                "max": 0.09999999776482582,
+                "samples": [
+                  0.09999999776482582,
+                  0.0,
+                  0.09999999776482582
+                ]
+              },
+              "water.acquire.read-mask": {
+                "median": 815.3000000007451,
+                "p95": 849.4099999994039,
+                "max": 853.1999999992549,
+                "samples": [
+                  815.3000000007451,
+                  731.6999999992549,
+                  853.1999999992549
+                ]
+              },
+              "water.authority.diff": {
+                "median": 0.0,
+                "p95": 0.0900000013411045,
+                "max": 0.10000000149011612,
+                "samples": [
+                  0.0,
+                  0.10000000149011612,
+                  0.0
+                ]
+              },
+              "water.mask.patch": {
+                "median": 0.0,
+                "p95": 0.0,
+                "max": 0.0,
+                "samples": [
+                  0.0,
+                  0.0,
+                  0.0
+                ]
+              },
+              "water.refresh.total": {
+                "median": 816.5,
+                "p95": 850.7900000013411,
+                "max": 854.6000000014901,
+                "samples": [
+                  816.5,
+                  733.3000000007451,
+                  854.6000000014901
+                ]
+              },
+              "water.upload": {
+                "median": 815.5,
+                "p95": 849.6099999986589,
+                "max": 853.3999999985099,
+                "samples": [
+                  815.5,
+                  731.8000000007451,
+                  853.3999999985099
+                ]
+              },
+              "water.upload.texture": {
+                "median": 0.0,
+                "p95": 0.08999999798834322,
+                "max": 0.09999999776482582,
+                "samples": [
+                  0.0,
+                  0.0,
+                  0.09999999776482582
+                ]
+              }
+            },
+            "dominantMedianPhase": {
+              "name": "water.upload",
+              "ms": 815.5
+            }
+          },
+          "records": [
+            {
+              "id": 4,
+              "name": "editor-water",
+              "meta": {
+                "room": "tin_stream",
+                "mutation": "water-tile"
+              },
+              "startedAt": 12052.60000000149,
+              "syncMs": 1028.0999999977648,
+              "frameGapMs": 1033.800000000745,
+              "firstFrameAfterMs": 1033.5999999977648,
+              "phases": {
+                "editor.room.rebind": 0.30000000074505806,
+                "static.build": 185.19999999925494,
+                "static.upload.color": 4.900000002235174,
+                "static.upload.normal": 0,
+                "static.upload.specular": 0.20000000298023224,
+                "ui.update": 0.09999999776482582,
+                "water.authority.diff": 0,
+                "water.mask.patch": 0,
+                "water.acquire.read-mask": 815.3000000007451,
+                "water.upload.texture": 0,
+                "water.upload": 815.5,
+                "surface.water.plan": 0.09999999776482582,
+                "surface.water.acquire.downsample": 0,
+                "surface.water.acquire.read-mask": 0.5,
+                "surface.water.distance": 0,
+                "surface.water.encode": 0.19999999925494194,
+                "surface.water.upload": 0,
+                "surface.water.total": 1,
+                "water.refresh.total": 816.5,
+                "foliage.grass-descriptor.build": 0.10000000149011612,
+                "surface.grass.refresh": 0,
+                "foliage.descriptor.refresh": 0,
+                "foliage.descriptor.build": 0,
+                "editor.selection.refresh": 0.10000000149011612,
+                "editor.overlay.render": 0.19999999925494194,
+                "editor.status.update": 12.300000000745058
+              },
+              "phaseCalls": {
+                "editor.room.rebind": 1,
+                "static.build": 1,
+                "static.upload.color": 1,
+                "static.upload.normal": 1,
+                "static.upload.specular": 1,
+                "ui.update": 1,
+                "water.authority.diff": 1,
+                "water.mask.patch": 1,
+                "water.acquire.read-mask": 2,
+                "water.upload.texture": 2,
+                "water.upload": 1,
+                "surface.water.plan": 2,
+                "surface.water.acquire.downsample": 1,
+                "surface.water.acquire.read-mask": 1,
+                "surface.water.distance": 1,
+                "surface.water.encode": 1,
+                "surface.water.upload": 1,
+                "surface.water.total": 1,
+                "water.refresh.total": 1,
+                "foliage.grass-descriptor.build": 1,
+                "surface.grass.refresh": 1,
+                "foliage.descriptor.refresh": 1,
+                "foliage.descriptor.build": 1,
+                "editor.selection.refresh": 1,
+                "editor.overlay.render": 1,
+                "editor.status.update": 1
+              },
+              "extra": {},
+              "pendingFrame": false,
+              "waterDiagnostics": {
+                "ready": true,
+                "error": "",
+                "quality": 3,
+                "field": [
+                  320,
+                  180
+                ],
+                "fieldBytes": 230400,
+                "rebuilds": 2,
+                "boundedUpdates": 7,
+                "noopUpdates": 0,
+                "fallbacks": 0,
+                "lastUploadBytes": 3072,
+                "totalUploadBytes": 478848,
+                "lastUpdate": {
+                  "mode": "bounded",
+                  "reason": null,
+                  "quality": 3,
+                  "field": [
+                    320,
+                    180
+                  ],
+                  "maxDistance": 22,
+                  "logicalChangedCells": 2,
+                  "changedMaskCells": 128,
+                  "changedCells": 323,
+                  "regions": 1,
+                  "acquireRects": 1,
+                  "acquirePixels": 180,
+                  "distanceCells": 6240,
+                  "scanVisits": 12480,
+                  "encodedCells": 2280,
+                  "uploadBytes": 3072,
+                  "uploadCalls": 1
+                },
+                "gateRebuilds": 2,
+                "ripples": 3,
+                "rippleCap": 12
+              },
+              "legacyWater": {
+                "mode": "bounded",
+                "revision": "[\"tin_stream\",0,[\"15,1\",\"16,10\",\"16,11\",\"16,12\",\"16,13\",\"16,14\",\"16,15\",\"16,16\",\"16,17\",\"16,2\",\"16,3\",\"16,4\",\"16,5\",\"16,6\",\"16,7\",\"16,8\",\"16,9\",\"17,1\",\"17,10\",\"17,11\",\"17,12\",\"17,13\",\"17,14\",\"17,15\",\"17,16\",\"17,17\",\"17,2\",\"17,3\",\"17,4\",\"17,5\",\"17,6\",\"17,7\",\"17,8\",\"17,9\",\"18,1\",\"18,12\",\"18,13\",\"18,14\",\"18,15\",\"18,16\",\"18,17\",\"18,2\",\"18,3\",\"18,4\",\"18,5\",\"18,6\",\"18,7\",\"19,1\",\"19,12\",\"19,13\",\"19,14\",\"19,15\",\"19,16\",\"19,17\",\"19,2\",\"19,3\",\"19,4\",\"19,5\",\"19,6\",\"19,7\",\"20,1\",\"20,12\",\"20,13\",\"20,14\",\"20,15\",\"20,16\",\"20,17\",\"20,2\",\"20,3\",\"20,4\",\"20,5\",\"20,6\",\"20,7\",\"21,1\",\"21,12\",\"21,13\",\"21,14\",\"21,15\",\"21,16\",\"21,17\",\"21,2\",\"21,3\",\"21,4\",\"21,5\",\"21,6\",\"21,7\",\"22,1\",\"22,10\",\"22,11\",\"22,12\",\"22,13\",\"22,14\",\"22,15\",\"22,16\",\"22,17\",\"22,2\",\"22,3\",\"22,4\",\"22,5\",\"22,6\",\"22,7\",\"22,8\",\"22,9\",\"23,1\",\"23,10\",\"23,11\",\"23,12\",\"23,13\",\"23,14\",\"23,15\",\"23,16\",\"23,17\",\"23,2\",\"23,3\",\"23,4\",\"23,5\",\"23,6\",\"23,7\",\"23,8\",\"23,9\"]]",
+                "uploadBytes": 2048,
+                "uploadCalls": 2,
+                "surfaceMode": "bounded",
+                "surfaceReason": null
+              }
+            },
+            {
+              "id": 5,
+              "name": "editor-water",
+              "meta": {
+                "room": "tin_stream",
+                "mutation": "water-tile"
+              },
+              "startedAt": 14113.10000000149,
+              "syncMs": 922.8999999985099,
+              "frameGapMs": 927.5,
+              "firstFrameAfterMs": 927.5,
+              "phases": {
+                "editor.room.rebind": 0.19999999925494194,
+                "static.build": 172,
+                "static.upload.color": 6.800000000745058,
+                "static.upload.normal": 0.10000000149011612,
+                "static.upload.specular": 0,
+                "ui.update": 0,
+                "water.authority.diff": 0.10000000149011612,
+                "water.mask.patch": 0,
+                "water.acquire.read-mask": 731.6999999992549,
+                "water.upload.texture": 0,
+                "water.upload": 731.8000000007451,
+                "surface.water.plan": 0.20000000298023224,
+                "surface.water.acquire.downsample": 0,
+                "surface.water.acquire.read-mask": 0.8000000007450581,
+                "surface.water.distance": 0.09999999776482582,
+                "surface.water.encode": 0.30000000074505806,
+                "surface.water.upload": 0,
+                "surface.water.total": 1.5,
+                "water.refresh.total": 733.3000000007451,
+                "foliage.grass-descriptor.build": 0,
+                "surface.grass.refresh": 0.09999999776482582,
+                "foliage.descriptor.refresh": 0,
+                "foliage.descriptor.build": 0,
+                "editor.selection.refresh": 0,
+                "editor.overlay.render": 0,
+                "editor.status.update": 9.600000001490116
+              },
+              "phaseCalls": {
+                "editor.room.rebind": 1,
+                "static.build": 1,
+                "static.upload.color": 1,
+                "static.upload.normal": 1,
+                "static.upload.specular": 1,
+                "ui.update": 1,
+                "water.authority.diff": 1,
+                "water.mask.patch": 1,
+                "water.acquire.read-mask": 2,
+                "water.upload.texture": 2,
+                "water.upload": 1,
+                "surface.water.plan": 2,
+                "surface.water.acquire.downsample": 1,
+                "surface.water.acquire.read-mask": 1,
+                "surface.water.distance": 1,
+                "surface.water.encode": 1,
+                "surface.water.upload": 1,
+                "surface.water.total": 1,
+                "water.refresh.total": 1,
+                "foliage.grass-descriptor.build": 1,
+                "surface.grass.refresh": 1,
+                "foliage.descriptor.refresh": 1,
+                "foliage.descriptor.build": 1,
+                "editor.selection.refresh": 1,
+                "editor.overlay.render": 1,
+                "editor.status.update": 1
+              },
+              "extra": {},
+              "pendingFrame": false,
+              "waterDiagnostics": {
+                "ready": true,
+                "error": "",
+                "quality": 3,
+                "field": [
+                  320,
+                  180
+                ],
+                "fieldBytes": 230400,
+                "rebuilds": 2,
+                "boundedUpdates": 9,
+                "noopUpdates": 0,
+                "fallbacks": 0,
+                "lastUploadBytes": 3072,
+                "totalUploadBytes": 484992,
+                "lastUpdate": {
+                  "mode": "bounded",
+                  "reason": null,
+                  "quality": 3,
+                  "field": [
+                    320,
+                    180
+                  ],
+                  "maxDistance": 22,
+                  "logicalChangedCells": 2,
+                  "changedMaskCells": 128,
+                  "changedCells": 323,
+                  "regions": 1,
+                  "acquireRects": 1,
+                  "acquirePixels": 180,
+                  "distanceCells": 6240,
+                  "scanVisits": 12480,
+                  "encodedCells": 2280,
+                  "uploadBytes": 3072,
+                  "uploadCalls": 1
+                },
+                "gateRebuilds": 2,
+                "ripples": 3,
+                "rippleCap": 12
+              },
+              "legacyWater": {
+                "mode": "bounded",
+                "revision": "[\"tin_stream\",0,[\"15,1\",\"16,10\",\"16,11\",\"16,12\",\"16,13\",\"16,14\",\"16,15\",\"16,16\",\"16,17\",\"16,2\",\"16,3\",\"16,4\",\"16,5\",\"16,6\",\"16,7\",\"16,8\",\"16,9\",\"17,1\",\"17,10\",\"17,11\",\"17,12\",\"17,13\",\"17,14\",\"17,15\",\"17,16\",\"17,17\",\"17,2\",\"17,3\",\"17,4\",\"17,5\",\"17,6\",\"17,7\",\"17,8\",\"17,9\",\"18,1\",\"18,12\",\"18,13\",\"18,14\",\"18,15\",\"18,16\",\"18,17\",\"18,2\",\"18,3\",\"18,4\",\"18,5\",\"18,6\",\"18,7\",\"19,1\",\"19,12\",\"19,13\",\"19,14\",\"19,15\",\"19,16\",\"19,17\",\"19,2\",\"19,3\",\"19,4\",\"19,5\",\"19,6\",\"19,7\",\"20,1\",\"20,12\",\"20,13\",\"20,14\",\"20,15\",\"20,16\",\"20,17\",\"20,2\",\"20,3\",\"20,4\",\"20,5\",\"20,6\",\"20,7\",\"21,1\",\"21,12\",\"21,13\",\"21,14\",\"21,15\",\"21,16\",\"21,17\",\"21,2\",\"21,3\",\"21,4\",\"21,5\",\"21,6\",\"21,7\",\"22,1\",\"22,10\",\"22,11\",\"22,12\",\"22,13\",\"22,14\",\"22,15\",\"22,16\",\"22,17\",\"22,2\",\"22,3\",\"22,4\",\"22,5\",\"22,6\",\"22,7\",\"22,8\",\"22,9\",\"23,1\",\"23,10\",\"23,11\",\"23,12\",\"23,13\",\"23,14\",\"23,15\",\"23,16\",\"23,17\",\"23,2\",\"23,3\",\"23,4\",\"23,5\",\"23,6\",\"23,7\",\"23,8\",\"23,9\"]]",
+                "uploadBytes": 2048,
+                "uploadCalls": 2,
+                "surfaceMode": "bounded",
+                "surfaceReason": null
+              }
+            },
+            {
+              "id": 6,
+              "name": "editor-water",
+              "meta": {
+                "room": "tin_stream",
+                "mutation": "water-tile"
+              },
+              "startedAt": 16247.699999999255,
+              "syncMs": 1036.6000000014901,
+              "frameGapMs": 1040.5999999977648,
+              "firstFrameAfterMs": 1040.5,
+              "phases": {
+                "editor.room.rebind": 0.19999999925494194,
+                "static.build": 165.80000000074506,
+                "static.upload.color": 3.099999997764826,
+                "static.upload.normal": 0,
+                "static.upload.specular": 0.10000000149011612,
+                "ui.update": 0.09999999776482582,
+                "water.authority.diff": 0,
+                "water.mask.patch": 0,
+                "water.acquire.read-mask": 853.1999999992549,
+                "water.upload.texture": 0.09999999776482582,
+                "water.upload": 853.3999999985099,
+                "surface.water.plan": 0.10000000149011612,
+                "surface.water.acquire.downsample": 0,
+                "surface.water.acquire.read-mask": 0.6999999992549419,
+                "surface.water.distance": 0.10000000149011612,
+                "surface.water.encode": 0,
+                "surface.water.upload": 0.10000000149011612,
+                "surface.water.total": 1.1000000014901161,
+                "water.refresh.total": 854.6000000014901,
+                "foliage.grass-descriptor.build": 0,
+                "surface.grass.refresh": 0,
+                "foliage.descriptor.refresh": 0.10000000149011612,
+                "foliage.descriptor.build": 0.10000000149011612,
+                "editor.selection.refresh": 0,
+                "editor.overlay.render": 0,
+                "editor.status.update": 12
+              },
+              "phaseCalls": {
+                "editor.room.rebind": 1,
+                "static.build": 1,
+                "static.upload.color": 1,
+                "static.upload.normal": 1,
+                "static.upload.specular": 1,
+                "ui.update": 1,
+                "water.authority.diff": 1,
+                "water.mask.patch": 1,
+                "water.acquire.read-mask": 2,
+                "water.upload.texture": 2,
+                "water.upload": 1,
+                "surface.water.plan": 2,
+                "surface.water.acquire.downsample": 1,
+                "surface.water.acquire.read-mask": 1,
+                "surface.water.distance": 1,
+                "surface.water.encode": 1,
+                "surface.water.upload": 1,
+                "surface.water.total": 1,
+                "water.refresh.total": 1,
+                "foliage.grass-descriptor.build": 1,
+                "surface.grass.refresh": 1,
+                "foliage.descriptor.refresh": 1,
+                "foliage.descriptor.build": 1,
+                "editor.selection.refresh": 1,
+                "editor.overlay.render": 1,
+                "editor.status.update": 1
+              },
+              "extra": {},
+              "pendingFrame": false,
+              "waterDiagnostics": {
+                "ready": true,
+                "error": "",
+                "quality": 3,
+                "field": [
+                  320,
+                  180
+                ],
+                "fieldBytes": 230400,
+                "rebuilds": 2,
+                "boundedUpdates": 11,
+                "noopUpdates": 0,
+                "fallbacks": 0,
+                "lastUploadBytes": 3072,
+                "totalUploadBytes": 491136,
+                "lastUpdate": {
+                  "mode": "bounded",
+                  "reason": null,
+                  "quality": 3,
+                  "field": [
+                    320,
+                    180
+                  ],
+                  "maxDistance": 22,
+                  "logicalChangedCells": 2,
+                  "changedMaskCells": 128,
+                  "changedCells": 323,
+                  "regions": 1,
+                  "acquireRects": 1,
+                  "acquirePixels": 180,
+                  "distanceCells": 6240,
+                  "scanVisits": 12480,
+                  "encodedCells": 2280,
+                  "uploadBytes": 3072,
+                  "uploadCalls": 1
+                },
+                "gateRebuilds": 2,
+                "ripples": 3,
+                "rippleCap": 12
+              },
+              "legacyWater": {
+                "mode": "bounded",
+                "revision": "[\"tin_stream\",0,[\"15,1\",\"16,10\",\"16,11\",\"16,12\",\"16,13\",\"16,14\",\"16,15\",\"16,16\",\"16,17\",\"16,2\",\"16,3\",\"16,4\",\"16,5\",\"16,6\",\"16,7\",\"16,8\",\"16,9\",\"17,1\",\"17,10\",\"17,11\",\"17,12\",\"17,13\",\"17,14\",\"17,15\",\"17,16\",\"17,17\",\"17,2\",\"17,3\",\"17,4\",\"17,5\",\"17,6\",\"17,7\",\"17,8\",\"17,9\",\"18,1\",\"18,12\",\"18,13\",\"18,14\",\"18,15\",\"18,16\",\"18,17\",\"18,2\",\"18,3\",\"18,4\",\"18,5\",\"18,6\",\"18,7\",\"19,1\",\"19,12\",\"19,13\",\"19,14\",\"19,15\",\"19,16\",\"19,17\",\"19,2\",\"19,3\",\"19,4\",\"19,5\",\"19,6\",\"19,7\",\"20,1\",\"20,12\",\"20,13\",\"20,14\",\"20,15\",\"20,16\",\"20,17\",\"20,2\",\"20,3\",\"20,4\",\"20,5\",\"20,6\",\"20,7\",\"21,1\",\"21,12\",\"21,13\",\"21,14\",\"21,15\",\"21,16\",\"21,17\",\"21,2\",\"21,3\",\"21,4\",\"21,5\",\"21,6\",\"21,7\",\"22,1\",\"22,10\",\"22,11\",\"22,12\",\"22,13\",\"22,14\",\"22,15\",\"22,16\",\"22,17\",\"22,2\",\"22,3\",\"22,4\",\"22,5\",\"22,6\",\"22,7\",\"22,8\",\"22,9\",\"23,1\",\"23,10\",\"23,11\",\"23,12\",\"23,13\",\"23,14\",\"23,15\",\"23,16\",\"23,17\",\"23,2\",\"23,3\",\"23,4\",\"23,5\",\"23,6\",\"23,7\",\"23,8\",\"23,9\"]]",
+                "uploadBytes": 2048,
+                "uploadCalls": 2,
+                "surfaceMode": "bounded",
+                "surfaceReason": null
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "browserErrors": [],
+  "experimentSource": {
+    "recoveredCommit": "50e6b5b72115d14d6ad798067ecca6ed53b979ed",
+    "changes": [
+      "Separate legacy canvas readback and texture-upload phase instrumentation"
+    ],
+    "measuredDate": "2026-11-03",
+    "comparison": "same-host sequential measurements; not hardware FPS certification"
+  }
+}

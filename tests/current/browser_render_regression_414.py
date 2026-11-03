@@ -12,6 +12,165 @@ ROOT=Path(__file__).resolve().parents[2]
 SETUP=r'''window.requestAnimationFrame=()=>1;
 window.fetch=async(url)=>{const k=String(url).split('?')[0];if(k in window.__json)return {ok:true,json:async()=>structuredClone(window.__json[k]),text:async()=>JSON.stringify(window.__json[k])};throw Error('Unexpected offline fetch: '+url)};
 '''
+WATER_CHECK_SETUP=r'''()=>{
+  const check=(ok,label)=>{if(!ok)throw Error('PERF-003 '+label)};
+  const mismatches=(a,b)=>{check(a.length===b.length,'byte lengths differ');let n=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])n++;return n};
+  const readTexture=(g,texture,w,h)=>{
+    const draw=g.getParameter(g.DRAW_FRAMEBUFFER_BINDING),read=g.getParameter(g.READ_FRAMEBUFFER_BINDING),f=g.createFramebuffer(),bytes=new Uint8Array(w*h*4);
+    try{g.bindFramebuffer(g.FRAMEBUFFER,f);g.framebufferTexture2D(g.FRAMEBUFFER,g.COLOR_ATTACHMENT0,g.TEXTURE_2D,texture,0);check(g.checkFramebufferStatus(g.FRAMEBUFFER)===g.FRAMEBUFFER_COMPLETE,'incomplete texture framebuffer');g.readPixels(0,0,w,h,g.RGBA,g.UNSIGNED_BYTE,bytes)}
+    finally{g.bindFramebuffer(g.DRAW_FRAMEBUFFER,draw);g.bindFramebuffer(g.READ_FRAMEBUFFER,read);g.deleteFramebuffer(f)}
+    return bytes;
+  };
+  const fullTexture=(g,source,w,h,isCanvas)=>{
+    const old=g.getParameter(g.TEXTURE_BINDING_2D),flip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL),t=g.createTexture();
+    try{
+      g.bindTexture(g.TEXTURE_2D,t);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);
+      if(isCanvas)g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,source);
+      else g.texImage2D(g.TEXTURE_2D,0,g.RGBA8,w,h,0,g.RGBA,g.UNSIGNED_BYTE,source);
+      return readTexture(g,t,w,h);
+    }finally{g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,flip);g.bindTexture(g.TEXTURE_2D,old);g.deleteTexture(t)}
+  };
+  const parity=(label,canvas=game.waterMaskCanvas,water=game.renderer.surfaceFX.water,legacy=game.renderer.waterMaskTex,g=game.renderer.gl)=>{
+    const q=water.quality,[w,h]=RelaySurfaceFX.fieldResolutionForQuality(q),c=new OffscreenCanvas(w,h),x=c.getContext('2d',{willReadFrequently:true});
+    x.imageSmoothingEnabled=false;x.drawImage(canvas,0,0,w,h);
+    const data=x.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h);
+    for(let i=0;i<mask.length;i++)mask[i]=data[i*4+3]>20&&data[i*4]>20?1:0;
+    const ref=RelaySurfaceFX.buildShoreField(mask,w,h,RelaySurfaceFX.shoreMaxDistanceForQuality(q));
+    const result={label,quality:q,mode:water.lastUpdate?.mode,legacyMode:game.renderer.lastWaterMaskUpdate?.mode,
+      maskMismatch:mismatches(mask,water.mask),fieldMismatch:mismatches(ref.rgba,water.rgba),
+      fieldGpuMismatch:mismatches(readTexture(g,water.texture,w,h),fullTexture(g,ref.rgba,w,h,false)),
+      legacyGpuMismatch:legacy?mismatches(readTexture(g,legacy,640,360),fullTexture(g,canvas,640,360,true)):0,
+      last:water.lastUpdate,legacy:legacy?game.renderer.lastWaterMaskUpdate:null};
+    check(!result.maskMismatch&&!result.fieldMismatch&&!result.fieldGpuMismatch&&!result.legacyGpuMismatch,label+' CPU/full-texture parity '+JSON.stringify(result));
+    check(g.getError()===g.NO_ERROR,label+' WebGL error');
+    return result;
+  };
+  const snapshot=()=>({field:game.renderer.surfaceFX.water.rebuilds,legacy:game.renderer.waterMaskFullUploads||0});
+  const bounded=(label,before,canvas=game.waterMaskCanvas)=>{
+    const r=game.renderer,w=r.surfaceFX.water,last=w.lastUpdate;
+    check(w.rebuilds===before.field&&(r.waterMaskFullUploads||0)===before.legacy,label+' performed a full rebuild/upload');
+    check(last?.mode==='bounded'&&r.lastWaterMaskUpdate?.mode==='bounded',label+' did not use both bounded paths');
+    check(last.distanceCells<w.fieldW*w.fieldH&&last.acquirePixels<w.fieldW*w.fieldH,label+' performed whole-field CPU work');
+    check(last.uploadBytes>0&&last.uploadBytes<4*w.fieldW*w.fieldH&&r.lastWaterMaskUpdate.uploadBytes>0&&r.lastWaterMaskUpdate.uploadBytes<640*360*4,label+' upload was not bounded');
+    return parity(label,canvas);
+  };
+  const authority=label=>{
+    const raw=game.maps.rooms[game.room.key],expected=new Set(raw.water.map(p=>p.join(',')));
+    check(expected.size===game.room.water.size&&[...expected].every(k=>game.room.water.has(k)),label+' Room rebind is stale');
+    for(let y=0;y<19;y++)for(let x=0;x<40;x++){
+      const key=x+','+y,wet=expected.has(key)&&!game.room.bridgeOpen(key);
+      check(game.waterAuthority[y*40+x]===(wet?1:0),label+' effective authority '+key);
+    }
+  };
+  window.auditWater={check,parity,snapshot,bounded,authority};
+  window.__waterTinOriginal=structuredClone(game.maps.rooms.tin_stream);
+}'''
+
+WATER_QUALITY_CASE=r'''q=>{
+  const a=auditWater,r=game.renderer,e=rmfEditor,idx=game.storyData.rooms.findIndex(s=>s.key==='tin_stream'),spec=game.storyData.rooms[idx];
+  e.toggle(true);e.clearPendingInvalidation();game.maps.rooms.tin_stream=structuredClone(__waterTinOriginal);game.rooms[idx]=new Room(idx,spec,game.maps);e.history.set('tin_stream',{undo:[],redo:[]});
+  for(const o of spec.objects)game.state.completed.delete(o.object_id);
+  game.graphics.waterQuality=q;game.enterRoom(idx,null);document.querySelector('#storyModal').classList.add('hidden');
+  const attributes=game.waterMaskCanvas.getContext('2d').getContextAttributes();
+  a.check(attributes.willReadFrequently===true,'authority canvas must request CPU readback on its first context creation');
+  const result={quality:q,cpuReadback:attributes.willReadFrequently,initial:a.parity('q'+q+' initial'),stages:[]};
+  for(let stage=0;stage<spec.objects.length;stage++){
+    const o=spec.objects[stage],before=a.snapshot();[game.x,game.y]=game.room.center(game.room.objects[o.object_id]);game.checkObjectives();
+    a.check(game.state.isDone(o.object_id)&&game.room.bridgeProgress===stage+1,'bridge objective did not commit');
+    for(let s=0;s<game.room.bridgeSegments.length;s++)for(const tile of game.room.bridgeSegments[s]){
+      const open=s<=stage;a.check(game.room.bridgeOpen(tile.join(','))===open,'bridge stage authority mismatch');
+      a.check(game.room.blocked(tile)===!open,'bridge collision is stale before next player update');
+    }
+    a.authority('q'+q+' '+o.object_id);
+    result.stages.push(a.bounded('q'+q+' '+o.object_id,before));
+  }
+  const noChange=a.snapshot();game.refreshEditorWater();
+  a.check(r.surfaceFX.water.rebuilds===noChange.field&&(r.waterMaskFullUploads||0)===noChange.legacy,'unchanged topology rebuilt');
+  a.check(r.lastWaterMaskUpdate.uploadBytes===0&&r.surfaceFX.water.lastUpdate.uploadBytes===0&&r.surfaceFX.water.lastUploadBytes===0,'unchanged topology uploaded');
+  // Move a wet cell diagonally across a shoreline. The sparse multirow change
+  // catches subupload row packing, vertical placement and same-count invalidation.
+  const raw=e.rawRoom(),source=raw.water.find(p=>p[0]===16&&p[1]===2),target=[15,3];
+  a.check(source&&!raw.water.some(p=>p.join(',')===target.join(',')),'asymmetric water fixture unavailable');
+  const originalWater=JSON.stringify(raw.water),signature=r.surfaceFX.water.signature,counters=e.getInvalidationDiagnostics().counters,before=a.snapshot();
+  e.beginTransaction('PERF-003 same-count water move');raw.water[raw.water.indexOf(source)]=target;
+  for(let i=0;i<40;i++)e.queueInvalidation(RelayEditorInvalidation.TERRAIN);
+  const queued=e.getInvalidationDiagnostics();
+  a.check(queued.pending!==0&&queued.counters.flushes===counters.flushes&&queued.counters.scheduled===counters.scheduled+1,'40 events did not coalesce into one pending flush');
+  e.pointerDown=true;e.pointerId=415;e.dragMode='paint';
+  const box=e.overlay.getBoundingClientRect();
+  e.overlay.dispatchEvent(new PointerEvent('pointerup',{pointerId:415,button:0,clientX:box.left+box.width*.4,clientY:box.top+box.height*.4,bubbles:true}));
+  const committed=e.getInvalidationDiagnostics();
+  a.check(!committed.pending&&!e.transaction&&committed.counters.flushes===counters.flushes+1&&committed.counters.water===counters.water+1,'pointerup did not synchronously flush final topology');
+  a.check(committed.counters.creatures===counters.creatures&&committed.counters.miniRobots===counters.miniRobots,'water edit reset unrelated actors');
+  a.check(raw.water.length===JSON.parse(originalWater).length&&r.surfaceFX.water.signature!==signature,'same-count identity did not change');
+  a.authority('q'+q+' commit');result.editorCommit=a.bounded('q'+q+' editor commit',before);
+  const editedWater=JSON.stringify(e.rawRoom().water),undoBefore=a.snapshot();a.check(e.undoOne(),'water undo unavailable');
+  a.check(JSON.stringify(e.rawRoom().water)===originalWater,'water undo lost original data');a.authority('water undo');result.editorUndo=a.bounded('q'+q+' editor undo',undoBefore);
+  const redoBefore=a.snapshot();a.check(e.redoOne(),'water redo unavailable');
+  a.check(JSON.stringify(e.rawRoom().water)===editedWater,'water redo lost final data');a.authority('water redo');result.editorRedo=a.bounded('q'+q+' editor redo',redoBefore);
+  e.flushForPersistence();a.check(!e.getInvalidationDiagnostics().pending&&JSON.stringify(e.rawRoom().water)===editedWater,'persistence flush missed final water data');
+  result.coalescing={queued:40,flushes:committed.counters.flushes-counters.flushes,waterRefreshes:committed.counters.water-counters.water,synchronousPointerup:true};
+  return result;
+}'''
+
+WATER_FALLBACK_CASE=r'''()=>{
+  const a=auditWater,r=game.renderer,w=r.surfaceFX.water,e=rmfEditor,result={};
+  game.graphics.waterQuality=0;game.refreshEditorWater();a.check(w.lastUpdate.mode==='disabled','quality zero did not disable field');
+  e.beginTransaction('PERF-003 disabled-quality water edit');e.rawRoom().water.push([14,4]);e.queueInvalidation(RelayEditorInvalidation.TERRAIN);e.flushForPersistence();
+  a.check(!e.transaction&&!e.getInvalidationDiagnostics().pending&&w.lastUpdate.mode==='disabled','save boundary did not commit disabled-quality edit');a.authority('disabled quality');
+  const count=w.rebuilds;game.graphics.waterQuality=2;game.refreshEditorWater();a.check(w.rebuilds===count+1&&w.lastUpdate.mode==='full','reenabling quality reused stale field');result.qualityResume=a.parity('quality off/edit/on');
+  const replacement=new OffscreenCanvas(640,360),x=replacement.getContext('2d',{willReadFrequently:true});x.drawImage(game.waterMaskCanvas,0,0);
+  let changed=r.setWaterMask(replacement,'water-source-replacement',game.graphics);
+  a.check(changed.legacy.mode==='full'&&changed.surface.mode==='full','source replacement must rebuild');result.sourceReplacement=a.parity('source replacement',replacement);
+  const asymmetricBefore=a.snapshot();
+  x.fillStyle='#fff';x.fillRect(35,25,7,19);x.clearRect(35,25,3,4);
+  r.setWaterMask(replacement,'water-asymmetric-rectangle',game.graphics,{fromRevision:'water-source-replacement',toRevision:'water-asymmetric-rectangle',logicalRects:[{x0:35,y0:25,x1:42,y1:44}],logicalChangedCells:1});
+  result.asymmetricRectangle=a.bounded('asymmetric multirow pixel rectangle',asymmetricBefore,replacement);
+  x.clearRect(35,40,5,4);
+  changed=r.setWaterMask(replacement,'water-revision-fallback',game.graphics,{fromRevision:'stale-base',toRevision:'water-revision-fallback',logicalRects:[{x0:35,y0:25,x1:42,y1:44}]});
+  a.check(changed.legacy.mode==='full'&&changed.surface.mode==='full','stale delta base must rebuild');result.revisionFallback=a.parity('revision fallback',replacement);
+  const fragmented=[];for(let i=0;i<40;i++){const px=i*16;x.fillRect(px,320,8,7);fragmented.push({x0:px,y0:320,x1:px+8,y1:327})}
+  changed=r.setWaterMask(replacement,'water-fragmentation-fallback',game.graphics,{fromRevision:'water-revision-fallback',toRevision:'water-fragmentation-fallback',logicalRects:fragmented});
+  a.check(changed.legacy.mode==='full'&&changed.surface.mode==='full','large legacy delta must rebuild');result.fragmentationFallback=a.parity('fragmentation fallback',replacement);
+  x.fillRect(0,0,640,360);
+  const field=w.setSource(replacement,'water-field-budget-fallback',2,{fromRevision:w.signature,toRevision:'water-field-budget-fallback',logicalRects:[{x0:0,y0:0,x1:640,y1:360}]});
+  a.check(field.mode==='full'&&field.reason==='bounded-fallback:source-work-budget','large field delta must use work-budget fallback');result.workBudgetFallback=a.parity('field work-budget fallback',replacement,w,null);
+  // Fresh field ownership is the path used after the game's recovery reload. No
+  // old CPU cache or delta base may be accepted for the recreated GPU resource.
+  const fresh=new RelaySurfaceFX.WaterField(r.gl),recreated=fresh.setSource(replacement,'water-recreated',2,{fromRevision:w.signature,toRevision:'water-recreated',logicalRects:[]});
+  try{a.check(recreated.mode==='full'&&recreated.reason==='baseline-missing','recreated field accepted stale cache');result.fieldRecreation=a.parity('fresh field recreation',replacement,fresh,null)}
+  finally{r.gl.deleteTexture(fresh.texture);r.gl.deleteBuffer(fresh.quad);r.gl.deleteProgram(fresh.program)}
+  return result;
+}'''
+
+WATER_FAULT_CASE=r'''()=>{
+  const a=auditWater,e=rmfEditor,idx=game.storyData.rooms.findIndex(s=>s.key==='tin_stream'),spec=game.storyData.rooms[idx],results=[];
+  for(const fault of ['first-particle-burst','objective-effect','bridge-effect']){
+    e.clearPendingInvalidation();game.maps.rooms.tin_stream=structuredClone(__waterTinOriginal);game.rooms[idx]=new Room(idx,spec,game.maps);
+    for(const o of spec.objects)game.state.completed.delete(o.object_id);
+    game.graphics.waterQuality=2;game.enterRoom(idx,null);document.querySelector('#storyModal').classList.add('hidden');
+    const before=a.snapshot(),objective=spec.objects[0],expected=new Error('expected PERF-003 '+fault),burst=game.particles.burst,add=game.fx.add;
+    [game.x,game.y]=game.room.center(game.room.objects[objective.object_id]);
+    if(fault==='first-particle-burst')game.particles.burst=()=>{throw expected};
+    else game.fx.add=function(kind,...args){if(kind===(fault==='objective-effect'?'objective_generic':'bridge_build'))throw expected;return add.call(this,kind,...args)};
+    let caught=null;
+    try{game.checkObjectives()}catch(error){caught=error}
+    finally{game.particles.burst=burst;game.fx.add=add}
+    a.check(caught===expected,fault+' injection did not reach the intended optional effect');
+    a.check(game.state.isDone(objective.object_id)&&game.room.bridgeProgress===1,fault+' lost committed objective progress');
+    for(const tile of game.room.bridgeSegments[0])a.check(game.room.bridgeOpen(tile.join(','))&&!game.room.blocked(tile),fault+' bridge collision did not commit');
+    // Assert immediately after the throw: no subsequent update or retry may be
+    // needed to reconcile the authoritative collision mask and either texture.
+    a.authority(fault);const pixels=a.bounded(fault+' committed water before effects',before);
+    const after=a.snapshot(),signature=game.renderer.surfaceFX.water.signature;
+    game.checkObjectives();
+    a.check(game.room.bridgeProgress===1&&game.renderer.surfaceFX.water.signature===signature,fault+' retry changed accepted progress');
+    a.check(game.renderer.surfaceFX.water.rebuilds===after.field&&(game.renderer.waterMaskFullUploads||0)===after.legacy,fault+' retry rebuilt completed objective water');
+    results.push({fault,expectedErrorCaught:true,coherentBeforeNextUpdate:true,pixels});
+  }
+  return results;
+}'''
+
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--out',type=Path);ap.add_argument('--chromium');args=ap.parse_args()
     from playwright.sync_api import sync_playwright
@@ -73,12 +232,9 @@ def main():
                 if alt:page.keyboard.up('Alt')
         changed=page.evaluate('''()=>{const r=rmfEditor.rawRoom(),fx=game.renderer.foliageFX,water=game.renderer.surfaceFX.water,oldGrass=fx.descriptorKey,oldWater=water.signature;r.grass_clumps[0].x+=11;rmfEditor.queueInvalidation(RelayEditorInvalidation.FOLIAGE,{sync:true});auditFrame(2975,false);const grassChanged=oldGrass!==fx.descriptorKey,waterAfterGrass=water.signature;r.water[0]=[r.water[0][0]+1,r.water[0][1]];rmfEditor.queueInvalidation(RelayEditorInvalidation.TERRAIN,{sync:true});auditFrame(3000,false);return {grass:grassChanged,water:oldWater!==water.signature,grassDidNotRebuildWater:waterAfterGrass===oldWater,counters:rmfEditor.getInvalidationDiagnostics().counters}}''')
         assert changed['grass'] and changed['water'] and changed['grassDidNotRebuildWater'],changed;result['same_count_edits']=changed
-        bounded=page.evaluate(r'''()=>{const water=game.renderer.surfaceFX.water,g=game.renderer.gl,q=water.quality,[w,h]=RelaySurfaceFX.fieldResolutionForQuality(q),md=RelaySurfaceFX.shoreMaxDistanceForQuality(q),c=new OffscreenCanvas(w,h),x=c.getContext('2d',{willReadFrequently:true});x.imageSmoothingEnabled=false;x.clearRect(0,0,w,h);x.drawImage(game.waterMaskCanvas,0,0,w,h);const d=x.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h);for(let i=0;i<mask.length;i++)mask[i]=(d[i*4+3]>20&&d[i*4]>20)?1:0;let maskMismatch=0;for(let i=0;i<mask.length;i++)if(mask[i]!==water.mask[i])maskMismatch++;const ref=RelaySurfaceFX.buildShoreField(mask,w,h,md);let fieldMismatch=0;for(let i=0;i<ref.rgba.length;i++)if(ref.rgba[i]!==water.rgba[i])fieldMismatch++;
-          const readTex=(tex,tw,th)=>{const old=g.getParameter(g.FRAMEBUFFER_BINDING),f=g.createFramebuffer(),out=new Uint8Array(tw*th*4);g.bindFramebuffer(g.FRAMEBUFFER,f);g.framebufferTexture2D(g.FRAMEBUFFER,g.COLOR_ATTACHMENT0,g.TEXTURE_2D,tex,0);if(g.checkFramebufferStatus(g.FRAMEBUFFER)!==g.FRAMEBUFFER_COMPLETE)throw Error('water texture framebuffer incomplete');g.readPixels(0,0,tw,th,g.RGBA,g.UNSIGNED_BYTE,out);g.bindFramebuffer(g.FRAMEBUFFER,old);g.deleteFramebuffer(f);return out};
-          const referenceArray=(bytes,tw,th)=>{const oldTex=g.getParameter(g.TEXTURE_BINDING_2D),flip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL),t=g.createTexture();g.bindTexture(g.TEXTURE_2D,t);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);g.texImage2D(g.TEXTURE_2D,0,g.RGBA8,tw,th,0,g.RGBA,g.UNSIGNED_BYTE,bytes);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,flip);const out=readTex(t,tw,th);g.deleteTexture(t);g.bindTexture(g.TEXTURE_2D,oldTex);return out};
-          const referenceCanvas=(canvas,tw,th)=>{const oldTex=g.getParameter(g.TEXTURE_BINDING_2D),flip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL),t=g.createTexture();g.bindTexture(g.TEXTURE_2D,t);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,canvas);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,flip);const out=readTex(t,tw,th);g.deleteTexture(t);g.bindTexture(g.TEXTURE_2D,oldTex);return out};
-          const actualField=readTex(water.texture,w,h),refField=referenceArray(ref.rgba,w,h),actualLegacy=readTex(game.renderer.waterMaskTex,640,360),refLegacy=referenceCanvas(game.waterMaskCanvas,640,360);let fieldGpuMismatch=0,legacyGpuMismatch=0;for(let i=0;i<actualField.length;i++)if(actualField[i]!==refField[i])fieldGpuMismatch++;for(let i=0;i<actualLegacy.length;i++)if(actualLegacy[i]!==refLegacy[i])legacyGpuMismatch++;return{mode:water.lastUpdate?.mode,legacyMode:game.renderer.lastWaterMaskUpdate?.mode,maskMismatch,fieldMismatch,fieldGpuMismatch,legacyGpuMismatch,last:water.lastUpdate,legacy:game.renderer.lastWaterMaskUpdate}}''')
-        assert bounded['mode']=='bounded' and bounded['legacyMode']=='bounded' and not bounded['maskMismatch'] and not bounded['fieldMismatch'] and not bounded['fieldGpuMismatch'] and not bounded['legacyGpuMismatch'],bounded
+        page.evaluate(WATER_CHECK_SETUP)
+        bounded=page.evaluate("()=>auditWater.parity('same-count editor')")
+        assert bounded['mode']=='bounded' and bounded['legacyMode']=='bounded',bounded
         result['waterfield_bounded']=bounded
 
         # v4.15 editor safety interactions: real DOM pointer/keyboard actions against the
@@ -159,8 +315,14 @@ def main():
         if args.out:page.screenshot(path=str(args.out/'editor_controls.png'))
         page.evaluate('()=>{rmfEditor.toggle(false);game.graphics={...__settings}}')
         page.set_viewport_size({'width':1280,'height':800});page.evaluate('()=>auditFrame(3500,false)');result['resize_to_1280']=True
+        result['waterfield_quality_matrix']=[]
+        for quality in range(1,5):
+            print('NATIVE WEBGL bounded water quality',quality,flush=True)
+            result['waterfield_quality_matrix'].append(page.evaluate(WATER_QUALITY_CASE,quality))
+        result['waterfield_fallbacks']=page.evaluate(WATER_FALLBACK_CASE)
+        result['waterfield_optional_effect_faults']=page.evaluate(WATER_FAULT_CASE)
         result['runtime_errors']=logs;assert not logs,logs
         if args.out:(args.out/'browser_results.json').write_text(json.dumps(result,indent=2))
-        print('NATIVE BROWSER WEBGL2 PASS: nine rooms, material/quality toggles, same-count invalidation, v4.15 right-click/inspector/cycle/recovery/dirty interactions, ghost geometry and UI input; '+result['driver']['renderer'],flush=True)
+        print('NATIVE BROWSER WEBGL2 PASS: nine rooms, material/quality toggles, same-count invalidation, v4.15 right-click/inspector/cycle/recovery/dirty interactions, ghost geometry, UI input and q1-q4 bounded-water GPU/collision/history/fallback parity; '+result['driver']['renderer'],flush=True)
         browser.close()
 if __name__=='__main__':main()

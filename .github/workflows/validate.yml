@@ -1,0 +1,121 @@
+name: Validate source and runtime
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONUNBUFFERED: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      VALIDATION_OUT: ${{ runner.temp }}/relay-moth-validation
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the exact source commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements-authoring.txt
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Record source and environment
+        run: |
+          mkdir -p "$VALIDATION_OUT"
+          python - <<'PY'
+          import json, os, platform, subprocess
+          from pathlib import Path
+          git = lambda *args: subprocess.check_output(['git', *args], text=True).strip()
+          record = {
+              'commit': git('rev-parse', 'HEAD'),
+              'tree': git('rev-parse', 'HEAD^{tree}'),
+              'event': os.environ['GITHUB_EVENT_NAME'],
+              'event_sha': os.environ['GITHUB_SHA'],
+              'run_id': os.environ['GITHUB_RUN_ID'],
+              'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'python': platform.python_version(),
+              'node': subprocess.check_output(['node', '--version'], text=True).strip(),
+              'platform': platform.platform(),
+          }
+          Path(os.environ['VALIDATION_OUT'], 'source.json').write_text(json.dumps(record, indent=2) + '\n')
+          print(json.dumps(record, indent=2))
+          PY
+
+      - name: Verify the complete tracked source manifest
+        run: python tools/source_manifest.py --check 2>&1 | tee "$VALIDATION_OUT/manifest-before.log"
+
+      - name: Install test, browser and GLES dependencies
+        timeout-minutes: 12
+        run: |
+          python -m pip install -r tools/requirements-authoring.txt playwright
+          python -m playwright install --with-deps chromium
+          sudo apt-get install -y --no-install-recommends libegl1 libegl-mesa0 libgles2 libgl1-mesa-dri
+          python -m pip freeze > "$VALIDATION_OUT/python-packages.txt"
+
+      - name: Require a genuine GLES3 context
+        run: |
+          python - <<'PY' 2>&1 | tee "$VALIDATION_OUT/gles.log"
+          import sys
+          sys.path.insert(0, 'tests/support')
+          from gles import GLES
+          context = GLES()
+          try:
+              print('Required GLES context:', context.version)
+              context.check('CI context preflight')
+          finally:
+              context.close()
+          PY
+
+      - name: Full deterministic, shader and pixel regression
+        timeout-minutes: 5
+        run: python self_test.py 2>&1 | tee "$VALIDATION_OUT/self-test.log"
+
+      - name: Native Chromium, editor and bounded water textures
+        timeout-minutes: 5
+        run: python tests/current/browser_render_regression_414.py --out "$VALIDATION_OUT/browser" 2>&1 | tee "$VALIDATION_OUT/browser.log"
+
+      - name: Bounded state-change performance evidence
+        timeout-minutes: 6
+        run: |
+          python tests/current/state_change_performance_415.py \
+            --out "$VALIDATION_OUT/performance.json" \
+            --samples 3 --cpu-throttle 1 --cpu-throttle 4 \
+            2>&1 | tee "$VALIDATION_OUT/performance.log"
+
+      - name: Verify tests did not change shipped source
+        if: always()
+        run: python tools/source_manifest.py --check 2>&1 | tee "$VALIDATION_OUT/manifest-after.log"
+
+      - name: Preserve validation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: relay-moth-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.VALIDATION_OUT }}
+          if-no-files-found: error
+          retention-days: 30

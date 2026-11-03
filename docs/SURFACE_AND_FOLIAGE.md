@@ -4,7 +4,7 @@ Relay Moth Forest intentionally separates two kinds of vegetation and water rend
 
 ## SurfaceFX
 
-\`surfacefx.js\` is a reusable raw-WebGL2 visual subsystem.
+`surfacefx.js` is a reusable raw-WebGL2 visual subsystem.
 
 It consumes descriptors/masks and bounded interaction sources. It does not receive mutable story or collision authority.
 
@@ -33,6 +33,38 @@ Current bounds:
 - visual quality never changes gameplay walkability.
 
 If WaterField fails or is disabled, the retained legacy water renderer is the fallback.
+
+### Bounded water topology updates
+
+`Game` owns the active logical mask canvas and its effective wet/dry tile snapshot.
+Opened Tin Stream bridge cells are dry in this snapshot, matching `Room` collision
+authority. Bridge progression commits the visual topology synchronously; editor
+terrain updates use the existing coalesced invalidation and final transaction flush.
+Same-count moves are detected by cell contents, not array length.
+
+A revision-bound delta identifies changed logical rectangles. The legacy mask uses
+bounded texture subuploads. WaterField conservatively projects those rectangles
+to its quality resolution, reads only the affected mask pixels, and recomputes
+shore distances in bounded crops. The encoded distance caps are 10 pixels at q1,
+16 at q2, and 22 at q3/q4. Each changed cell expands by that cap for output and
+by a second cap for source context, so removing the nearest shore still finds
+all replacement shores capable of changing an encoded byte.
+
+The production integer encoding is compared against a clean full rebuild. Texture
+uploads cover only changed bytes. More than eight disjoint field regions, distance
+work above 65% of the full field, ambiguous/stale revisions, source replacement,
+room entry, quality changes, and fresh renderer recovery retain a full rebuild
+path. Logical legacy deltas are capped at 32 rectangles.
+
+The logical mask requests `{willReadFrequently:true}` on its **first** 2D context
+creation. Requesting that hint only during a later read does not change the
+existing backing store and caused large synchronous GPU readback stalls in the
+recovered implementation. Timing reports retain separate mask-read and texture-
+upload phases, plus full/bounded counters and actual work/upload sizes.
+
+See [PERF-003 validation](validation/performance/PERF-003.md). Ordinary water
+updates are bounded; structural editor terrain still legitimately rebuilds the
+static room backing and is a separate remaining performance cost.
 
 ### Fine GrassField
 
@@ -63,18 +95,18 @@ The v4.14 shader census caught and fixed a real optional GrassField compile fail
 
 ## FoliageFX
 
-\`foliagefx.js\` owns readable physical foliage such as grass tufts, ferns, broad leaves, flowers, bushes and moss.
+`foliagefx.js` owns readable physical foliage such as grass tufts, ferns, broad leaves, flowers, bushes and moss.
 
 ### Category model
 
 The current metadata categories are:
 
-- \`GROUND_MOSS\`;
-- \`SHORT_GRASS\`;
-- \`FERN\`;
-- \`BROAD_LEAF\`;
-- \`FLOWER_CLUSTER\`;
-- \`BUSH\`.
+- `GROUND_MOSS`;
+- `SHORT_GRASS`;
+- `FERN`;
+- `BROAD_LEAF`;
+- `FLOWER_CLUSTER`;
+- `BUSH`.
 
 Metadata controls root cutoff, bend, flutter, stiffness, damping, interaction response, shadow response and display scale.
 
@@ -107,12 +139,12 @@ A foreground relationship is conservative and directional, using the lower edge 
 
 v4.14 preserves source opacity during the transition.
 
-For source alpha \`a\` and foreground weight \`f\`:
+For source alpha `a` and foreground weight `f`:
 
-\`\`\`text
+```text
 foreground alpha = a * f
 background alpha = a * (1 - f) / (1 - a * f)
-\`\`\`
+```
 
 with a safe opaque endpoint.
 
