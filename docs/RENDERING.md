@@ -62,6 +62,8 @@ Stateful or frequently authored presentation is intentionally outside this cache
 
 Current mutable classes include generated and authored editor decor, unrecruited persistent robots, completed-objective visuals, gate state and Tin Stream bridge-stage presentation. Structural terrain remains in the static backing; a terrain edit may therefore still require an expensive room bake.
 
+Small ground/path/water edits recompose bounded native color regions through the same painter. Neighboring floor marks and all overlapping static overlays are replayed into guarded scratch surfaces with the original native transform and draw order. Floor primitives affect color only; every dependency that can change a static material sprite must match before taking this path. The existing normal/specular textures therefore remain byte-for-byte intact. Color subuploads commit synchronously, with a complete three-map rebuild on dependency changes or patch failure. No full-room CPU canvases are retained. [PERF-004](validation/performance/PERF-004.md) documents the authority proof, raster halos and exact comparisons of all three textures against full rebuilds.
+
 Rendered-pixel tests compare mutable tinted output against the equivalent static colour/normal/specular composition.
 
 ## Tree splits

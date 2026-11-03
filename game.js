@@ -266,7 +266,7 @@ class StoryState{
 
 
 class HDArtSheet{
-  constructor(img,manifest,bumpImg=null,specImg=null,normalImg=null){this.img=img;this.bumpImg=bumpImg;this.specImg=specImg;this.normalImg=normalImg;this.normalTransformCache=new Map();this.manifest=manifest;this.regions=manifest.regions||{};this.roles=manifest.roles||{};this.meta=manifest.region_meta||{};this.worldScale=manifest.world_scale||HD_WORLD_SCALE_DEFAULT;this.tintCache=new Map()}
+  constructor(img,manifest,bumpImg=null,specImg=null,normalImg=null){this.img=img;this.bumpImg=bumpImg;this.specImg=specImg;this.normalImg=normalImg;this.normalTransformCache=new Map();this.normalTransformGeneration=0;this.manifest=manifest;this.regions=manifest.regions||{};this.roles=manifest.roles||{};this.meta=manifest.region_meta||{};this.worldScale=manifest.world_scale||HD_WORLD_SCALE_DEFAULT;this.tintCache=new Map()}
   region(name){const r=this.regions[name];if(!r)throw new Error(`Unknown HD atlas region: ${name}`);return r}
   regionMeta(name){return this.meta[name]||{}}
   aspect(name){const r=this.region(name);return r[3]/r[2]}
@@ -282,10 +282,14 @@ class HDArtSheet{
   transformedNormal(name,flip=false,rot=0){
     const r=this.region(name);if(!this.normalImg)return null;
     if(!flip&&!rot)return null;
-    const cacheKey=`${name}|${flip?1:0}|${rot.toFixed(6)}`;if(this.normalTransformCache.has(cacheKey))return this.normalTransformCache.get(cacheKey);
+    const cacheKey=`${name}|${flip?1:0}|${rot.toFixed(6)}`;if(this.normalTransformCache.has(cacheKey)){const cached=this.normalTransformCache.get(cacheKey);this.normalTransformCache.delete(cacheKey);this.normalTransformCache.set(cacheKey,cached);return cached}
     const c=new OffscreenCanvas(r[2],r[3]),ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(this.normalImg,r[0],r[1],r[2],r[3],0,0,r[2],r[3]);const pixels=ctx.getImageData(0,0,r[2],r[3]),d=pixels.data,co=Math.cos(rot),si=Math.sin(rot);
     for(let i=0;i<d.length;i+=4){const nx=(d[i]-128)*(flip?-1:1),ny=d[i+1]-128;d[i]=Math.max(0,Math.min(255,Math.round(128+co*nx+si*ny)));d[i+1]=Math.max(0,Math.min(255,Math.round(128-si*nx+co*ny)))}ctx.putImageData(pixels,0,0);
-    if(this.normalTransformCache.size>=64){const first=this.normalTransformCache.keys().next().value,old=this.normalTransformCache.get(first);releaseCanvasBacking(old);this.normalTransformCache.delete(first)}this.normalTransformCache.set(cacheKey,c);return c;
+    // Keep the current room's source surfaces stable across full and bounded
+    // draws. Dawn uses 66 distinct transforms: a 64-entry FIFO recreated every
+    // source on repeat builds. Chromium can sample equivalent canvas objects
+    // differently, so retain recently used sources within a fixed atlas cache.
+    if(this.normalTransformCache.size>=96){const first=this.normalTransformCache.keys().next().value,old=this.normalTransformCache.get(first);releaseCanvasBacking(old);this.normalTransformCache.delete(first)}this.normalTransformCache.set(cacheKey,c);this.normalTransformGeneration++;return c;
   }
   drawMap(ctx,source,name,cx,cy,w,h,opts={}){const r=this.region(name);this.drawMapSubrect(ctx,source,name,0,0,r[2],r[3],cx,cy,w,h,opts)}
   drawMapSubrect(ctx,source,name,sx,sy,sw,sh,cx,cy,w,h,opts={}){if(!ctx||!source||!this.regions[name])return;const r=this.region(name),anchor=opts.anchor||'center',alpha=opts.alpha??1,rot=opts.rot||0,flip=opts.flip||false,transformed=source===this.normalImg?this.transformedNormal(name,flip,rot):null;ctx.save();ctx.globalAlpha=alpha;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.translate(cx,cy);ctx.rotate(rot);if(flip)ctx.scale(-1,1);const dy=anchor==='bottom'?-h:anchor==='top'?0:-h/2;ctx.drawImage(transformed||source,(transformed?0:r[0])+sx,(transformed?0:r[1])+sy,sw,sh,-w/2,dy,w,h);ctx.restore()}
@@ -293,7 +297,9 @@ class HDArtSheet{
 }
 
 class StaticPainter{
+  static COLOR_POLICY='canvas2d-row-sync-v1';
   constructor(art,luts){this.art=art;this.luts=luts;this.materialNormalCtx=null;this.materialSpecCtx=null;this.lastMaterialMaps=null}
+  get colorPolicy(){return StaticPainter.COLOR_POLICY}
   col(e,i){return this.luts.hex(e,i)}
   px(ctx,x,y,w,h,c,a=1){ctx.save();ctx.globalAlpha=a;ctx.fillStyle=c;ctx.fillRect(Math.floor(x),Math.floor(y),Math.ceil(w),Math.ceil(h));ctx.restore()}
   dot(ctx,x,y,c,s=2,a=1){ctx.save();ctx.globalAlpha=a;ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,s/2,0,TAU);ctx.fill();ctx.restore()}
@@ -346,13 +352,143 @@ class StaticPainter{
     if(p==='garden'){const names=['bush_yellow','bush_blue','bush_pair','flower_pink','flower_blue','flower_bush'];for(let i=0;i<24;i++){if(skip(`garden:${i}`))continue;const seed=hash32(i,room.index,440),x=42+(seed%555),y=72+((seed>>>8)%175),n=names[i%names.length];this.sprite(ctx,n,x,y+18,{element:'far_forest',alpha:.9})}}
   }
   persistentObjective(ctx,obj,x,y,roomDone){if(obj.kind==='pip')return;let n=(this.art.roles.objective||{})[obj.kind];if(n){this.sprite(ctx,n,x,y+12,{element:'discoveries',alpha:.97});this.glow(ctx,x,y,'discoveries',225,obj.kind==='dawn'?50:26,.26)}if(roomDone)this.glow(ctx,x,y,'discoveries',245,23,.14)}
-  build(room,state,renderW=W,renderH=H){this.microtile=room.floorMicrotile||FLOOR_TILE;const c=new OffscreenCanvas(renderW,renderH),ctx=c.getContext('2d',{alpha:false}),normalCanvas=new OffscreenCanvas(renderW,renderH),specCanvas=new OffscreenCanvas(renderW,renderH),bctx=normalCanvas.getContext('2d',{alpha:true}),sctx=specCanvas.getContext('2d',{alpha:true});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';bctx.imageSmoothingEnabled=sctx.imageSmoothingEnabled=true;bctx.imageSmoothingQuality=sctx.imageSmoothingQuality='high';ctx.save();bctx.save();sctx.save();ctx.scale(renderW/W,renderH/H);bctx.scale(renderW/W,renderH/H);sctx.scale(renderW/W,renderH/H);this.materialNormalCtx=bctx;this.materialSpecCtx=sctx;
-    const sky=ctx.createLinearGradient(0,0,0,PLAY_H);sky.addColorStop(0,this.col('sky',4));sky.addColorStop(.55,this.col('sky',19));sky.addColorStop(1,this.col('ground',30));ctx.fillStyle=sky;ctx.fillRect(0,0,W,PLAY_H);
-    for(let ty=0;ty<GRID_H;ty++)for(let tx=0;tx<GRID_W;tx++){const k=`${tx},${ty}`,seed=hash32(tx,ty,room.index+311),bridgeCell=room.bridgeCells.has(k);if(room.border.has(k)||room.walls.has(k))this.baseTile(ctx,tx,ty,seed,'blocker');else if(room.water.has(k)&&(bridgeCell||!room.bridgeOpen(k)))this.baseTile(ctx,tx,ty,seed,'water');else if(room.paths.has(k)||(!bridgeCell&&room.bridgeOpen(k)))this.baseTile(ctx,tx,ty,seed,'path');else this.baseTile(ctx,tx,ty,seed,'ground')}
-    this.patternDecor(ctx,room,state);this.drawBlockerSprites(ctx,room);this.drawVegetationInterstitials(ctx,room);this.drawDecor(ctx,room);
-    // editor_decor, recruitable robots, completed objectives, gates and bridge/progression presentation are live mutable content.
-    this.materialNormalCtx=null;this.materialSpecCtx=null;bctx.restore();sctx.restore();this.lastMaterialMaps={normal:normalCanvas,spec:specCanvas};
-    const ui=ctx.createLinearGradient(0,PLAY_H,0,H);ui.addColorStop(0,this.col('ui',14));ui.addColorStop(1,this.col('ui',4));ctx.fillStyle=ui;ctx.fillRect(0,PLAY_H,W,BOTTOM_H);this.px(ctx,0,PLAY_H,W,2,this.col('ui',105),.7);this.px(ctx,8,PLAY_H+7,W-16,BOTTOM_H-14,this.col('ui',24),.92);ctx.strokeStyle=this.col('ui',88);ctx.lineWidth=1.5;ctx.strokeRect(8.5,PLAY_H+7.5,W-17,BOTTOM_H-15);this.sprite(ctx,'gear',W-31,H-17,{anchor:'bottom',alpha:.42,element:'ui'});this.sprite(ctx,'orb_cyan',28,H-18,{anchor:'bottom',alpha:.38,element:'ui'});ctx.restore();return c}
+  // Metadata-only replay of unchanged color overlays. The returned
+  // AABBs are logical, whole-primitive geometry, never alpha-trimmed bounds.
+  // Native projection, output intersection, alignment and work gates belong
+  // to the planner. Any invalid/unbounded metadata must select a full refresh.
+  staticOverlayBounds(room,state){
+    const invalid=()=>{throw new Error('Invalid static overlay bounds context')};
+    const maxCells=GRID_W*GRID_H,maxPrimitives=4096;
+    if(!room?.spec||!this.art?.roles||!this.art.regions||typeof this.art.region!=='function'||typeof this.art.worldSize!=='function'||typeof state?.isDone!=='function'||typeof this.drawFooter!=='function')invalid();
+    // Bound traversal before the production methods create their temporary
+    // sorted wall lists, vegetation role list or objective substitutions.
+    for(const cells of [room.border,room.walls]){
+      if(Object.prototype.toString.call(cells)!=='[object Set]'||cells.size>maxCells)invalid();
+      for(const key of cells){
+        if(typeof key!=='string'||!/^(0|[1-9]\d*),(0|[1-9]\d*)$/.test(key))invalid();
+        const [x,y]=key.split(',').map(Number);if(x>=GRID_W||y>=GRID_H)invalid();
+      }
+    }
+    const lamps=room.decorLamps||[],objects=room.spec.objects||[];
+    if(!Array.isArray(lamps)||lamps.length>maxCells||!Array.isArray(objects)||objects.length>maxCells)invalid();
+    for(const lamp of lamps)if(!lamp||!Array.isArray(lamp.tile)||lamp.tile.length!==2||!lamp.tile.every(Number.isFinite))invalid();
+    for(const object of objects)if(!object||typeof object.kind!=='string')invalid();
+    for(const key of ['foliage_v391','foliage_mix','blocker_variants','blockers','decor_plants','lamps']){
+      const names=this.art.roles[key];if(names!=null&&(!Array.isArray(names)||names.length>maxCells||names.some(name=>typeof name!=='string')))invalid();
+    }
+    const bounds=[],recorder=Object.create(this);let primitives=0;
+    const emit=(x0,y0,x1,y1,alpha=1)=>{
+      if(++primitives>maxPrimitives||![x0,y0,x1,y1,alpha].every(Number.isFinite)||alpha<0||alpha>1)invalid();
+      const left=Math.min(x0,x1),top=Math.min(y0,y1),right=Math.max(x0,x1),bottom=Math.max(y0,y1);
+      if(alpha>0&&left<right&&top<bottom)bounds.push(Object.freeze({x0:left,y0:top,x1:right,y1:bottom}));
+    };
+    const quad=(x,y,w,h,opts={})=>{
+      const rotation=opts.rot||0,anchor=opts.anchor||'bottom',alpha=opts.alpha??1;
+      if(![x,y,w,h,rotation].every(Number.isFinite)||w<=0||h<=0||typeof anchor!=='string')invalid();
+      const top=anchor==='bottom'?-h:anchor==='top'?0:-h/2,flip=opts.flip?-1:1,co=Math.cos(rotation),si=Math.sin(rotation);
+      let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+      for(const [u,v] of [[-w/2,top],[w/2,top],[-w/2,top+h],[w/2,top+h]]){
+        const px=x+u*flip*co-v*si,py=y+u*flip*si+v*co;
+        x0=Math.min(x0,px);y0=Math.min(y0,py);x1=Math.max(x1,px);y1=Math.max(y1,py);
+      }
+      emit(x0,y0,x1,y1,alpha);return[w,h];
+    };
+    recorder.sprite=(_ctx,name,x,y,opts={})=>{
+      if(!name||!recorder.art.regions[name])return[0,0];
+      const scale=recorder.spriteScale(name,opts.scale??1);if(!Number.isFinite(scale)||scale<=0)invalid();
+      const [w,h]=recorder.art.worldSize(name,scale);return quad(x,y,w,h,opts);
+    };
+    recorder.spriteSubrect=(_ctx,name,sx,sy,sw,sh,x,y,w,h,opts={})=>{
+      if(!name||!recorder.art.regions[name])return[0,0];
+      if(![sx,sy,sw,sh].every(Number.isFinite)||sw<=0||sh<=0)invalid();
+      return quad(x,y,w,h,opts);
+    };
+    recorder.glow=(_ctx,x,y,_element,_index,r=18,alpha=.26)=>{
+      if(![x,y,r].every(Number.isFinite)||r<0)invalid();emit(x-r,y-r,x+r,y+r,alpha);
+    };
+    recorder.px=(_ctx,x,y,w,h,_colour,alpha=1)=>{
+      if(![x,y,w,h].every(Number.isFinite))invalid();
+      emit(Math.floor(x),Math.floor(y),Math.floor(x)+Math.ceil(w),Math.floor(y)+Math.ceil(h),alpha);
+    };
+    recorder.dot=(_ctx,x,y,_colour,size=2,alpha=1)=>{
+      if(![x,y,size].every(Number.isFinite)||size<0)invalid();emit(x-size/2,y-size/2,x+size/2,y+size/2,alpha);
+    };
+    recorder.col=()=>'';recorder.materialNormalCtx=null;recorder.materialSpecCtx=null;recorder.lastMaterialMaps=null;
+    for(const method of ['patternDecor','drawBlockerSprites','drawVegetationInterstitials','drawDecor'])recorder[method](null,room,state);
+    // Replay the real footer authority for sampled sprites. The footer's
+    // unfiltered background gradient, stripe, panel and stroke are intentionally
+    // not whole-sprite geometry: they retain their original bounded clip path.
+    recorder.px=()=>{};
+    const footerContext={createLinearGradient:()=>({addColorStop(){}}),fillRect(){},strokeRect(){}};
+    recorder.drawFooter(footerContext);
+    return Object.freeze(bounds);
+  }
+  drawFooter(ctx){
+    const ui=ctx.createLinearGradient(0,PLAY_H,0,H);ui.addColorStop(0,this.col('ui',14));ui.addColorStop(1,this.col('ui',4));ctx.fillStyle=ui;ctx.fillRect(0,PLAY_H,W,BOTTOM_H);this.px(ctx,0,PLAY_H,W,2,this.col('ui',105),.7);this.px(ctx,8,PLAY_H+7,W-16,BOTTOM_H-14,this.col('ui',24),.92);ctx.strokeStyle=this.col('ui',88);ctx.lineWidth=1.5;ctx.strokeRect(8.5,PLAY_H+7.5,W-17,BOTTOM_H-15);this.sprite(ctx,'gear',W-31,H-17,{anchor:'bottom',alpha:.42,element:'ui'});this.sprite(ctx,'orb_cyan',28,H-18,{anchor:'bottom',alpha:.38,element:'ui'});
+  }
+  build(room,state,renderW=W,renderH=H){return this.buildSurface(room,state,renderW,renderH,null)}
+  buildPatch(room,state,renderW,renderH,region){
+    const raster={...region,x:region.rasterX??region.x,y:region.rasterY??region.y,width:region.rasterWidth??region.width,height:region.rasterHeight??region.height};
+    return this.buildSurface(room,state,renderW,renderH,raster);
+  }
+  buildSurface(room,state,renderW,renderH,region){
+    // Full and partial draws share primitives. Scaled partial draws retain
+    // the full native target dimensions as well as its origin: the GPU's device
+    // projection depends on the target, independently of the Canvas2D matrix.
+    const r=region||{x:0,y:0,width:renderW,height:renderH,tx0:0,ty0:0,tx1:GRID_W,ty1:GRID_H},phase=region?'static.patch':'static.full';
+    const canvasX=region?(r.canvasX??r.x):0,canvasY=region?(r.canvasY??r.y):0,canvasWidth=r.canvasWidth??r.width,canvasHeight=r.canvasHeight??r.height;
+    const allocation=this.lastScratchAllocation={attempts:0,count:0,pixels:0,maxMapPixels:0,peakBytes:0};
+    const sync=this.lastColorSync={attempts:0,reads:0,pixels:0,ms:0};
+    const allocate=()=>{allocation.attempts++;const canvas=new OffscreenCanvas(canvasWidth,canvasHeight),pixels=canvasWidth*canvasHeight;allocation.count++;allocation.pixels+=pixels;allocation.maxMapPixels=Math.max(allocation.maxMapPixels,pixels);allocation.peakBytes=allocation.pixels*4;return canvas};
+    let c=null,normalCanvas=null,specCanvas=null,ctx,bctx,sctx;this.lastMaterialMaps=null;this.microtile=room.floorMicrotile||FLOOR_TILE;
+    try{
+      perfMeasure(phase+'.scratch',()=>{
+        c=allocate();ctx=c.getContext('2d',{alpha:false,willReadFrequently:false});
+        // Terrain-only deltas cannot change material pixels: baseTile, sky and
+        // footer paint color only, and the planner verifies every static sprite
+        // dependency. Keep the already qualified normal/specular GPU textures.
+        // Repainting unchanged atlas sprites on a translated canvas can change
+        // subpixel filtering, even when the source and logical transform agree.
+        if(!region){normalCanvas=allocate();specCanvas=allocate();bctx=normalCanvas.getContext('2d',{alpha:true});sctx=specCanvas.getContext('2d',{alpha:true})}
+        // The native clip bounds explicit redraw work. Allocation/initialization
+        // can touch the full color capacity and is accounted separately.
+        for(const x of [ctx,bctx,sctx].filter(Boolean)){
+          x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.save();
+          if(region?.canvasMode==='native-clip'){x.beginPath();x.rect(r.x,r.y,r.width,r.height);x.clip()}
+          if(region&&(canvasX||canvasY))x.translate(-canvasX,-canvasY);
+          x.scale(renderW/W,renderH/H);
+        }
+      });
+      this.materialNormalCtx=bctx;this.materialSpecCtx=sctx;
+      perfMeasure(phase+'.floor',()=>{
+        const sky=ctx.createLinearGradient(0,0,0,PLAY_H);sky.addColorStop(0,this.col('sky',4));sky.addColorStop(.55,this.col('sky',19));sky.addColorStop(1,this.col('ground',30));ctx.fillStyle=sky;ctx.fillRect(0,0,W,PLAY_H);
+        // Neighboring floor cells are replayed in their original row-major order;
+        // microtile strokes can extend beyond the cell which owns them.
+        for(let ty=r.ty0;ty<r.ty1;ty++){
+          for(let tx=r.tx0;tx<r.tx1;tx++){const k=`${tx},${ty}`,seed=hash32(tx,ty,room.index+311),bridgeCell=room.bridgeCells.has(k);if(room.border.has(k)||room.walls.has(k))this.baseTile(ctx,tx,ty,seed,'blocker');else if(room.water.has(k)&&(bridgeCell||!room.bridgeOpen(k)))this.baseTile(ctx,tx,ty,seed,'water');else if(room.paths.has(k)||(!bridgeCell&&room.bridgeOpen(k)))this.baseTile(ctx,tx,ty,seed,'path');else this.baseTile(ctx,tx,ty,seed,'ground')}
+          // End each painted floor row before later commands can be batched with
+          // it. The one native pixel is discarded; this is synchronization, not
+          // a color source. Explicit false keeps the creation policy distinct
+          // from Chromium's omitted-hint repeated-readback heuristic.
+          if(r.tx0<r.tx1)perfMeasure(phase+'.color-sync',()=>{
+            sync.attempts++;const start=performance.now();
+            try{ctx.getImageData(0,0,1,1);sync.reads++;sync.pixels++}
+            finally{sync.ms+=performance.now()-start}
+          });
+        }
+      });
+      // Static overlays may reach across many cells. Replaying all of them into
+      // the small clipped color surface preserves sorting and glows. Material
+      // contexts are present only for a full build, including every fallback.
+      perfMeasure(phase+'.overlays-materials',()=>{this.patternDecor(ctx,room,state);this.drawBlockerSprites(ctx,room);this.drawVegetationInterstitials(ctx,room);this.drawDecor(ctx,room)});
+      // editor_decor, recruitable robots, completed objectives, gates and bridge/progression presentation are live mutable content.
+      // Footer sprites affect color only, including a patch crossing PLAY_H.
+      this.materialNormalCtx=null;this.materialSpecCtx=null;bctx?.restore();sctx?.restore();
+      perfMeasure(phase+'.footer',()=>this.drawFooter(ctx));
+      ctx.restore();this.lastMaterialMaps=region?null:{normal:normalCanvas,spec:specCanvas};return c;
+    }catch(err){releaseCanvasBacking(c);releaseCanvasBacking(normalCanvas);releaseCanvasBacking(specCanvas);throw err}
+    finally{this.materialNormalCtx=null;this.materialSpecCtx=null}
+  }
 }
 
 class SpriteAtlas{
@@ -498,7 +634,42 @@ class GLRenderer{
     this.scene=this.bloomA=this.bloomB=this.light=this.shadowMask=null;this.groundNormal=[];this.groundGlow=[];this.groundHDGrassNormal=[];this.grassFrontNormal=[];this.grassFrontHDNormal=[];this.foregroundHDNormal=[];this.foregroundHDFlat=[];this.mutableNormal=[];this.mutableGlow=[];this.mutableHD=[];this.normal=[];this.glow=[];this.hdNormal=[];this.hdGlow=[];this.hdTintNormal=[];this.hdTintGlow=[];this.topNormal=[];this.topGlow=[];this.resizeToDisplaySize(true);g.bindFramebuffer(g.FRAMEBUFFER,null);g.disable(g.DEPTH_TEST);g.enable(g.BLEND)
   }
   resizeToDisplaySize(force=false){const r=this.c.getBoundingClientRect(),dpr=Math.max(1,window.devicePixelRatio||1);let rawW=Math.max(2,Math.round(r.width*dpr)),rawH=Math.max(2,Math.round(r.height*dpr));this.requestedNativeW=rawW;this.requestedNativeH=rawH;const pxScale=Math.min(1,Math.sqrt(MAX_FRAMEBUFFER_PIXELS/Math.max(1,rawW*rawH))),texScale=Math.min(1,this.maxTextureSize/rawW,this.maxTextureSize/rawH),scale=Math.min(pxScale,texScale);let w=Math.max(2,Math.floor(rawW*scale)),h=Math.max(2,Math.floor(rawH*scale));this.renderScale=Math.min(1,w/rawW,h/rawH);if(!force&&w===this.nativeW&&h===this.nativeH)return false;this.nativeW=w;this.nativeH=h;this.c.width=w;this.c.height=h;this.deleteTarget(this.scene);this.deleteTarget(this.bloomA);this.deleteTarget(this.bloomB);this.deleteTarget(this.light);this.deleteTarget(this.shadowMask);const g=this.gl;this.scene=this.makeTarget(w,h,g.NEAREST);this.light=this.makeTarget(w,h,g.LINEAR);this.shadowMask=this.makeTarget(Math.max(2,w>>1),Math.max(2,h>>1),g.LINEAR);this.bloomA=this.makeTarget(Math.max(2,w>>1),Math.max(2,h>>1),g.LINEAR);this.bloomB=this.makeTarget(Math.max(2,w>>1),Math.max(2,h>>1),g.LINEAR);return true}
-  setBackground(canvas,maps=null){const g=this.gl,upload=(tex,src,label)=>perfMeasure(label,()=>{g.bindTexture(g.TEXTURE_2D,tex);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);if(src)g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,src);else g.texImage2D(g.TEXTURE_2D,0,g.RGBA,1,1,0,g.RGBA,g.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false)});upload(this.bgTex,canvas,'static.upload.color');upload(this.bgNormalTex,maps?.normal||null,'static.upload.normal');upload(this.bgSpecTex,maps?.spec||null,'static.upload.specular')}
+  setBackground(canvas,maps=null){
+    const g=this.gl,upload=(tex,src,label)=>perfMeasure(label,()=>{g.bindTexture(g.TEXTURE_2D,tex);this.backgroundUploadCalls=(this.backgroundUploadCalls||0)+1;this.backgroundUploadBytes=(this.backgroundUploadBytes||0)+(src?src.width*src.height*4:4);if(src)g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,src);else g.texImage2D(g.TEXTURE_2D,0,g.RGBA,1,1,0,g.RGBA,g.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]))});
+    this.backgroundReady=false;g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);
+    try{
+      upload(this.bgTex,canvas,'static.upload.color');upload(this.bgNormalTex,maps?.normal||null,'static.upload.normal');upload(this.bgSpecTex,maps?.spec||null,'static.upload.specular');
+      if(g.isContextLost?.()||(g.getError&&g.getError()!==g.NO_ERROR))throw new Error('Static background upload failed');
+      this.backgroundSize=[canvas.width,canvas.height];this.backgroundReady=!!(maps?.normal&&maps?.spec);this.backgroundRevision=(this.backgroundRevision||0)+1;
+    }finally{g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false)}
+  }
+  patchBackground(region,canvas){
+    const g=this.gl,{x,y,width,height}=region;
+    if(!this.backgroundReady||this.backgroundSize?.[0]!==this.nativeW||this.backgroundSize?.[1]!==this.nativeH||![x,y,width,height].every(Number.isInteger)||x<0||y<0||width<=0||height<=0||x+width>this.nativeW||y+height>this.nativeH)throw new Error('Stale or invalid static background patch');
+    const rasterX=region.rasterX??x,rasterY=region.rasterY??y,rasterWidth=region.rasterWidth??width,rasterHeight=region.rasterHeight??height;
+    if(![rasterX,rasterY,rasterWidth,rasterHeight].every(Number.isInteger)||rasterX<0||rasterY<0||rasterWidth<=0||rasterHeight<=0||rasterX+rasterWidth>this.nativeW||rasterY+rasterHeight>this.nativeH||rasterX>x||rasterY>y||rasterX+rasterWidth<x+width||rasterY+rasterHeight<y+height)throw new Error('Stale or invalid static background patch crop');
+    const canvasX=region.canvasX??rasterX,canvasY=region.canvasY??rasterY,canvasWidth=region.canvasWidth??rasterWidth,canvasHeight=region.canvasHeight??rasterHeight;
+    if(region.canvasMode!==undefined&&!['local','native-clip'].includes(region.canvasMode))throw new Error('Invalid static background canvas mode');
+    if(![canvasX,canvasY,canvasWidth,canvasHeight].every(Number.isInteger)||canvasX<0||canvasY<0||canvasWidth<=0||canvasHeight<=0||canvasX+canvasWidth>this.nativeW||canvasY+canvasHeight>this.nativeH||canvasX>rasterX||canvasY>rasterY||canvasX+canvasWidth<rasterX+rasterWidth||canvasY+canvasHeight<rasterY+rasterHeight)throw new Error('Stale or invalid static background canvas');
+    if(region.canvasMode==='local'&&(canvasX!==rasterX||canvasY!==rasterY||canvasWidth!==rasterWidth||canvasHeight!==rasterHeight))throw new Error('Incomplete local static raster');
+    if(region.canvasMode==='native-clip'&&(canvasX!==0||canvasY!==0||canvasWidth!==this.nativeW||canvasHeight!==this.nativeH))throw new Error('Incomplete native static projection');
+    if(!canvas||canvas.width!==canvasWidth||canvas.height!==canvasHeight)throw new Error('Incomplete static color patch');
+    const flip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels=g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows=g.getParameter(g.UNPACK_SKIP_ROWS);
+    const upload=(tex,src,label)=>perfMeasure(label,()=>{g.bindTexture(g.TEXTURE_2D,tex);this.backgroundUploadCalls=(this.backgroundUploadCalls||0)+1;this.backgroundUploadBytes=(this.backgroundUploadBytes||0)+width*height*4;g.texSubImage2D(g.TEXTURE_2D,0,x,this.nativeH-y-height,width,height,g.RGBA,g.UNSIGNED_BYTE,src)});
+    this.backgroundReady=false;
+    try{
+      // Draw filtering away from the uploaded interior. WebGL2 selects the crop
+      // directly from the actual canvas; its capacity can exceed the clip. With
+      // flip enabled, skipped rows count from the source canvas's bottom.
+      // No intermediate crop canvas or readback is required.
+      g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);g.pixelStorei(g.UNPACK_SKIP_PIXELS,x-canvasX);g.pixelStorei(g.UNPACK_SKIP_ROWS,canvasHeight-(y-canvasY)-height);
+      // Only a dependency-qualified terrain delta reaches this method. Both
+      // material textures remain byte-for-byte identical to the full baseline.
+      upload(this.bgTex,canvas,'static.patch.upload.color');
+      if(g.isContextLost?.()||(g.getError&&g.getError()!==g.NO_ERROR))throw new Error('Static background subupload failed');
+      this.backgroundReady=true;this.backgroundRevision=(this.backgroundRevision||0)+1;
+    }finally{g.pixelStorei(g.UNPACK_SKIP_PIXELS,skipPixels);g.pixelStorei(g.UNPACK_SKIP_ROWS,skipRows);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,flip)}
+  }
   renderBackground(settings=GRAPHICS_DEFAULTS){const g=this.gl;if(!this.materialEnabled){this.quadDraw(this.quadProg,this.bgTex);return}const p=this.bgMaterialProg;g.useProgram(p);this.quadGeometry(p);g.activeTexture(g.TEXTURE0);g.bindTexture(g.TEXTURE_2D,this.bgTex);g.uniform1i(g.getUniformLocation(p,'uTex'),0);g.activeTexture(g.TEXTURE1);g.bindTexture(g.TEXTURE_2D,this.bgNormalTex);g.uniform1i(g.getUniformLocation(p,'uNormalTex'),1);g.activeTexture(g.TEXTURE2);g.bindTexture(g.TEXTURE_2D,this.bgSpecTex);g.uniform1i(g.getUniformLocation(p,'uSpecularTex'),2);g.uniform2f(g.getUniformLocation(p,'uMainLightPos'),this.mainLightPos[0],this.mainLightPos[1]);g.uniform2f(g.getUniformLocation(p,'uLogicalSize'),W,H);g.uniform1f(g.getUniformLocation(p,'uBumpStrength'),this.bumpStrength);g.uniform1f(g.getUniformLocation(p,'uSpecularStrength'),this.specularStrength);g.uniform1f(g.getUniformLocation(p,'uMaterialOn'),this.materialEnabled?1:0);g.drawArrays(g.TRIANGLES,0,6)}
   setWaterMask(canvas,signature='water',settings=GRAPHICS_DEFAULTS,delta=null){
     const g=this.gl,revision=String(signature),validRect=r=>r&&[r.x0,r.y0,r.x1,r.y1].every(Number.isInteger)&&r.x0>=0&&r.y0>=0&&r.x1<=W&&r.y1<=H&&r.x1>r.x0&&r.y1>r.y0;
@@ -752,7 +923,7 @@ class Game{
     this.canvas.addEventListener('webglcontextrestored',()=>{clearTimeout(this.recoveryTimer);this.contextLost=false;this.scheduleContextRecovery('restored')});
     window.addEventListener('blur',()=>this.keys.clear());
   }
-  diagnostics(){const rw=this.renderer?.nativeW||0,rh=this.renderer?.nativeH||0;return{version:'4.15',room:this.room?.key||null,position:[this.x,this.y],inputMode:this.inputMode||'none',keys:[...this.keys],frameErrorCount:this.frameErrorCount,lastFrameError:this.lastFrameError,updateFaults:Object.fromEntries([...this.updateFaultState].map(([k,v])=>[k,{total:v.total||0,consecutive:v.consecutive||0,last:v.last||'',lastAt:v.lastAt||0,suspendedUntil:v.suspendedUntil||0}])),recentFaults:this.updateFaultLog.slice(-24),renderer:{native:[rw,rh],requested:[this.renderer?.requestedNativeW||rw,this.renderer?.requestedNativeH||rh],renderScale:this.renderer?.renderScale??1,pixelBudget:MAX_FRAMEBUFFER_PIXELS,estimatedCoreTargetBytes:Math.round(rw*rh*15),shadowMask:[this.renderer?.shadowMask?.w||0,this.renderer?.shadowMask?.h||0],contextLost:this.contextLost,retainedStaticCanvas:!!this.currentStatic,waterMask:this.renderer?.lastWaterMaskUpdate||null},surfaceFX:this.renderer?.surfaceFX?.diagnostics?.()||null,foliageFX:this.renderer?.foliageFX?.diagnostics?.()||null,heroGrass:{rendered:0,front:0,authoredClumps:this.room?.grassClumps?.length||0,legacyPath:'shader-fallback-v3.999-compat'},floaterFX:{rendered:this.floaterRendered||0,authoredClumps:this.room?.floaterClumps?.length||0}}}
+  diagnostics(){const rw=this.renderer?.nativeW||0,rh=this.renderer?.nativeH||0;return{version:'4.15',room:this.room?.key||null,position:[this.x,this.y],inputMode:this.inputMode||'none',keys:[...this.keys],frameErrorCount:this.frameErrorCount,lastFrameError:this.lastFrameError,updateFaults:Object.fromEntries([...this.updateFaultState].map(([k,v])=>[k,{total:v.total||0,consecutive:v.consecutive||0,last:v.last||'',lastAt:v.lastAt||0,suspendedUntil:v.suspendedUntil||0}])),recentFaults:this.updateFaultLog.slice(-24),renderer:{native:[rw,rh],requested:[this.renderer?.requestedNativeW||rw,this.renderer?.requestedNativeH||rh],renderScale:this.renderer?.renderScale??1,pixelBudget:MAX_FRAMEBUFFER_PIXELS,estimatedCoreTargetBytes:Math.round(rw*rh*15),shadowMask:[this.renderer?.shadowMask?.w||0,this.renderer?.shadowMask?.h||0],contextLost:this.contextLost,retainedStaticCanvas:!!this.currentStatic,staticRefresh:this.staticRefreshStats||null,waterMask:this.renderer?.lastWaterMaskUpdate||null},surfaceFX:this.renderer?.surfaceFX?.diagnostics?.()||null,foliageFX:this.renderer?.foliageFX?.diagnostics?.()||null,heroGrass:{rendered:0,front:0,authoredClumps:this.room?.grassClumps?.length||0,legacyPath:'shader-fallback-v3.999-compat'},floaterFX:{rendered:this.floaterRendered||0,authoredClumps:this.room?.floaterClumps?.length||0}}}
   persistFaultDiagnostic(){const now=performance.now();if(now-this.lastFaultPersistAt<750)return;this.lastFaultPersistAt=now;try{localStorage.setItem('relayMothLastFault399',JSON.stringify(this.diagnostics()))}catch(_e){}}
   showFaultBadge(label,msg=''){const now=performance.now();if(now-this.lastFaultBadgeAt<450)return;this.lastFaultBadgeAt=now;const badge=$('#runtimeStatus');if(badge){badge.textContent=`RECOVERED ${label}${msg?` · ${msg}`:''}`.slice(0,96);badge.classList.add('show');clearTimeout(this._faultBadgeTimer);this._faultBadgeTimer=setTimeout(()=>badge.classList.remove('show'),1800)}}
   noteUpdateFault(name,err,critical=false){const now=performance.now(),msg=String(err?.message||err),stack=String(err?.stack||'').slice(0,1800);let st=this.updateFaultState.get(name);if(!st){st={total:0,consecutive:0,last:'',lastAt:0,suspendedUntil:0};this.updateFaultState.set(name,st)}st.total++;st.consecutive++;st.last=msg;st.lastAt=now;this.frameErrorCount++;this.lastFrameError=`update/${name}: ${msg}`;this.updateFaultLog.push({time:Date.now(),room:this.room?.key||null,subsystem:name,message:msg,stack});if(this.updateFaultLog.length>48)this.updateFaultLog.splice(0,this.updateFaultLog.length-48);if(!critical){const delay=st.consecutive<=1?180:st.consecutive===2?500:st.consecutive===3?1400:Math.min(8000,2200+st.consecutive*650);st.suspendedUntil=now+delay}console.error(`Relay Moth Forest update fault [${name}]`,err);this.showFaultBadge(`UPDATE/${name.toUpperCase()}`,msg);this.persistFaultDiagnostic()}
@@ -793,11 +964,77 @@ class Game{
   hdTint(name,elementOverride=null,index=170){const m=this.art.regionMeta(name),element=elementOverride||m.element;if(!element)return[1,1,1];return this.luts.rgb(element,index)}
   roomUnlocked(i){if(i<=0)return true;const spec=this.storyData.rooms[i];if(this.state.shown.has(spec.key))return true;return this.state.roomComplete(this.storyData.rooms[i-1])}
   updateUI(){const sp=this.room.spec;$('#roomTitle').textContent=`${sp.index+1}/9  ${sp.title}`;$('#roomSubtitle').textContent=sp.subtitle||'';$('#roomLead').textContent=(sp.intro||[])[0]||'';const pending=sp.objects.find(o=>!this.state.isDone(o.object_id));this.currentObjective=pending;this.renderObjectiveHud(pending);$('#mothHud').textContent=`✦ ${this.flock.m.length}/${this.totalMoths}`;this.uiDirty=false}
-  bgSignature(){return`${this.room.key}|${this.luts.signature()}|${this.renderer.nativeW}x${this.renderer.nativeH}`}
+  bgSignature(){return`${this.room.key}|${this.luts.signature()}|${this.renderer.nativeW}x${this.renderer.nativeH}|${this.painter.colorPolicy}`}
   releaseCurrentStatic(){if(this.currentStatic){releaseCanvasBacking(this.currentStatic);this.currentStatic=null}}
   syncEditorRenderStage(){this.room.bridgeProgress=this.room.key==='tin_stream'?this.room.spec.objects.filter(o=>this.state.isDone(o.object_id)).length:0;this.room.bridgeBuilt=this.room.key==='tin_stream'&&this.state.roomComplete(this.room.spec)}
   editorBackgroundKey(){return this.bgSignature()}
-  refreshEditorStatic(){this.syncEditorRenderStage();this.releaseCurrentStatic();this.art.trimTintCache?.(96);const staticCanvas=perfMeasure('static.build',()=>this.painter.build(this.room,this.state,this.renderer.nativeW,this.renderer.nativeH)),materialMaps=this.painter.lastMaterialMaps;try{this.renderer.setBackground(staticCanvas,materialMaps)}finally{releaseCanvasBacking(staticCanvas);releaseCanvasBacking(materialMaps?.normal);releaseCanvasBacking(materialMaps?.spec);this.painter.lastMaterialMaps=null}this.bgKey=this.editorBackgroundKey();perfMeasure('ui.update',()=>this.updateUI())}
+  staticTerrainContext(){
+    const imageKey=image=>image?[image.currentSrc||image.src||'',image.width,image.height]:null;
+    return{renderWidth:this.renderer.nativeW,renderHeight:this.renderer.nativeH,logicalWidth:W,logicalHeight:H,tileSize:TILE,columns:GRID_W,rows:GRID_H,
+      sourceRef:this.maps,rendererRef:this.renderer,artRef:this.art,atlasRef:this.art.img,normalRef:this.art.normalImg,specularRef:this.art.specImg,
+      colorPolicy:this.painter.colorPolicy,
+      // Theme names alone do not change when a color is edited in place.
+      lutSignature:JSON.stringify([this.luts.signature(),this.luts.data,Array.from(this.luts.elementChannel||[])]),
+      resourceSignature:JSON.stringify([this.art.regions,this.art.meta,this.art.roles,this.art.worldScale,imageKey(this.art.img),imageKey(this.art.normalImg),imageKey(this.art.specImg)])};
+  }
+  refreshEditorStatic({force=false}={}){
+    this.syncEditorRenderStage();this.releaseCurrentStatic();this.art.trimTintCache?.(96);
+    const planner=globalThis.RelayStaticTerrain,previous=this.staticTerrainSnapshot,renderer=this.renderer,startCalls=renderer.backgroundUploadCalls||0,startBytes=renderer.backgroundUploadBytes||0;
+    let snapshot=null,plan;
+    perfMeasure('static.plan',()=>{
+      try{snapshot=planner?.capture(this.room,this.staticTerrainContext())||null;plan=planner?.plan(previous,snapshot)||{kind:'full',reason:'planner-unavailable'}}
+      catch(_err){plan={kind:'full',reason:'invalid-context'}}
+      if(force)plan={...plan,kind:'full',reason:'forced'};
+      else if(previous&&(!renderer.backgroundReady||this.staticBackgroundRevision!==renderer.backgroundRevision))plan={...plan,kind:'full',reason:'stale-background'};
+      if(plan.kind==='patch'){
+        try{plan=planner.plan(previous,snapshot,{overlayBounds:this.painter.staticOverlayBounds(this.room,this.state)})}
+        catch(_err){plan={...plan,kind:'full',reason:'invalid-overlay-bounds'}}
+      }
+    });
+    // Asset replacement on an existing HDArtSheet must also discard derived
+    // tint/normal tiles; their historical keys identify sprite names, not images.
+    if(previous?.valid&&snapshot?.valid&&previous.references[2]===this.art&&(previous.resourceSignature!==snapshot.resourceSignature||previous.references.slice(3).some((ref,i)=>ref!==snapshot.references[i+3]))){
+      for(const cache of [this.art.tintCache,this.art.normalTransformCache]){if(cache){for(const canvas of cache.values())releaseCanvasBacking(canvas);cache.clear()}}
+    }
+    const stats={mode:plan.kind,reason:plan.reason,colorPolicy:this.painter.colorPolicy,changedCells:plan.changedCellCount||0,rasterCells:0,rasterPixels:0,pixels:0,uploadCalls:0,uploadBytes:0,scratchMode:plan.kind==='patch'?plan.scratchMode:plan.kind==='noop'?'none':'full',scratchPixels:0,scratchBytes:0,scratchAllocationAttempts:0,scratchAllocations:0,scratchAllocationPixels:0,scratchAllocationBytes:0,colorSyncAttempts:0,colorSyncReads:0,colorSyncPixels:0,colorSyncMs:0,readbackPixels:0,regions:[],retainedScratchPixels:0};
+    this.staticRefreshStats=stats;
+    const paint=build=>{
+      this.painter.lastScratchAllocation=null;
+      this.painter.lastColorSync=null;
+      try{return build()}
+      finally{
+        const a=this.painter.lastScratchAllocation;
+        if(a){stats.scratchAllocationAttempts+=a.attempts;stats.scratchAllocations+=a.count;stats.scratchAllocationPixels+=a.pixels;stats.scratchAllocationBytes+=a.pixels*4;stats.scratchPixels=Math.max(stats.scratchPixels,a.maxMapPixels);stats.scratchBytes=Math.max(stats.scratchBytes,a.peakBytes)}
+        const s=this.painter.lastColorSync;
+        if(s){stats.colorSyncAttempts+=s.attempts;stats.colorSyncReads+=s.reads;stats.colorSyncPixels+=s.pixels;stats.colorSyncMs+=s.ms;stats.readbackPixels+=s.pixels}
+      }
+    };
+    const full=()=>{
+      stats.mode='full';stats.scratchMode='full';stats.rasterCells+=GRID_W*GRID_H;stats.pixels+=renderer.nativeW*renderer.nativeH;stats.rasterPixels+=renderer.nativeW*renderer.nativeH;
+      const staticCanvas=paint(()=>perfMeasure('static.build',()=>this.painter.build(this.room,this.state,renderer.nativeW,renderer.nativeH))),materialMaps=this.painter.lastMaterialMaps;
+      try{renderer.setBackground(staticCanvas,materialMaps)}finally{releaseCanvasBacking(staticCanvas);releaseCanvasBacking(materialMaps?.normal);releaseCanvasBacking(materialMaps?.spec);this.painter.lastMaterialMaps=null}
+    };
+    try{
+      // A no-op is valid only while the previous GPU contents still exist.
+      // Context loss can occur without a terrain mutation or a revision bump.
+      if(renderer.gl?.isContextLost?.())throw new Error('Static background context lost');
+      if(plan.kind==='patch'){
+        try{
+          for(const region of plan.regions){
+            const rasterPixels=(region.rasterWidth??region.width)*(region.rasterHeight??region.height);
+            stats.rasterCells+=(region.tx1-region.tx0)*(region.ty1-region.ty0);stats.pixels+=region.width*region.height;stats.rasterPixels+=rasterPixels;stats.regions.push({...region});
+            const staticCanvas=paint(()=>perfMeasure('static.patch.build',()=>this.painter.buildPatch(this.room,this.state,renderer.nativeW,renderer.nativeH,region)));
+            try{renderer.patchBackground(region,staticCanvas)}finally{releaseCanvasBacking(staticCanvas);this.painter.lastMaterialMaps=null}
+          }
+        }catch(err){stats.reason='patch-failed';stats.repairError=String(err?.message||err);full()}
+      }else if(plan.kind!=='noop')full();
+      // The only retained authority is data. Commit after all color regions and
+      // their unchanged material baseline are coherent, or full repair succeeds.
+      this.staticTerrainSnapshot=snapshot;this.staticBackgroundRevision=renderer.backgroundRevision;this.bgKey=this.editorBackgroundKey();
+    }catch(err){renderer.backgroundReady=false;this.staticTerrainSnapshot=null;this.staticBackgroundRevision=null;this.bgKey='';stats.reason='refresh-failed';throw err}
+    finally{stats.uploadCalls=(renderer.backgroundUploadCalls||0)-startCalls;stats.uploadBytes=(renderer.backgroundUploadBytes||0)-startBytes}
+    perfMeasure('ui.update',()=>this.updateUI());return stats;
+  }
   effectiveWaterAuthority(){const out=new Uint8Array(GRID_W*GRID_H);for(const k of this.room.water){if(this.room.bridgeOpen(k))continue;const [tx,ty]=k.split(',').map(Number);if(tx>=0&&tx<GRID_W&&ty>=0&&ty<GRID_H)out[ty*GRID_W+tx]=1}return out}
   waterRevisionSignature(){return JSON.stringify([this.room.key,this.room.bridgeProgress,Array.from(this.room.water).sort()])}
   refreshEditorWater(){
@@ -811,7 +1048,7 @@ class Game{
     this.waterMaskCanvas=waterMask;this.waterAuthority=next;this.waterAuthorityRoomKey=this.room.key;this.waterRevision=revision;if(oldCanvas&&oldCanvas!==waterMask)releaseCanvasBacking(oldCanvas);return result;
   }
   refreshEditorFoliage(){this.syncEditorRenderStage();const grassDescriptor=perfMeasure('foliage.grass-descriptor.build',()=>this.buildGrassSurfaceDescriptor());this.renderer.setGrassDescriptor(grassDescriptor,this.graphics);perfMeasure('foliage.descriptor.build',()=>this.renderer.setFoliageDescriptor(this.buildFoliageDescriptor(grassDescriptor),this.graphics))}
-  ensureBackground(force=false){this.syncEditorRenderStage();const k=this.editorBackgroundKey();if(!force&&k===this.bgKey)return;this.refreshEditorStatic();this.refreshEditorWater();this.refreshEditorFoliage();this.bgKey=k}
+  ensureBackground(force=false){this.syncEditorRenderStage();const k=this.editorBackgroundKey();if(!force&&k===this.bgKey)return;this.refreshEditorStatic({force:true});this.refreshEditorWater();this.refreshEditorFoliage();this.bgKey=k}
   buildWaterMask(){
     // The first context request selects the backing store. Bounded updates read
     // this mask on the CPU; requesting the hint later cannot undo GPU stalls.

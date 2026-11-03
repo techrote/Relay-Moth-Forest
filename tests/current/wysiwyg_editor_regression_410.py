@@ -45,7 +45,9 @@ assert 'renderMutableEditorDecor()' in game and 'this.renderMutableEditorDecor()
 assert 'this.drawEditorDecor(ctx,room)' not in game[game.index('  build(room,state,renderW=W,renderH=H){'):game.index('\n}\n\nclass SpriteAtlas')]
 assert 'new Room(idx,spec,this.game.maps)' in editor
 assert 'EDITOR_INVALIDATION' in editor and 'queueInvalidation(' in editor and 'applyInvalidation(' in editor
-assert 'refreshEditorStatic()' in game and 'refreshEditorWater()' in game and 'refreshEditorFoliage()' in game
+# Static refresh accepts an explicit full-build option; its transaction and
+# fallback behavior is exercised by static_terrain_runtime_regression_415.js.
+assert 'refreshEditorStatic(' in game and 'refreshEditorWater()' in game and 'refreshEditorFoliage()' in game
 assert 'rebuildRoom(skipInspector=false){return this.queueInvalidation(EDITOR_INVALIDATION.ALL' in editor
 assert "if(k==='f2'){e.preventDefault();toggleWysiwygEditor();return}" in game
 assert '!!globalThis.rmfEditor?.active' in game

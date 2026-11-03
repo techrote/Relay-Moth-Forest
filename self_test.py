@@ -147,7 +147,7 @@ def main():
     assert "fetch('/__editor/save_maps'" in editor and "path != '/__editor/save_maps'" in server and "backups = ROOT / 'editor_backups'" in server
     assert 'relay-moth-runtime-diagnostics-415.json' in js
     # SurfaceFX v3.995.2 bridge architecture: separate reusable file, bounded water/grass resources, clean fallback.
-    assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('procedural_decor.js') < html.index('editor_identity.js') < html.index('editor_validation.js') < html.index('editor.js') < html.index('game.js')
+    assert html.index('surfacefx.js') < html.index('foliagefx.js') < html.index('procedural_decor.js') < html.index('static_terrain.js') < html.index('editor_identity.js') < html.index('editor_validation.js') < html.index('editor.js') < html.index('game.js')
     for token in ('class SurfaceFX','class WaterField','class GrassField','buildShoreField','drawArraysInstanced','GRASS_HARD_CAP=4600','MAX_RIPPLES=12',"const VERSION='3.999'",'uRefractionStrength','sampler2D uScene'): assert token in surface,token
     assert 'settings.waterQuality??2' in js and 'this.waterProg' in js
     assert 'buildGrassSurfaceDescriptor' in js and "this.updateStep('surface-fx'" in js
@@ -192,6 +192,7 @@ def main():
     subprocess.run(['node','--check',str(ROOT/'surfacefx.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'foliagefx.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'procedural_decor.js')],check=True)
+    subprocess.run(['node','--check',str(ROOT/'static_terrain.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'editor_identity.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'editor_validation.js')],check=True)
     subprocess.run(['node','--check',str(ROOT/'game.js')],check=True)
@@ -199,6 +200,10 @@ def main():
     subprocess.run(['node','--check',str(ROOT/'editor.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'surfacefx_regression.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'waterfield_bounded_regression_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'static_terrain_regression_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'static_terrain_runtime_regression_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'static_matrix_orchestration_415.js')],check=True)
+    subprocess.run(['node',str(ROOT/'tests'/'current'/'normal_cache_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'foliagefx_regression_400.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'foliagefx_depth_regression_400.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'foliagefx_occlusion_regression_404.js')],check=True)

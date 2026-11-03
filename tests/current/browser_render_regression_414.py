@@ -193,13 +193,14 @@ def main():
             name=meta[key];page.locator('#auditAsset').set_input_files(str(ROOT/name))
             page.evaluate('(name)=>{window.__assets[name]=URL.createObjectURL(document.querySelector("#auditAsset").files[0])}',name)
         page.add_script_tag(content=SETUP)
-        for name in ('surfacefx.js','sprite_material.js','foliagefx.js','procedural_decor.js','editor_identity.js','editor_validation.js','editor.js','game.js'):
+        for name in ('surfacefx.js','sprite_material.js','foliagefx.js','procedural_decor.js','static_terrain.js','editor_identity.js','editor_validation.js','editor.js','game.js'):
             source=(ROOT/name).read_text()
             if name=='game.js':source=source.replace('img.src=url','img.src=window.__assets[url]||url')
             page.add_script_tag(content=source)
         page.wait_for_function("document.body.dataset.ready==='1'",timeout=60000)
-        result={'rooms':[],'native_webgl':True,'asset_transport':'offline injected, normal renderer'}
-        result['driver']=page.evaluate("(()=>{const g=game.renderer.gl,d=g.getExtension('WEBGL_debug_renderer_info');return {version:g.getParameter(g.VERSION),renderer:d?g.getParameter(d.UNMASKED_RENDERER_WEBGL):g.getParameter(g.RENDERER)}})()")
+        result={'rooms':[],'native_webgl':True,'asset_transport':'offline injected, normal renderer',
+            'browserVersion':browser.version,'userAgent':page.evaluate('navigator.userAgent')}
+        result['driver']=page.evaluate("(()=>{const g=game.renderer.gl,d=g.getExtension('WEBGL_debug_renderer_info');return {version:g.getParameter(g.VERSION),vendor:d?g.getParameter(d.UNMASKED_VENDOR_WEBGL):g.getParameter(g.VENDOR),renderer:d?g.getParameter(d.UNMASKED_RENDERER_WEBGL):g.getParameter(g.RENDERER)}})()")
         # Rendering/readback happen in the same browser task before the drawing buffer is discarded.
         page.evaluate('''()=>{window.auditFrame=(time=1000,capture=false)=>{game.renderer.foliageFX.update(.016,game.foliageInteractionSources(),game.graphics,time/1000);game.render(time);const g=game.renderer.gl;g.finish();const error=g.getError();if(error)throw Error('WebGL error '+error);if(game.renderer.foliageFX.error)throw Error(game.renderer.foliageFX.error);if(game.renderer.surfaceFX.errors.length)throw Error(game.renderer.surfaceFX.errors.join(';'));return {png:capture?game.canvas.toDataURL():null,foliage:game.renderer.foliageFX.diagnostics(),surface:game.renderer.surfaceFX.diagnostics()}}}'''.replace('game.canvas.toDataURL()','document.querySelector("#game").toDataURL()'))
         for i in range(9):
@@ -321,6 +322,18 @@ def main():
             result['waterfield_quality_matrix'].append(page.evaluate(WATER_QUALITY_CASE,quality))
         result['waterfield_fallbacks']=page.evaluate(WATER_FALLBACK_CASE)
         result['waterfield_optional_effect_faults']=page.evaluate(WATER_FAULT_CASE)
+        page.add_script_tag(content=(ROOT/'tests/current/static_terrain_browser_415.js').read_text())
+        print('NATIVE WEBGL bounded static color/material textures',flush=True)
+        try:
+            result['static_terrain']=page.evaluate('()=>auditStaticTerrain.run()')
+        except Exception:
+            if args.out:
+                try:
+                    diagnostic=page.evaluate('window.__staticRasterDiagnostics||null')
+                    if diagnostic:(args.out/'static_raster_failure.json').write_text(json.dumps(diagnostic,indent=2))
+                except Exception:
+                    pass  # Preserve the original native assertion/driver error.
+            raise
         result['runtime_errors']=logs;assert not logs,logs
         if args.out:(args.out/'browser_results.json').write_text(json.dumps(result,indent=2))
         print('NATIVE BROWSER WEBGL2 PASS: nine rooms, material/quality toggles, same-count invalidation, v4.15 right-click/inspector/cycle/recovery/dirty interactions, ghost geometry, UI input and q1-q4 bounded-water GPU/collision/history/fallback parity; '+result['driver']['renderer'],flush=True)
