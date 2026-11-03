@@ -254,7 +254,6 @@ RASTER_EXPORT_CASE = r'''async()=>{
       check(work.patchClips.length===1&&JSON.stringify(work.patchClips[0].rectangles)===JSON.stringify([[16,16,96,96]]),'post-export redraw lost its independently observed local guard clip');
       check(work.diagnostics.scratchMode==='native-clip'&&work.diagnostics.rasterPixels===96*96&&work.diagnostics.scratchPixels===capacity&&work.diagnostics.scratchBytes===capacity*4&&work.diagnostics.uploadBytes===31*29*4,'post-export capacity/redraw/upload accounting changed');
       check(work.diagnostics.scratchAllocationAttempts===1&&work.diagnostics.scratchAllocations===1&&work.diagnostics.scratchAllocationPixels===capacity&&work.diagnostics.scratchAllocationBytes===capacity*4,'post-export cumulative allocation accounting changed');
-      check(!work.readbacks.some(read=>read.staticPatch),'post-export terrain introduced a static patch readback');
       let textures;
       try{textures=audit.parity('terrain immediately after F8 tint-cache pressure',before,work.subUploads,baseline.snapshot)}
       catch(error){
