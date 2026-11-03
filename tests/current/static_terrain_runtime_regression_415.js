@@ -56,7 +56,7 @@ function renderer(){const r=Object.create(production.GLRenderer.prototype);Objec
 function fixture(){
   const g=Object.create(production.Game.prototype),spec={key:'fixture',pattern:'fixture',objects:[]},maps={rooms:{fixture:{walls:[],water:[],path_cells:[],floor_microtile:4}}};
   Object.assign(g,{maps,room:new production.Room(0,spec,maps),state:{isDone:()=>false,roomComplete:()=>false},renderer:renderer(),uiCalls:0});g.room.border.clear();
-  g.art={img:{src:'color.png',width:64,height:64},normalImg:{src:'normal.png',width:64,height:64},specImg:{src:'spec.png',width:64,height:64},regions:{},meta:{},roles:{},worldScale:.18,tintCache:new Map(),normalTransformCache:new Map(),trimTintCache(){}};
+  g.art={img:{src:'color.png',width:64,height:64},normalImg:{src:'normal.png',width:64,height:64},specImg:{src:'spec.png',width:64,height:64},regions:{},meta:{},roles:{},worldScale:.18,tintCache:new Map(),normalTransformCache:new Map(),normalTransformGeneration:0,trimTintCache(){}};
   g.luts={data:{test:['#123456']},elementChannel:new Map([['ground','ground']]),signature:()=> 'unchanged-theme',hex:()=> '#123456'};
   g.painter=new production.StaticPainter(g.art,g.luts);g.updateUI=()=>{g.uiCalls++};
   return g;
@@ -108,6 +108,70 @@ function staticIdentityAndStaleness(){
   const before=g.staticTerrainSnapshot;g.art.meta.cycle=g.art.meta;assert.strictEqual(refresh(g).reason,'invalid-context');assert.strictEqual(g.staticTerrainSnapshot,null,'unserializable resources cannot become a trusted patch baseline');delete g.art.meta.cycle;assert.strictEqual(refresh(g).mode,'full');assert.notStrictEqual(g.staticTerrainSnapshot,before);
   const planner=sandbox.RelayStaticTerrain;sandbox.RelayStaticTerrain=null;assert.strictEqual(refresh(g).reason,'planner-unavailable');assert.strictEqual(g.staticTerrainSnapshot,null);sandbox.RelayStaticTerrain=planner;assert.strictEqual(refresh(g).mode,'full');
   scenarios+=17;
+}
+
+function normalSourceGeneration(){
+  // A source created outside this static update may leave the uploaded normal
+  // texture sampling older canvas identities. Reject the patch before raster.
+  {
+    const g=fixture();g.art.normalTransformGeneration=11;refresh(g);
+    assert.strictEqual(g.staticNormalTransformGeneration,11,'full build records the generation it actually uploaded');
+    const gl=g.renderer.gl,first=allocations.length,sub=gl.subCount;
+    g.art.normalTransformGeneration+=2;g.room.water.add('6,7');
+    g.painter.buildPatch=()=>{throw Error('upfront source pressure must not raster a patch')};
+    const stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'normal-cache-pressure');assert.strictEqual(stats.repairError,undefined);
+    assert.strictEqual(stats.regions.length,0);assert.strictEqual(stats.rasterCells,760);assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(gl.subCount,sub);
+    assert.strictEqual(allocations.length-first,3,'upfront source pressure allocates only the full repair maps');assert.strictEqual(g.staticNormalTransformGeneration,13);scenarios++;
+  }
+  // A no-op performs no upload and therefore cannot bless a newer generation.
+  // Once repaired, a stable generation must allow genuinely bounded work.
+  {
+    const g=fixture();refresh(g);const first=allocations.length,revision=g.renderer.backgroundRevision;
+    g.art.normalTransformGeneration=7;
+    for(let i=0;i<2;i++){
+      const stats=refresh(g);assert.strictEqual(stats.mode,'noop');assert.strictEqual(stats.uploadCalls,0);assert.strictEqual(allocations.length,first);
+      assert.strictEqual(g.staticNormalTransformGeneration,0,'no-op must preserve the uploaded generation');assert.strictEqual(g.renderer.backgroundRevision,revision);
+    }
+    g.room.water.add('6,7');let stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'normal-cache-pressure');assert.strictEqual(g.staticNormalTransformGeneration,7);
+    const full=g.renderer.gl.fullCount;g.room.water.add('30,14');stats=refresh(g);
+    assert.strictEqual(stats.mode,'patch');assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(g.renderer.gl.fullCount,full);assert.strictEqual(g.staticNormalTransformGeneration,7);assert(stats.scratchPixels<640*360);scenarios+=3;
+  }
+  // A cache miss discovered while replaying either the first or a later region
+  // must discard that region before uploading any of its three material maps.
+  for(const missAt of [1,2]){
+    const g=fixture();refresh(g);const gl=g.renderer.gl,previous=g.staticTerrainSnapshot,revision=g.renderer.backgroundRevision,first=allocations.length;
+    g.room.water.add('6,7');g.room.water.add('30,14');
+    const patch=g.painter.buildPatch,build=g.painter.build,uploaded=[];let patches=0,changedScratch=null,repairs=0;
+    g.painter.buildPatch=function(...args){const canvas=patch.apply(this,args);if(++patches===missAt){g.art.normalTransformGeneration++;changedScratch=[canvas,this.lastMaterialMaps.normal,this.lastMaterialMaps.spec]}return canvas};
+    g.painter.build=function(...args){
+      repairs++;assert(changedScratch.every(c=>c.width===1&&c.height===1),'changed-source scratch must be released before full repair');
+      const canvas=build.apply(this,args);g.art.normalTransformGeneration+=3;return canvas;
+    };
+    const finish=observeCommit(g,previous),observe=gl.hook;
+    gl.hook=(mode,canvas)=>{observe(mode,canvas);assert.strictEqual(g.staticNormalTransformGeneration,0,'generation authority cannot advance during material uploads');uploaded.push(canvas)};
+    const stats=refresh(g);assert.strictEqual(finish(),3*missAt);assert.strictEqual(patches,missAt);assert.strictEqual(repairs,1,'source change is synchronously repaired once');
+    assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'normal-cache-pressure');assert.match(stats.repairError,/normal source cache changed/i);
+    assert.strictEqual(gl.subCount,3*(missAt-1));assert.strictEqual(gl.fullCount,6);assert.strictEqual(stats.uploadCalls,3*missAt);
+    assert(changedScratch.every(c=>!uploaded.includes(c)),'a changed-source region must never reach the GPU');
+    assert.strictEqual(g.renderer.backgroundRevision,revision+missAt);assert.strictEqual(g.renderer.backgroundReady,true);assert.notStrictEqual(g.staticTerrainSnapshot,previous);
+    assert.strictEqual(g.staticNormalTransformGeneration,4,'repair commits the post-build generation, not the generation from patch planning');
+    assert.strictEqual(stats.scratchPixels,640*360);released(g,first);scenarios++;
+  }
+  // If full repair itself fails after a later region succeeded, neither the
+  // partial texture nor its old generation may be reused as patch authority.
+  {
+    const g=fixture();refresh(g);const gl=g.renderer.gl,previous=g.staticTerrainSnapshot,revision=g.renderer.backgroundRevision,first=allocations.length;
+    g.room.water.add('6,7');g.room.water.add('30,14');const patch=g.painter.buildPatch,build=g.painter.build;let patches=0;
+    g.painter.buildPatch=function(...args){const canvas=patch.apply(this,args);if(++patches===2)g.art.normalTransformGeneration++;return canvas};
+    g.painter.build=function(...args){const canvas=build.apply(this,args);g.art.normalTransformGeneration+=2;return canvas};
+    gl.failFullAt=gl.fullCount+2;const finish=observeCommit(g,previous);
+    assert.throws(()=>g.refreshEditorStatic(),/injected full upload failure/);assert.strictEqual(finish(),5);released(g,first);
+    assert.strictEqual(patches,2);assert.strictEqual(gl.subCount,3);assert.strictEqual(g.renderer.backgroundRevision,revision+1);
+    assert.strictEqual(g.art.normalTransformGeneration,3);assert.strictEqual(g.staticNormalTransformGeneration,null);assert.strictEqual(g.staticTerrainSnapshot,null);assert.strictEqual(g.staticBackgroundRevision,null);
+    assert.strictEqual(g.bgKey,'');assert.strictEqual(g.renderer.backgroundReady,false);assert.strictEqual(g.staticRefreshStats.reason,'refresh-failed');assert.match(g.staticRefreshStats.repairError,/normal source cache changed/i);
+    g.painter.buildPatch=patch;g.painter.build=build;gl.failFullAt=0;
+    const stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'missing-baseline');assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(g.staticNormalTransformGeneration,3);assert.strictEqual(g.renderer.backgroundReady,true);scenarios++;
+  }
 }
 
 function repairedUploadFailures(){
@@ -182,8 +246,8 @@ function rejectInvalidPatches(){
   c.width=c.height=normal.width=normal.height=spec.width=spec.height=1;scenarios++;
 }
 
-fullPatchNoopAndHistory();staticIdentityAndStaleness();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();rejectInvalidPatches();
+fullPatchNoopAndHistory();staticIdentityAndStaleness();normalSourceGeneration();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();rejectInvalidPatches();
 console.log('STATIC TERRAIN RUNTIME REGRESSION PERF-004 PASS');
 console.log('  production Game / StaticPainter / GLRenderer scenarios:',scenarios);
 console.log('  bounded uploads, coherent snapshot/revision commits, native Y offsets, exact resource/source invalidation and editor history');
-console.log('  partial upload / GL error / context-loss repair, failed repair invalidation, canvas allocation/raster cleanup, zero retained scratch');
+console.log('  normal-source generation/no-op authority, partial upload / GL error / context-loss repair, failed repair invalidation, canvas allocation/raster cleanup, zero retained scratch');

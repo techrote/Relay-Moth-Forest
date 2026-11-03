@@ -9,6 +9,33 @@
   const textureKeys=['bgTex','bgNormalTex','bgSpecTex'];
   const check=(ok,label)=>{if(!ok)throw Error('PERF-004 '+label)};
   const release=c=>{if(c){c.width=1;c.height=1}};
+  let normalBaseline=null;
+
+  function captureNormalBaseline(action){
+    const art=game.art,own=Object.prototype.hasOwnProperty.call(art,'transformedNormal'),original=art.transformedNormal,sources=new Map();
+    let calls=0,peakCacheSize=art.normalTransformCache.size;normalBaseline=null;
+    art.transformedNormal=function(name,flip=false,rot=0){
+      const canvas=original.call(this,name,flip,rot);if(!canvas)return canvas;
+      const key=name+'|'+(flip?1:0)+'|'+rot.toFixed(6),previous=sources.get(key);calls++;
+      check(!previous||previous.canvas===canvas,'baseline recreated transformed normal source '+key);
+      sources.set(key,{canvas,width:canvas.width,height:canvas.height});peakCacheSize=Math.max(peakCacheSize,art.normalTransformCache.size);
+      check(peakCacheSize<=96,'transformed normal cache exceeded 96 during baseline');return canvas;
+    };
+    try{action()}finally{if(own)art.transformedNormal=original;else delete art.transformedNormal}
+    normalBaseline={art,room:game.room.key,width:game.renderer.nativeW,height:game.renderer.nativeH,sources,calls,peakCacheSize};
+    return assertNormalSources('full baseline');
+  }
+
+  function assertNormalSources(label){
+    const baseline=normalBaseline,art=game.art;
+    check(baseline&&baseline.art===art&&baseline.room===game.room.key&&baseline.width===game.renderer.nativeW&&baseline.height===game.renderer.nativeH,label+' has no matching full normal-source baseline');
+    check(baseline.sources.size>0&&art.normalTransformCache.size<=96,label+' transformed normal cache is empty or exceeds 96');
+    for(const [key,source] of baseline.sources){
+      check(art.normalTransformCache.get(key)===source.canvas,label+' replaced transformed normal source '+key);
+      check(source.canvas.width===source.width&&source.canvas.height===source.height,label+' resized borrowed transformed normal source '+key);
+    }
+    return{uniqueSources:baseline.sources.size,baselineCalls:baseline.calls,baselinePeakCacheSize:baseline.peakCacheSize,cacheSize:art.normalTransformCache.size,stable:true};
+  }
 
   // Frozen composition from accepted 5e6ea67. This independent full builder
   // prevents a shared full/patch refactor from making both sides equally wrong.
@@ -242,7 +269,9 @@
   }
 
   function measured(label,action,mode='patch',options={}){
+    if(mode==='patch'||mode==='noop')assertNormalSources(label+' before action');
     const before=mode==='patch'||mode==='noop'?capture():null,work=instrument(action),r=game.renderer,area=r.nativeW*r.nativeH;
+    if(mode==='patch'||mode==='noop')assertNormalSources(label+' after action');
     check(work.diagnostics.mode===mode,label+' expected '+mode+' diagnostics: '+JSON.stringify(work.diagnostics));
     if(options.actors!==false)check(work.actorsUnchanged,label+' reset or moved unrelated actors');
     if(mode==='patch'){
@@ -267,6 +296,7 @@
     else check(work.fullBuilds>=1&&channels.every(c=>work.fullUploads.some(u=>u.channel===c)),label+' full fallback did not repair all maps');
     if(options.authority!==false)authority(label);
     const textures=parity(label,before,work.subUploads);
+    if(mode==='patch'||mode==='noop')work.normalSources=assertNormalSources(label+' after full reference');
     if(options.materials)check(textures.normal.coveredAlphaPixels>0&&textures.specular.coveredAlphaPixels>0,label+' did not actually overlap material pixels');
     const water=options.water!==false&&root.auditWater?root.auditWater.parity(label):null;
     return {label,...work,textures,water:water?{mode:water.mode,maskMismatch:water.maskMismatch,fieldMismatch:water.fieldMismatch,fieldGpuMismatch:water.fieldGpuMismatch,legacyGpuMismatch:water.legacyGpuMismatch}:null};
@@ -290,10 +320,10 @@
     raw.decor_lamps=[{tile:[10,8],lamp:'lamp_blue'},{tile:[28,13],lamp:'lamp_blue'}];
     raw.decor_exclusions=[];raw.pattern_exclusions=[];raw.floor_microtile=4;raw.bridge_cells=[];raw.bridge_segments=[];raw.bridge_phases=[];
     game.rooms=game.storyData.rooms.map((spec,i)=>new Room(i,spec,game.maps));e.history=new Map();
-    setNative(width,height);game.enterRoom(game.storyData.rooms.findIndex(s=>s.key==='quiet_nest'),null);
+    setNative(width,height);captureNormalBaseline(()=>game.enterRoom(game.storyData.rooms.findIndex(s=>s.key==='quiet_nest'),null));
     document.querySelector('#storyModal')?.classList.add('hidden');e.toggle(true);game.x=80;game.y=200;
     check(game.room.spec.pattern==='nest','quiet_nest pattern fixture changed');
-    return parity('initial '+width+'x'+height);
+    const textures=parity('initial '+width+'x'+height);assertNormalSources('initial full reference');return textures;
   }
 
   function paint(kind,x,y){const e=rmfEditor;e.choice={kind};e.paintVisited.clear();e.paintAt({x:x*16+8,y:y*16+8})}
@@ -318,11 +348,11 @@
     for(const [width,height] of [[640,360],[997,563]]){
       setNative(width,height);
       for(let index=0;index<game.rooms.length;index++){
-        game.enterRoom(index,null);document.querySelector('#storyModal')?.classList.add('hidden');
+        captureNormalBaseline(()=>game.enterRoom(index,null));document.querySelector('#storyModal')?.classList.add('hidden');
         const actual=capture(),textures=qualify('warm shared sources',actual,reference(legacyFullBuild));
         const coldCurrent=reference(null,{freshCaches:true}),coldLegacy=reference(legacyFullBuild,{freshCaches:true});
         const coldIndependentTextures=qualify('cold independent sources',{width,height,maps:coldCurrent},coldLegacy);
-        out.push({room:game.room.key,native:[width,height],textures,coldIndependentTextures});
+        out.push({room:game.room.key,native:[width,height],textures,coldIndependentTextures,normalSources:assertNormalSources('legacy compatibility references')});
       }
     }
     return out;
@@ -382,7 +412,7 @@
     e.rawRoom().floor_microtile=4;invalidation();
     // An intentionally open last border tile makes the changed floor cross the
     // PLAY_H seam. This exercises the footer's different material/color order.
-    game.room.border.delete('20,18');game.ensureBackground(true);
+    game.room.border.delete('20,18');captureNormalBaseline(()=>game.ensureBackground(true));
     out.push(measured('open bottom cell crossing footer boundary',()=>{game.room.paths.add('20,18');e.rawRoom().path_cells.push([20,18]);game.refreshEditorStatic()},'patch',{authority:false,water:false}));
     return result;
   }
@@ -394,7 +424,7 @@
       game.maps=structuredClone(sourceMaps);game.state.completed=new Set(['pip']);game.graphics={...game.graphics,waterQuality:3};
       game.rooms=game.storyData.rooms.map((spec,index)=>new Room(index,spec,game.maps));e.history=new Map();setNative(width,height);
       const index=game.storyData.rooms.findIndex(spec=>spec.key===roomKey);check(index>=0,'natural room fixture missing '+roomKey);
-      game.enterRoom(index,null);document.querySelector('#storyModal')?.classList.add('hidden');e.toggle(true);
+      captureNormalBaseline(()=>game.enterRoom(index,null));document.querySelector('#storyModal')?.classList.add('hidden');e.toggle(true);
       // Keep natural authored content and existing cache caps/order intact. A
       // visible ground cell must have no other dependency that paintAt removes.
       const candidates=[];
@@ -526,6 +556,7 @@
       result.fallbacks=fallbackCases(sourceMaps);result.recovery=recoveryCases(sourceMaps);result.liveOwnership=ownershipCases(sourceMaps);
       return result;
     }finally{
+      normalBaseline=null;
       if(e.transaction)e.cancelTransaction(false);e.clearPendingInvalidation();e.resetPointerState();
       game.maps=saved.maps;game.rooms=saved.rooms;game.state.completed=saved.completed;game.graphics=saved.graphics;e.history=saved.history;e.choice=saved.choice;
       if(saved.rectOwn)r.c.getBoundingClientRect=saved.rect;else delete r.c.getBoundingClientRect;

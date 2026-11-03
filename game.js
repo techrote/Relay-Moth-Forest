@@ -266,7 +266,7 @@ class StoryState{
 
 
 class HDArtSheet{
-  constructor(img,manifest,bumpImg=null,specImg=null,normalImg=null){this.img=img;this.bumpImg=bumpImg;this.specImg=specImg;this.normalImg=normalImg;this.normalTransformCache=new Map();this.manifest=manifest;this.regions=manifest.regions||{};this.roles=manifest.roles||{};this.meta=manifest.region_meta||{};this.worldScale=manifest.world_scale||HD_WORLD_SCALE_DEFAULT;this.tintCache=new Map()}
+  constructor(img,manifest,bumpImg=null,specImg=null,normalImg=null){this.img=img;this.bumpImg=bumpImg;this.specImg=specImg;this.normalImg=normalImg;this.normalTransformCache=new Map();this.normalTransformGeneration=0;this.manifest=manifest;this.regions=manifest.regions||{};this.roles=manifest.roles||{};this.meta=manifest.region_meta||{};this.worldScale=manifest.world_scale||HD_WORLD_SCALE_DEFAULT;this.tintCache=new Map()}
   region(name){const r=this.regions[name];if(!r)throw new Error(`Unknown HD atlas region: ${name}`);return r}
   regionMeta(name){return this.meta[name]||{}}
   aspect(name){const r=this.region(name);return r[3]/r[2]}
@@ -282,10 +282,14 @@ class HDArtSheet{
   transformedNormal(name,flip=false,rot=0){
     const r=this.region(name);if(!this.normalImg)return null;
     if(!flip&&!rot)return null;
-    const cacheKey=`${name}|${flip?1:0}|${rot.toFixed(6)}`;if(this.normalTransformCache.has(cacheKey))return this.normalTransformCache.get(cacheKey);
+    const cacheKey=`${name}|${flip?1:0}|${rot.toFixed(6)}`;if(this.normalTransformCache.has(cacheKey)){const cached=this.normalTransformCache.get(cacheKey);this.normalTransformCache.delete(cacheKey);this.normalTransformCache.set(cacheKey,cached);return cached}
     const c=new OffscreenCanvas(r[2],r[3]),ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(this.normalImg,r[0],r[1],r[2],r[3],0,0,r[2],r[3]);const pixels=ctx.getImageData(0,0,r[2],r[3]),d=pixels.data,co=Math.cos(rot),si=Math.sin(rot);
     for(let i=0;i<d.length;i+=4){const nx=(d[i]-128)*(flip?-1:1),ny=d[i+1]-128;d[i]=Math.max(0,Math.min(255,Math.round(128+co*nx+si*ny)));d[i+1]=Math.max(0,Math.min(255,Math.round(128-si*nx+co*ny)))}ctx.putImageData(pixels,0,0);
-    if(this.normalTransformCache.size>=64){const first=this.normalTransformCache.keys().next().value,old=this.normalTransformCache.get(first);releaseCanvasBacking(old);this.normalTransformCache.delete(first)}this.normalTransformCache.set(cacheKey,c);return c;
+    // Keep the current room's source surfaces stable across full and bounded
+    // draws. Dawn uses 66 distinct transforms: a 64-entry FIFO recreated every
+    // source on repeat builds. Chromium can sample equivalent canvas objects
+    // differently, so retain recently used sources within a fixed atlas cache.
+    if(this.normalTransformCache.size>=96){const first=this.normalTransformCache.keys().next().value,old=this.normalTransformCache.get(first);releaseCanvasBacking(old);this.normalTransformCache.delete(first)}this.normalTransformCache.set(cacheKey,c);this.normalTransformGeneration++;return c;
   }
   drawMap(ctx,source,name,cx,cy,w,h,opts={}){const r=this.region(name);this.drawMapSubrect(ctx,source,name,0,0,r[2],r[3],cx,cy,w,h,opts)}
   drawMapSubrect(ctx,source,name,sx,sy,sw,sh,cx,cy,w,h,opts={}){if(!ctx||!source||!this.regions[name])return;const r=this.region(name),anchor=opts.anchor||'center',alpha=opts.alpha??1,rot=opts.rot||0,flip=opts.flip||false,transformed=source===this.normalImg?this.transformedNormal(name,flip,rot):null;ctx.save();ctx.globalAlpha=alpha;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.translate(cx,cy);ctx.rotate(rot);if(flip)ctx.scale(-1,1);const dy=anchor==='bottom'?-h:anchor==='top'?0:-h/2;ctx.drawImage(transformed||source,(transformed?0:r[0])+sx,(transformed?0:r[1])+sy,sw,sh,-w/2,dy,w,h);ctx.restore()}
@@ -853,13 +857,14 @@ class Game{
   }
   refreshEditorStatic({force=false}={}){
     this.syncEditorRenderStage();this.releaseCurrentStatic();this.art.trimTintCache?.(96);
-    const planner=globalThis.RelayStaticTerrain,previous=this.staticTerrainSnapshot,renderer=this.renderer,startCalls=renderer.backgroundUploadCalls||0,startBytes=renderer.backgroundUploadBytes||0;
+    const planner=globalThis.RelayStaticTerrain,previous=this.staticTerrainSnapshot,renderer=this.renderer,startCalls=renderer.backgroundUploadCalls||0,startBytes=renderer.backgroundUploadBytes||0,normalGeneration=this.art.normalTransformGeneration||0;
     let snapshot=null,plan;
     perfMeasure('static.plan',()=>{
       try{snapshot=planner?.capture(this.room,this.staticTerrainContext())||null;plan=planner?.plan(previous,snapshot)||{kind:'full',reason:'planner-unavailable'}}
       catch(_err){plan={kind:'full',reason:'invalid-context'}}
       if(force)plan={...plan,kind:'full',reason:'forced'};
       else if(previous&&(!renderer.backgroundReady||this.staticBackgroundRevision!==renderer.backgroundRevision))plan={...plan,kind:'full',reason:'stale-background'};
+      else if(plan.kind==='patch'&&this.staticNormalTransformGeneration!==normalGeneration)plan={...plan,kind:'full',reason:'normal-cache-pressure'};
     });
     // Asset replacement on an existing HDArtSheet must also discard derived
     // tint/normal tiles; their historical keys identify sprite names, not images.
@@ -882,14 +887,21 @@ class Game{
           for(const region of plan.regions){
             stats.rasterCells+=(region.tx1-region.tx0)*(region.ty1-region.ty0);stats.pixels+=region.width*region.height;stats.scratchPixels=Math.max(stats.scratchPixels,region.width*region.height);stats.regions.push({...region});
             const staticCanvas=perfMeasure('static.patch.build',()=>this.painter.buildPatch(this.room,this.state,renderer.nativeW,renderer.nativeH,region)),materialMaps=this.painter.lastMaterialMaps;
-            try{renderer.patchBackground(region,staticCanvas,materialMaps)}finally{releaseCanvasBacking(staticCanvas);releaseCanvasBacking(materialMaps?.normal);releaseCanvasBacking(materialMaps?.spec);this.painter.lastMaterialMaps=null}
+            try{
+              // An authored room can exceed the bounded sprite cache. A newly
+              // created normal source cannot safely share a partially redrawn
+              // texture with the older source objects used by its baseline.
+              if((this.art.normalTransformGeneration||0)!==normalGeneration){const err=new Error('Static normal source cache changed during patch');err.code='STATIC_NORMAL_SOURCE_CHANGED';throw err}
+              renderer.patchBackground(region,staticCanvas,materialMaps);
+            }finally{releaseCanvasBacking(staticCanvas);releaseCanvasBacking(materialMaps?.normal);releaseCanvasBacking(materialMaps?.spec);this.painter.lastMaterialMaps=null}
           }
-        }catch(err){stats.reason='patch-failed';stats.repairError=String(err?.message||err);full()}
+        }catch(err){stats.reason=err?.code==='STATIC_NORMAL_SOURCE_CHANGED'?'normal-cache-pressure':'patch-failed';stats.repairError=String(err?.message||err);full()}
       }else if(plan.kind!=='noop')full();
       // The only retained authority is data. Commit after every color/material
       // region succeeded, or after the complete synchronous repair succeeded.
       this.staticTerrainSnapshot=snapshot;this.staticBackgroundRevision=renderer.backgroundRevision;this.bgKey=this.editorBackgroundKey();
-    }catch(err){renderer.backgroundReady=false;this.staticTerrainSnapshot=null;this.staticBackgroundRevision=null;this.bgKey='';stats.reason='refresh-failed';throw err}
+      if(stats.mode!=='noop')this.staticNormalTransformGeneration=this.art.normalTransformGeneration||0;
+    }catch(err){renderer.backgroundReady=false;this.staticTerrainSnapshot=null;this.staticBackgroundRevision=null;this.staticNormalTransformGeneration=null;this.bgKey='';stats.reason='refresh-failed';throw err}
     finally{stats.uploadCalls=(renderer.backgroundUploadCalls||0)-startCalls;stats.uploadBytes=(renderer.backgroundUploadBytes||0)-startBytes;stats.scratchBytes=stats.scratchPixels*12}
     perfMeasure('ui.update',()=>this.updateUI());return stats;
   }

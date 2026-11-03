@@ -90,7 +90,8 @@ counters include attempted calls when a failure requires repair.
 The opt-in probe separates `static.plan`, full/patch scratch allocation, floor
 raster, static overlays/materials, footer and each color/normal/specular upload.
 The bounded renderer performs no full-canvas readback. Normal atlas transform
-tiles retain their preexisting bounded cache and readback behavior.
+tiles use the bounded source cache described below; their pixel-transform and
+small-tile readback behavior is unchanged.
 
 The performance harness now includes editor path painting as well as editor
 water movement. Both must avoid `static.build`, raster fewer than 760 cells,
@@ -146,6 +147,30 @@ CPU-backed destination comparisons agreed, while changing the entire renderer
 to CPU backing changed many other pixels. The production raster path therefore
 remains unchanged. Patch-versus-full acceptance still requires exact equality
 for every byte of all three textures, using the same loaded source surfaces.
+
+### Stable normal-sprite sources
+
+The same-source qualification exposed a production cache issue during room
+transitions: the 64-entry FIFO transformed-normal cache could evict a source
+already drawn for the current room. Dawn needs 66 distinct normal transforms,
+so a repeated full draw recreated its entire working set. That source-identity
+churn also occurred during transitions into rooms with smaller working sets.
+
+The transformed-normal cache now promotes hits and retains at most 96 entries,
+enough for every shipped room's static working set. Eviction still releases the
+old backing immediately. This is a bounded sprite-atlas cache; full-room CPU
+surfaces remain unretained. Normal-vector math, source pixels, tint-cache limits
+and drawing order are unchanged. A production-method regression replays the
+authored room requests, verifies full/patch source identity and bounded eviction,
+and demonstrates the old FIFO failure with the same data.
+
+Each newly created transformed source advances a generation counter. If cache
+pressure changes those sources after a rendered baseline, the next terrain edit
+uses a full render. If a bounded draw itself needs a new source, it releases its
+scratch and synchronously repairs all three textures with a full render before
+committing the baseline. This deliberately covers authored rooms exceeding 96
+distinct transforms without growing the cache. A no-op cannot authorize changed
+sources, and a failed repair invalidates both texture and source authority.
 
 ## Practical limits
 
