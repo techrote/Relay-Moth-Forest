@@ -177,25 +177,21 @@
     for(let i=0;i<next.cellTypes.length;i++)if(previous.cellTypes[i]!==next.cellTypes[i])changes.push(Object.freeze({x:i%next.geometry.columns,y:Math.floor(i/next.geometry.columns),before:previous.cellTypes[i],after:next.cellTypes[i]}));
     if(!changes.length)return result('noop','unchanged',next);
     if(changes.length>budget.maxChangedCells)return full('changed-cell-budget',changes);
-    // baseTile's accepted microtiles bound all floor mark overhang: water marks
-    // reach +3 logical pixels right / +2 down at microtile 4; other marks reach
-    // less. Four logical pixels on every side plus two native AA pixels cover
-    // this at fractional scales as well as native-pixel rounding. Unsupported
-    // microtiles keep the full painter as authority until separately qualified.
+    // baseTile never reaches left/up of its tile. At microtile 4 its union of
+    // floor types reaches +3 logical pixels right / +2 down; 8/16px microtiles
+    // remain within the tile. Keep two native AA pixels on every output side.
+    // The separate guarded raster, not the upload, must retain dither alignment.
+    // Unsupported microtiles keep the full painter until separately qualified.
     if(![4,8,16].includes(next.microtile)||next.geometry.tileSize!==16)return full('unsupported-microtile',changes);
-    const g=next.geometry,sx=g.renderWidth/g.logicalWidth,sy=g.renderHeight/g.logicalHeight;
+    const g=next.geometry,sx=g.renderWidth/g.logicalWidth,sy=g.renderHeight/g.logicalHeight,overhangX=next.microtile===4?3:0,overhangY=next.microtile===4?2:0;
     const raw=changes.map(cell=>{
-      const x0=Math.floor((cell.x*g.tileSize-LOGICAL_HALO)*sx)-NATIVE_HALO,y0=Math.floor((cell.y*g.tileSize-LOGICAL_HALO)*sy)-NATIVE_HALO;
-      const x1=Math.ceil(((cell.x+1)*g.tileSize+LOGICAL_HALO)*sx)+NATIVE_HALO,y1=Math.ceil(((cell.y+1)*g.tileSize+LOGICAL_HALO)*sy)+NATIVE_HALO;
-      // The 16px native grid preserves Skia's 8x8 gradient-dither phase.
-      // Material maps have no terrain dependency and are retained unchanged.
-      // sk_FragCoord is upper-left, independent of the later GL upload flip.
-      // Round outward, then recompute merging, raster inputs and all budgets.
+      const x0=Math.floor(cell.x*g.tileSize*sx)-NATIVE_HALO,y0=Math.floor(cell.y*g.tileSize*sy)-NATIVE_HALO;
+      const x1=Math.ceil(((cell.x+1)*g.tileSize+overhangX)*sx)+NATIVE_HALO,y1=Math.ceil(((cell.y+1)*g.tileSize+overhangY)*sy)+NATIVE_HALO;
+      // Upload only pixels the changed floor can affect. Replacing unrelated
+      // overlay pixels can introduce sampling differences at fractional scales.
       return{
-        x0:Math.max(0,Math.floor(x0/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT),
-        y0:Math.max(0,Math.floor(y0/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT),
-        x1:Math.min(g.renderWidth,Math.ceil(x1/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT),
-        y1:Math.min(g.renderHeight,Math.ceil(y1/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT)
+        x0:Math.max(0,x0),y0:Math.max(0,y0),
+        x1:Math.min(g.renderWidth,x1),y1:Math.min(g.renderHeight,y1)
       };
     });
     const merged=merge(raw);
@@ -203,8 +199,9 @@
     const regions=merged.map(rect=>{
       // Keep the color upload away from the scratch clip. Exact native color
       // qualification remains required; a guard alone cannot guarantee it.
-      // Guard overlaps remain
-      // separate raster work; they must not enlarge or merge upload regions.
+      // Its 16px top-origin grid preserves Skia's 8x8 gradient-dither phase,
+      // independently of the later GL upload flip. Guard overlaps remain
+      // separate raster work and must not enlarge or merge upload regions.
       const rasterX=Math.max(0,Math.floor((rect.x0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       const rasterY=Math.max(0,Math.floor((rect.y0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
       const rasterX1=Math.min(g.renderWidth,Math.ceil((rect.x1+NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);

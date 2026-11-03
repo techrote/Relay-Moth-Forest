@@ -97,22 +97,35 @@ clipped scratch surface to preserve sprite/glow blending with the changed floor.
 No material sprite is drawn during a terrain patch. Footer sprites affect color
 only, as they do in a full build.
 
-For supported 4/8/16-pixel microtiles, floor marks extend at most three logical
-pixels right and two down. A symmetric four-logical-pixel halo plus two native
-pixels covers raster rounding/antialiasing. A separate conservative input range
-includes neighboring floor marks that can reach the entire guarded raster. Other microtile
-sizes retain the full renderer until independently qualified.
+Output bounds follow the changed floor's actual drawing envelope. No accepted
+floor primitive extends left or above its owning tile. At microtile size 4, the
+union of ground/path/water marks extends at most three logical pixels right and
+two down; at sizes 8 and 16 it stays inside the tile. The native output minimum
+is `floor(logical minimum * native scale) - 2`, and its maximum is
+`ceil(logical maximum * native scale) + 2`, clipped to the surface. The two-native-
+pixel margin remains on every side for rounding and antialiasing. The production
+primitive regression checks this envelope across all 9,120 tile/type/microtile
+footprints, including the playable area's edges.
 
-Output bounds also expand to a sixteen-native-pixel grid before clipping to the
-canvas, merging regions and applying work budgets. Skia's gradient dither uses an
+Only these affected output rectangles are merged. Output coordinates need no
+alignment: they crop pixels from an independently aligned raster. That raster
+adds the 32-native-pixel guard and rounds outward to a sixteen-pixel grid before
+clipping to the surface. Its floor-input range retains the symmetric
+four-logical-pixel plus two-native-pixel halo, replaying every neighboring floor
+mark that can reach the entire scratch. Other microtile sizes retain the full
+renderer until independently qualified.
+
+Raster alignment matters because Skia's gradient dither uses an
 [8x8 table at device coordinates](https://skia.googlesource.com/skia/+/5fdfc51ef3e8/src/gpu/ganesh/SkGr.cpp),
 and its [fragment coordinates use an upper-left origin](https://skia.googlesource.com/skia/+/89c0ddff982bf3383beeba6397d3236526fb4a76/src/sksl/README.md).
 Preserving that phase matters for overlapping lamp glows: the unaligned native
 rectangle `(170,90,28,28)` differed from the full color texture by one byte level
 in 209 pixels, while normal/specular maps and exterior pixels matched exactly
 ([diagnostic run](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41563498272)).
-The expanded rectangle is `(160,80,48,48)`, preserving the eight-pixel dither
-phase. Material sampling exposed a separate problem:
+An earlier candidate expanded that rectangle to `(160,80,48,48)`, preserving the
+eight-pixel dither phase. The current implementation preserves the phase at the
+guarded raster origin without expanding the upload to that grid. Material
+sampling exposed a separate problem:
 at `(312,264,32,32)`, two specular-alpha bytes differed by one level, while the
 `(304,256,48,48)` diagnostic variant matched every color/normal/specular byte
 ([native comparison](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41564327204)).
@@ -131,10 +144,24 @@ guard differed in five, and the unguarded 48x48 surface matched. These results
 reject guard size as a general material correction. Retaining the already exact,
 unchanged material textures removes that resampling from eligible terrain edits.
 
-The color path retains its bounded 32-pixel raster guard and established output
-geometry. The raster input range and all memory, pixel and work limits account
-for guarded bounds. Exact color equality remains a requirement of the complete
-native acceptance matrix; alignment and guard constants alone are not proof.
+The color-only candidate passed the 640x360 matrix. At 997x563, its first
+water-to-ground edit at cell `(11,6)` exposed two one-level color differences at
+native pixels `(289,187)` and `(266,178)`. Both are outside the changed floor's
+drawing envelope; the earlier aligned upload `(256,128,64,64)` unnecessarily
+replaced them. Tightening the upload preserves those original pixels while
+retaining the raster alignment, guard and complete input replay:
+
+| Native surface, cell `(11,6)` | Output `(x,y,width,height)` | Guarded raster `(x,y,width,height)` |
+| --- | --- | --- |
+| 640x360 | `(174,94,23,22)` | `(128,48,112,112)` |
+| 997x563 | `(272,148,34,33)` | `(240,112,112,112)` |
+
+All memory, pixel and work limits still account for the guarded bounds. The
+complete all-three-texture native oracle and unchanged-exterior checks remain
+exact; this change avoids writes outside the affected envelope and introduces
+no comparison tolerance. Native qualification must still establish color
+equality inside the tightened output; alignment and guard constants alone are
+not proof.
 
 Default planning limits are 16 changed cells, eight merged regions, at most 20%
 of native output pixels and guarded raster pixels, 35% of logical floor raster
