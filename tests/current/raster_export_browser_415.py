@@ -243,6 +243,9 @@ RASTER_EXPORT_CASE = r'''async()=>{
       check(game.room.paths.has('2,2')&&e.rawRoom().path_cells.some(p=>p[0]===2&&p[1]===2),'post-export edit lost authoritative terrain');
       check(work.diagnostics.mode==='patch'&&work.diagnostics.reason==='terrain'&&work.diagnostics.changedCells===1,'post-export terrain did not remain eligible');
       check(work.fullBuilds===0&&work.fullUploads.length===0&&work.patchBuilds===1&&work.floorCalls===25,'post-export edit rebuilt full terrain or lost its bounded floor inputs');
+      const rowReads=work.readbacks.filter(read=>read.staticPatch),region=work.diagnostics.regions[0];
+      check(work.diagnostics.colorPolicy===StaticPainter.COLOR_POLICY&&rowReads.length===5&&rowReads.every((read,i)=>read.patchColor&&read.x===0&&read.y===0&&read.width===1&&read.height===1&&read.beforeOverlays&&read.lastFloor?.tx===region.tx1-1&&read.lastFloor?.ty===region.ty0+i),'post-export edit did not retain bounded color row synchronization');
+      check(['colorSyncAttempts','colorSyncReads','colorSyncPixels','readbackPixels'].every(key=>work.diagnostics[key]===5)&&Number.isFinite(work.diagnostics.colorSyncMs)&&work.diagnostics.colorSyncMs>=0,'post-export synchronization accounting differs from actual reads');
       check(work.subUploads.length===1&&work.subUploads[0].channel==='color'&&work.subUploads[0].x===49&&work.subUploads[0].y===484&&work.subUploads[0].width===31&&work.subUploads[0].height===29,'post-export edit did not issue the expected color-only crop');
       check(work.patchMaterialMaps===0&&work.normalTransformRequests===0&&work.materialHandlesUnchanged&&work.normalSourceGenerationUnchanged,'post-export edit changed material resources');
       check(work.releasedPatchCanvases&&work.unpackRestored&&!game.currentStatic&&!game.painter.lastMaterialMaps,'post-export edit retained scratch or changed unpack state');

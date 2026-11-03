@@ -12,14 +12,14 @@ assert(legacyStart>=0&&legacyEnd>legacyStart,'the frozen accepted full compositi
 const legacyFullSource=browserSource.slice(legacyStart,legacyEnd);
 const artManifest=JSON.parse(fs.readFileSync(path.join(ROOT,'hd_remake_atlas.json'),'utf8'));
 const source=(start,end)=>{const a=gameSource.indexOf(start),b=gameSource.indexOf(end,a+start.length);assert(a>=0&&b>a);return gameSource.slice(a,b)};
-const allocations=[],allocationAttempts=[],phases=[],faults={allocationAt:0,rasterAt:0,allocationCalls:0,rasterCalls:0};
-let traceCanvases=false,tracePrimitives=false;
+const allocations=[],allocationAttempts=[],phases=[],syncReads=[],faults={allocationAt:0,rasterAt:0,allocationCalls:0,rasterCalls:0,syncAt:0,syncFrom:0,syncCalls:0};
+let traceCanvases=false,tracePrimitives=false,syncClock=0;
 class FakeCanvas{
   constructor(width,height){const attempt={width,height,allocated:false};allocationAttempts.push(attempt);if(++faults.allocationCalls===faults.allocationAt)throw new Error('injected canvas allocation failure');this.width=width;this.height=height;this.originalWidth=width;this.originalHeight=height;this.contextRequests=[];this.context=new FakeContext(this);allocations.push(this);attempt.allocated=true}
   getContext(kind,options){assert.strictEqual(kind,'2d');this.contextRequests.push({kind,options});return this.context}
 }
 class FakeContext{
-  constructor(canvas){this.canvas=canvas;this.transforms=[];this.matrix=[1,0,0,1,0,0];this.stack=[];this.images=[];this.clips=[];this.clipBounds=null;this.pathRectangles=[];this.pathCircles=[];this.globalAlpha=1;this.primitives=tracePrimitives?[]:null;this.footerBackground=false;this.commands=traceCanvases?[]:null;this.floorCommands=traceCanvases?new Map():null;this.floorCell=null}
+  constructor(canvas){this.canvas=canvas;this.transforms=[];this.matrix=[1,0,0,1,0,0];this.stack=[];this.images=[];this.clips=[];this.clipBounds=null;this.pathRectangles=[];this.pathCircles=[];this.globalAlpha=1;this.primitives=tracePrimitives?[]:null;this.footerBackground=false;this.commands=traceCanvases?[]:null;this.floorCommands=traceCanvases?new Map():null;this.floorCell=null;this.paintedCells=[];this.overlaysStarted=false}
   recordPrimitive(kind,corners){if(!this.primitives||this.globalAlpha<=0)return;const xs=corners.map(p=>p[0]),ys=corners.map(p=>p[1]),bounds={x0:Math.min(...xs),y0:Math.min(...ys),x1:Math.max(...xs),y1:Math.max(...ys)};if(bounds.x0<bounds.x1&&bounds.y0<bounds.y1)this.primitives.push({kind,bounds})}
   corners(x,y,w,h){const[a,b,c,d,e,f]=this.matrix;return[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([px,py])=>[a*px+c*py+e,b*px+d*py+f])}
   recordCommand(name,args=[]){if(!this.commands)return;const entry={name,args:[...args],matrix:[...this.matrix],clip:this.clipBounds?[...this.clipBounds]:null};if(this.floorCell){if(!this.floorCommands.has(this.floorCell))this.floorCommands.set(this.floorCell,[]);this.floorCommands.get(this.floorCell).push(entry)}else this.commands.push(entry)}
@@ -57,8 +57,21 @@ class FakeContext{
   arc(...args){this.recordCommand('arc',args);this.recordTransform();if(this.primitives)this.pathCircles.push(args)}
   fill(){this.recordCommand('fill');this.recordTransform();if(this.primitives){const[a,b,c,d,e,f]=this.matrix;for(const[x,y,r,start,end]of this.pathCircles){assert.strictEqual(start,0);assert.strictEqual(end,Math.PI*2);const cx=a*x+c*y+e,cy=b*x+d*y+f,rx=Math.hypot(a,c)*r,ry=Math.hypot(b,d)*r;this.recordPrimitive('circle',[[cx-rx,cy-ry],[cx+rx,cy+ry]])}}}
   strokeRect(...args){this.recordCommand('strokeRect',args);this.recordTransform()}
+  getImageData(x,y,width,height){
+    // Synchronization is observed separately from the frozen draw-command
+    // oracle: it cannot hide any changed primitive, transform or draw order.
+    const read={canvas:this.canvas,x,y,width,height,floorCells:this.paintedCells.length,lastCell:this.paintedCells.at(-1),overlaysStarted:this.overlaysStarted,success:false,ms:2.5};syncReads.push(read);
+    try{
+      assert.deepStrictEqual([x,y,width,height],[0,0,1,1],'static color synchronizes exactly one native pixel');
+      const options=this.canvas.contextRequests[0].options;assert.strictEqual(options.alpha,false);assert(Object.prototype.hasOwnProperty.call(options,'willReadFrequently')&&options.willReadFrequently===false,'the synchronization context must explicitly request false');
+      assert(read.floorCells>0&&!read.overlaysStarted,'read follows painted floor work and precedes every overlay');
+      if(++faults.syncCalls===faults.syncAt||(faults.syncFrom&&faults.syncCalls>=faults.syncFrom))throw Error('injected color synchronization failure');
+      read.success=true;
+      return{get data(){throw Error('synchronization pixels must be discarded')}};
+    }finally{syncClock+=read.ms}
+  }
 }
-const sandbox={OffscreenCanvas:FakeCanvas,RelayStaticTerrain:terrain,perfMeasure:(name,fn)=>{phases.push(name);return fn()}};
+const sandbox={OffscreenCanvas:FakeCanvas,RelayStaticTerrain:terrain,performance:{now:()=>syncClock},perfMeasure:(name,fn)=>{phases.push(name);return fn()}};
 const production=vm.runInNewContext(`
   const W=640,H=360,TILE=16,FLOOR_TILE=4,GRID_W=40,GRID_H=19,PLAY_H=304,BOTTOM_H=56,TAU=Math.PI*2,HD_WORLD_SCALE_DEFAULT=.18;
   ${gameSource.match(/const BLOCKER_FOREGROUND_FRACTION=[^\n]+/)[0]}
@@ -73,6 +86,11 @@ const production=vm.runInNewContext(`
   ${legacyFullSource}
   ({Room,HDArtSheet,StaticPainter,GLRenderer,Game,legacyFullBuild});
 `,sandbox);
+const observeBaseTile=production.StaticPainter.prototype.baseTile;
+production.StaticPainter.prototype.baseTile=function(ctx,tx,ty,...args){const value=observeBaseTile.call(this,ctx,tx,ty,...args);ctx.paintedCells.push([tx,ty]);return value};
+for(const method of ['patternDecor','drawBlockerSprites','drawVegetationInterstitials','drawDecor','drawFooter']){
+  const original=production.StaticPainter.prototype[method];production.StaticPainter.prototype[method]=function(ctx,...args){if(ctx)ctx.overlaysStarted=true;return original.call(this,ctx,...args)};
+}
 
 function fakeGL(){
   const gl={TEXTURE_2D:3553,RGBA:6408,UNSIGNED_BYTE:5121,UNPACK_FLIP_Y_WEBGL:37440,UNPACK_SKIP_PIXELS:3316,UNPACK_SKIP_ROWS:3315,NO_ERROR:0,uploads:[],textures:new Map(),pixelStores:[],parameterQueries:[],fullCount:0,subCount:0,flip:false,skipPixels:0,skipRows:0,bound:null,lost:false,error:0,failFullAt:0,failSubAt:0,errorSubAt:0,hook:null};
@@ -123,8 +141,21 @@ function released(g,from=0){
 }
 function materialSnapshot(r){return['bgNormalTex','bgSpecTex'].map(key=>{const handle=r[key],texture=r.gl.textures.get(handle);return{key,handle,texture,bytes:texture?.bytes.slice()}})}
 function assertMaterialsRetained(r,before){for(const saved of before){assert.strictEqual(r[saved.key],saved.handle,'terrain delta cannot replace a material texture handle');assert.strictEqual(r.gl.textures.get(saved.handle),saved.texture,'terrain delta cannot allocate a material texture');assert.deepStrictEqual(saved.texture?.bytes,saved.bytes,'terrain delta cannot change existing material texture bytes')}}
-function refresh(g){
-  const first=allocations.length,firstAttempt=allocationAttempts.length,materials=materialSnapshot(g.renderer),beforeUploads=g.renderer.gl.uploads.length,result=g.refreshEditorStatic();released(g,first);assert.strictEqual(result.retainedScratchPixels,0);assert.strictEqual(g.staticBackgroundRevision,g.renderer.backgroundRevision);
+function assertSyncAccounting(g,stats,from){
+  const reads=syncReads.slice(from),successes=reads.filter(read=>read.success);
+  assert.strictEqual(stats.colorPolicy,g.painter.colorPolicy);assert.strictEqual(stats.colorSyncAttempts,reads.length,'count every attempted synchronization including throwing reads');
+  assert.strictEqual(stats.colorSyncReads,successes.length);assert.strictEqual(stats.colorSyncPixels,successes.length,'every successful read returns exactly one pixel');assert.strictEqual(stats.readbackPixels,successes.length,'reported static readback cost must include row synchronization');
+  assert.strictEqual(stats.colorSyncMs,reads.reduce((n,read)=>n+read.ms,0),'elapsed read time includes failures and every synchronous repair');
+  for(const read of reads){
+    assert(!read.overlaysStarted);assert.deepStrictEqual([read.x,read.y,read.width,read.height],[0,0,1,1]);
+    const next=read.canvas.context.paintedCells[read.floorCells];if(next)assert.notStrictEqual(next[1],read.lastCell[1],'a row read cannot occur before its final painted cell');
+  }
+  if(stats.mode==='patch')assert.strictEqual(reads.length,stats.regions.reduce((n,r)=>n+r.ty1-r.ty0,0),'one read per actually painted bounded row');
+  else if(stats.mode==='noop')assert.strictEqual(reads.length,0,'no-op refresh performs no synchronization');
+  else if(stats.reason!=='refresh-failed'&&!stats.repairError)assert.strictEqual(reads.length,19,'a successful full composition synchronizes all 19 floor rows');
+}
+function refresh(g,options){
+  const first=allocations.length,firstAttempt=allocationAttempts.length,firstRead=syncReads.length,materials=materialSnapshot(g.renderer),beforeUploads=g.renderer.gl.uploads.length,result=g.refreshEditorStatic(options);released(g,first);assert.strictEqual(result.retainedScratchPixels,0);assert.strictEqual(g.staticBackgroundRevision,g.renderer.backgroundRevision);assertSyncAccounting(g,result,firstRead);
   const fullPixels=result.mode==='full'?g.renderer.nativeW*g.renderer.nativeH:0,regions=result.regions;
   const rasterAreas=regions.map(r=>r.rasterWidth*r.rasterHeight),created=allocations.slice(first),canvasAreas=created.map(c=>c.originalWidth*c.originalHeight),attempts=allocationAttempts.slice(firstAttempt);
   assert.strictEqual(result.pixels,fullPixels+regions.reduce((n,r)=>n+r.width*r.height,0),'upload work uses output bounds');
@@ -133,6 +164,7 @@ function refresh(g){
   assert.strictEqual(result.scratchAllocationAttempts,attempts.length,'allocation attempts include throwing constructors');assert.strictEqual(result.scratchAllocations,created.length,'successful canvas allocations are independently observed');
   assert.strictEqual(result.scratchAllocationPixels,canvasAreas.reduce((n,area)=>n+area,0),'cumulative capacity includes every allocated color surface and full repair map');assert.strictEqual(result.scratchAllocationBytes,result.scratchAllocationPixels*4);
   assert.strictEqual(result.scratchMode,result.mode==='full'?'full':result.mode==='noop'?'none':regions[0].canvasMode);
+  for(const canvas of created){const options=canvas.contextRequests[0]?.options;if(options?.alpha===false)assert.strictEqual(options.willReadFrequently,false,'every color build uses the selected synchronization policy');else if(options?.alpha===true)assert(!Object.prototype.hasOwnProperty.call(options,'willReadFrequently'),'material context creation options remain unchanged')}
   if(result.mode==='patch'||result.mode==='noop')assertMaterialsRetained(g.renderer,materials);
   else assert.deepStrictEqual(g.renderer.gl.uploads.slice(-3).map(u=>[u.mode,u.texture]),[['full','color'],['full','normal'],['full','specular']],'every full dependency refresh or repair replaces all three channels');
   if(result.mode==='patch'){
@@ -455,6 +487,66 @@ function staticIdentityAndStaleness(){
   scenarios+=17;
 }
 
+function rowSynchronizationPolicy(){
+  assert.strictEqual(production.StaticPainter.COLOR_POLICY,'canvas2d-row-sync-v1');
+  for(const [width,height] of [[640,360],[997,563],[1280,720]]){
+    const g=fixture();g.renderer.nativeW=width;g.renderer.nativeH=height;
+    const first=syncReads.length,full=refresh(g);
+    assert.strictEqual(full.colorSyncReads,19);assert.strictEqual(full.colorSyncMs,47.5);
+    assert.deepStrictEqual(syncReads.slice(first).map(read=>read.lastCell),Array.from({length:19},(_,y)=>[39,y]),'full synchronization follows each complete authored row');
+    g.room.water.add('6,7');g.room.paths.add('30,14');const patchStart=syncReads.length,patch=refresh(g);
+    assert.strictEqual(patch.mode,'patch');assert.strictEqual(patch.regions.length,2);
+    const expected=Array.from(patch.regions).flatMap(r=>Array.from({length:r.ty1-r.ty0},(_,i)=>[r.tx1-1,r.ty0+i]));
+    assert.deepStrictEqual(syncReads.slice(patchStart).map(read=>read.lastCell),expected,'partial synchronization follows each actually painted row without expanding floor input');
+    assert.strictEqual(patch.colorSyncAttempts,expected.length);assert.strictEqual(patch.colorSyncPixels,expected.length);assert.strictEqual(patch.colorSyncMs,expected.length*2.5);
+    const noop=refresh(g);for(const key of ['colorSyncAttempts','colorSyncReads','colorSyncPixels','colorSyncMs','readbackPixels'])assert.strictEqual(noop[key],0,'unchanged authority has no '+key);
+    const forced=refresh(g,{force:true});assert.strictEqual(forced.reason,'forced');assert.strictEqual(forced.colorSyncReads,19);
+    assert.strictEqual(g.staticTerrainSnapshot.colorPolicy,g.painter.colorPolicy);assert(g.bgKey.endsWith('|'+g.painter.colorPolicy));scenarios+=4;
+  }
+  for(const changeTerrain of [false,true]){
+    const g=fixture();refresh(g);const previous=g.staticTerrainSnapshot,key=g.bgKey,tint=new FakeCanvas(7,9),normal=new FakeCanvas(11,13);
+    g.art.tintCache.set('retained-policy-tint',tint);g.art.normalTransformCache.set('retained-policy-normal',normal);
+    Object.defineProperty(g.painter,'colorPolicy',{configurable:true,value:'canvas2d-row-sync-v2'});
+    assert.notStrictEqual(g.editorBackgroundKey(),key,'policy revision invalidates the ordinary background key too');if(changeTerrain)g.room.water.add('6,7');
+    const stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'color-policy');assert.strictEqual(stats.colorSyncReads,19);
+    assert.strictEqual(g.staticTerrainSnapshot.colorPolicy,'canvas2d-row-sync-v2');assert.strictEqual(g.staticTerrainSnapshot.resourceSignature,previous.resourceSignature);assert.deepStrictEqual(g.staticTerrainSnapshot.references,previous.references);assert.deepStrictEqual(g.staticTerrainSnapshot.dependencies,previous.dependencies);
+    assert.strictEqual(g.art.tintCache.get('retained-policy-tint'),tint);assert.strictEqual(g.art.normalTransformCache.get('retained-policy-normal'),normal);assert.deepStrictEqual([tint.width,tint.height,normal.width,normal.height],[7,9,11,13],'a color policy revision cannot release unchanged derived atlas surfaces');
+    assert.strictEqual(refresh(g).mode,'noop');delete g.painter.colorPolicy;assert.strictEqual(refresh(g).reason,'color-policy');
+    g.art.tintCache.clear();g.art.normalTransformCache.clear();tint.width=tint.height=normal.width=normal.height=1;scenarios+=3;
+  }
+}
+
+function synchronizationFailuresAndRepair(){
+  for(const kind of ['first-patch-row','last-patch-row','second-region-row']){
+    const g=fixture();refresh(g);g.room.water.add('6,7');if(kind==='second-region-row')g.room.water.add('30,14');
+    const plan=terrain.plan(g.staticTerrainSnapshot,terrain.capture(g.room,g.staticTerrainContext())),firstRows=plan.regions[0].ty1-plan.regions[0].ty0;
+    const offset=kind==='first-patch-row'?1:kind==='last-patch-row'?firstRows:firstRows+1,first=allocations.length,readStart=syncReads.length;
+    faults.syncAt=faults.syncCalls+offset;
+    try{
+      const stats=refresh(g);assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'patch-failed');assert.match(stats.repairError,/color synchronization failure/);
+      assert.strictEqual(stats.colorSyncAttempts,offset+19);assert.strictEqual(stats.colorSyncReads,offset-1+19);assert.strictEqual(stats.colorSyncMs,(offset+19)*2.5);
+      assert.strictEqual(stats.uploadCalls,kind==='second-region-row'?4:3,'only completely synchronized color patches upload before full repair');
+      assert.strictEqual(syncReads.slice(readStart).filter(read=>!read.success).length,1);assert.strictEqual(g.renderer.backgroundReady,true);released(g,first);scenarios++;
+    }finally{faults.syncAt=0}
+  }
+  for(const offset of [1,19]){
+    const g=fixture(),first=allocations.length,readStart=syncReads.length;faults.syncAt=faults.syncCalls+offset;
+    try{
+      assert.throws(()=>g.refreshEditorStatic(),/color synchronization failure/);assertSyncAccounting(g,g.staticRefreshStats,readStart);released(g,first);
+      assert.strictEqual(g.staticRefreshStats.colorSyncAttempts,offset);assert.strictEqual(g.staticRefreshStats.colorSyncReads,offset-1);assert.strictEqual(g.staticRefreshStats.colorSyncMs,offset*2.5);
+      assert.strictEqual(g.renderer.backgroundUploadCalls,0);assert.strictEqual(g.renderer.backgroundReady,false);assert.strictEqual(g.staticTerrainSnapshot,null);assert.strictEqual(g.staticBackgroundRevision,null);assert.strictEqual(g.bgKey,'');
+    }finally{faults.syncAt=0}
+    assert.strictEqual(refresh(g).colorSyncReads,19);scenarios++;
+  }
+  const g=fixture();refresh(g);g.room.paths.add('9,9');const first=allocations.length,readStart=syncReads.length,uploadStart=g.renderer.backgroundUploadCalls;faults.syncFrom=faults.syncCalls+1;
+  try{
+    assert.throws(()=>g.refreshEditorStatic(),/color synchronization failure/);assertSyncAccounting(g,g.staticRefreshStats,readStart);released(g,first);
+    assert.strictEqual(g.staticRefreshStats.colorSyncAttempts,2,'both failed partial synchronization and failed full repair are charged');assert.strictEqual(g.staticRefreshStats.colorSyncReads,0);assert.strictEqual(g.staticRefreshStats.colorSyncMs,5);
+    assert.strictEqual(g.renderer.backgroundUploadCalls,uploadStart);assert.strictEqual(g.renderer.backgroundReady,false);assert.strictEqual(g.staticTerrainSnapshot,null);assert.strictEqual(g.staticBackgroundRevision,null);assert.strictEqual(g.bgKey,'');
+  }finally{faults.syncFrom=0}
+  assert.strictEqual(refresh(g).colorSyncReads,19);scenarios++;
+}
+
 function materialPreservationAndDependencies(){
   // Cache turnover cannot invalidate a color-only delta: the normal/specular
   // GPU contents keep their original backing and are never rerastered here.
@@ -645,7 +737,7 @@ function rejectInvalidPatches(){
   c.width=c.height=1;scenarios++;
 }
 
-fullPatchNoopAndHistory();staticIdentityAndStaleness();materialPreservationAndDependencies();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();guardedEdgeRasterMetrics();croppedUploadRestoresUnpackState();rejectInvalidPatches();nativeClipMatchesFullCommands();nativeClipCapacityAndFallbacks();nativeClipAllocationFailures();overlayCollectorGeometryAndPurity();overlayGeometryFallbacks();
+fullPatchNoopAndHistory();staticIdentityAndStaleness();rowSynchronizationPolicy();synchronizationFailuresAndRepair();materialPreservationAndDependencies();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();guardedEdgeRasterMetrics();croppedUploadRestoresUnpackState();rejectInvalidPatches();nativeClipMatchesFullCommands();nativeClipCapacityAndFallbacks();nativeClipAllocationFailures();overlayCollectorGeometryAndPurity();overlayGeometryFallbacks();
 console.log('STATIC TERRAIN RUNTIME REGRESSION PERF-004 PASS');
 console.log('  production Game / StaticPainter / GLRenderer scenarios:',scenarios);
 console.log('  color-only guarded-raster uploads, preserved material handles/bytes, full material-dependency refreshes, asymmetric flipped crops and exact scratch/raster accounting');
@@ -653,3 +745,4 @@ console.log('  coherent snapshot/revision commits, unpack restoration, upload / 
 console.log('  fractional native targets use bounded clips and accepted full floor/atlas command traces; local integer rasters, exact capacity/attempt accounting and early peak/cumulative fallbacks');
 console.log('  far and mounted edits remain eligible, fractional capacity is capped at 4 MiB peak / 8 MiB cumulative, and every surface is released before the next allocation');
 console.log('  dry whole-primitive bounds agree with actual atlas quads/circles/rounded pixels across all rooms, anchors, flips, rotations and imported footer scales; no source/cache/LUT/material mutations');
+console.log('  explicit-false color policy; separate observed one-pixel row synchronization counts/time, discarded pixels, policy-only full invalidation without cache clears, failed read/repair accounting and cleanup');

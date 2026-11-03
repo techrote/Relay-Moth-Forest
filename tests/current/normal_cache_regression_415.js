@@ -9,7 +9,7 @@ const source=(start,end)=>{const a=game.indexOf(start),b=game.indexOf(end,a+star
 const maps=JSON.parse(fs.readFileSync(path.join(ROOT,'relay_moth_maps.json'),'utf8'));
 const story=JSON.parse(fs.readFileSync(path.join(ROOT,'relay_moth_story.json'),'utf8'));
 const manifest=JSON.parse(fs.readFileSync(path.join(ROOT,'hd_remake_atlas.json'),'utf8'));
-let canvasSerial=0;
+let canvasSerial=0,colorSyncReads=0;
 
 // Actual room composition and production cache methods run unchanged. Only
 // Canvas2D storage is substituted: atlas crops have deterministic RGBA samples,
@@ -38,6 +38,10 @@ class Context{
     if(image?.sample&&dx===0&&dy===0&&sw===dw&&sh===dh)this.crop={image,sx,sy,sw,sh};
   }
   getImageData(x,y,width,height){
+    if(this.firstOptions?.alpha===false){
+      assert.deepStrictEqual([x,y,width,height],[0,0,1,1]);assert.strictEqual(this.firstOptions.willReadFrequently,false,'row synchronization applies only to the explicit-false opaque color context');colorSyncReads++;
+      return{get data(){throw Error('color synchronization cannot consume source pixels')}};
+    }
     assert(x===0&&y===0&&width===this.canvas.width&&height===this.canvas.height);
     const data=new Uint8ClampedArray(width*height*4);
     if(this.pixels)data.set(this.pixels);
@@ -54,7 +58,7 @@ const core=vm.runInNewContext(`
   ${source('class Room{','\n// Low-cost steering helpers')}
   ${source('class HDArtSheet{','\nclass SpriteAtlas')}
   ({Room,HDArtSheet,StaticPainter});
-`,{OffscreenCanvas:Canvas,releaseCanvasBacking:release,perfMeasure:(_name,fn)=>fn()});
+`,{OffscreenCanvas:Canvas,performance,releaseCanvasBacking:release,perfMeasure:(_name,fn)=>fn()});
 
 const image={width:4096,height:4096};
 const normal={...image,sample(x,y,out,i){out[i]=(x*17+y*3)&255;out[i+1]=(x*5+y*19)&255;out[i+2]=(x*11+y*7+128)&255;out[i+3]=[0,1,64,127,200,255][(x+y)%6]}};
@@ -68,10 +72,12 @@ function build(art,room,patch=false){
     if(original===core.HDArtSheet.prototype.transformedNormal)assert.strictEqual(this.normalTransformGeneration,generation+(canvas&&!existed?1:0),'generation advances exactly once per newly created transformed source');
     if(canvas)requests.push({key:cacheKey,name,flip,rot,canvas});assert(this.normalTransformCache.size<=96);return canvas;
   };
-  let color=null,materials=null;
+  let color=null,materials=null;const syncBefore=colorSyncReads;
   try{
     color=patch?painter.buildPatch(room,{isDone:()=>false},997,563,{x:147,y:131,width:47,height:49,tx0:5,ty0:4,tx1:9,ty1:8}):painter.build(room,{isDone:()=>false},997,563);
     materials=painter.lastMaterialMaps;
+    assert.strictEqual(colorSyncReads-syncBefore,patch?4:19,'full and bounded color draws synchronize only their painted floor rows');
+    assert.strictEqual(painter.lastColorSync.reads,colorSyncReads-syncBefore);assert.strictEqual(painter.lastColorSync.pixels,colorSyncReads-syncBefore);
   }finally{art.transformedNormal=original;release(color);release(materials?.normal);release(materials?.spec);painter.lastMaterialMaps=null}
   return requests;
 }

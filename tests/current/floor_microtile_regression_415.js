@@ -5,7 +5,8 @@ const assert=require('assert'),fs=require('fs'),path=require('path'),vm=require(
 const ROOT=path.resolve(__dirname,'../..'),text=fs.readFileSync(path.join(ROOT,'game.js'),'utf8');
 const Validation=require(path.join(ROOT,'editor_validation.js'));
 const section=(a,b)=>{const i=text.indexOf(a),j=text.indexOf(b,i+a.length);assert(i>=0&&j>i);return text.slice(i,j)};
-let instructions=0,legacyCappedInstructions=0;
+let instructions=0,legacyCappedInstructions=0,syncClock=0;
+const discardedReads=[];
 function legacyBaseTile(ctx,tx,ty,seed,type){
   const x=tx*TILE,y=ty*TILE,micro=this.microtile||FLOOR_TILE;
   let e='ground',lo=40,hi=116;if(type==='path'){e='path';lo=72;hi=160}else if(type==='water'){e='water';lo=38;hi=126}else if(type==='blocker'){e='ground';lo=25;hi=76}
@@ -17,12 +18,27 @@ function legacyBaseTile(ctx,tx,ty,seed,type){
   }
 }
 class Context{
+  constructor(canvas){this.canvas=canvas;this.floorCells=[];this.reads=[];this.overlaysStarted=false}
   save(){}restore(){}translate(){}scale(){}
   fillRect(...args){assert(args.every(Number.isFinite));instructions++}strokeRect(...args){assert(args.every(Number.isFinite));instructions++}
   beginPath(){}arc(...args){assert(args.every(Number.isFinite));instructions++}fill(){}
   createLinearGradient(){return{addColorStop(){}}}createRadialGradient(){return{addColorStop(){}}}
+  getImageData(x,y,width,height){
+    // Observe synchronization independently of the primitive oracle. The
+    // returned pixels are poisoned so they cannot become a drawing input.
+    assert.deepStrictEqual([x,y,width,height],[0,0,1,1],'only one native color pixel may be synchronized');
+    const options=this.canvas.requests[0].options;
+    assert.strictEqual(options.alpha,false);assert(Object.hasOwn(options,'willReadFrequently')&&options.willReadFrequently===false,'color creation must explicitly keep the non-read-frequent policy');
+    assert(this.floorCells.length>0&&!this.overlaysStarted,'row synchronization must follow floor drawing and precede overlays');
+    const read={canvas:this.canvas,floorCells:this.floorCells.length,lastCell:this.floorCells.at(-1),x,y,width,height};
+    this.reads.push(read);discardedReads.push(read);syncClock+=2.5;
+    return{get data(){throw Error('synchronization pixels must be discarded')}};
+  }
 }
-class Canvas{constructor(w,h){this.width=w;this.height=h;this.ctx=new Context()}getContext(){return this.ctx}}
+class Canvas{
+  constructor(w,h){this.width=w;this.height=h;this.requests=[];this.ctx=new Context(this)}
+  getContext(type,options){assert.strictEqual(type,'2d');this.requests.push({type,options});return this.ctx}
+}
 const code=[
   'const W=640,H=360,TILE=16,FLOOR_TILE=4,GRID_W=40,GRID_H=19,PLAY_H=304,BOTTOM_H=56,TAU=Math.PI*2;',
   'const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));',
@@ -32,7 +48,22 @@ const code=[
   section('class StaticPainter{','\nclass SpriteAtlas'),
   legacyBaseTile.toString(),'({Room,StaticPainter,legacyBaseTile});'
 ].join('\n');
-const {Room,StaticPainter,legacyBaseTile:legacy}=vm.runInNewContext(code,{OffscreenCanvas:Canvas,perfMeasure:(_name,fn)=>fn()});
+const {Room,StaticPainter,legacyBaseTile:legacy}=vm.runInNewContext(code,{OffscreenCanvas:Canvas,performance:{now:()=>syncClock},perfMeasure:(_name,fn)=>fn()});
+const baseTile=StaticPainter.prototype.baseTile;
+StaticPainter.prototype.baseTile=function(ctx,tx,ty,...args){const value=baseTile.call(this,ctx,tx,ty,...args);if(ctx)ctx.floorCells.push([tx,ty]);return value};
+for(const name of ['patternDecor','drawBlockerSprites','drawVegetationInterstitials','drawDecor','drawFooter']){
+  const original=StaticPainter.prototype[name];StaticPainter.prototype[name]=function(ctx,...args){ctx.overlaysStarted=true;return original.call(this,ctx,...args)};
+}
+function assertRowReads(painter,canvas,tx0,ty0,tx1,ty1){
+  const reads=canvas.ctx.reads,rows=ty1-ty0;
+  assert.strictEqual(reads.length,rows,'one discarded color read is required per painted patch/full row');
+  for(const [index,read] of reads.entries()){
+    assert.strictEqual(read.canvas,canvas);assert.strictEqual(read.floorCells,(index+1)*(tx1-tx0));
+    assert.deepStrictEqual(read.lastCell,[tx1-1,ty0+index],'synchronize only after the row is complete');
+  }
+  for(const field of ['attempts','reads','pixels'])assert.strictEqual(painter.lastColorSync[field],rows);
+  assert.strictEqual(painter.lastColorSync.ms,rows*2.5,'synchronization time comes from the injected clock');
+}
 function draws(method,micro,type,cap=1000,finite=true){
   const result=[],push=(name,values,colour,alpha)=>{if(result.length>=cap)throw Error('instruction cap');if(finite){assert(values.concat(alpha).every(Number.isFinite),'nonfinite primitive');instructions++}else legacyCappedInstructions++;result.push([name,...values,colour,alpha])};
   const painter={microtile:micro,col:(element,index)=>element+':'+index,
@@ -60,6 +91,7 @@ for(const test of cases){
   room.border.clear();room.floorMicrotile=test.value===omitted?undefined:test.value;
   const painter=new StaticPainter({regions:{},roles:{}},{hex:()=> '#123456'}),state={isDone:()=>false};
   const canvas=painter.buildPatch(room,state,640,360,{x:0,y:0,width:16,height:16,tx0:0,ty0:0,tx1:1,ty1:1});
+  assertRowReads(painter,canvas,0,0,1,1);
   assert.strictEqual(painter.microtile,test.wanted,'buildSurface cannot trust manually assigned room values');assert.strictEqual(painter.lastMaterialMaps,null);canvas.width=canvas.height=1;buildCases++;
   authorityCases++;
 }
@@ -68,8 +100,9 @@ for(const test of cases){
 for(const value of [-1,'0',3.5,16]){
   const room=new Room(0,spec,{rooms:{fixture:{}}});room.floorMicrotile=value;room.border.clear();
   const painter=new StaticPainter({regions:{},roles:{}},{hex:()=> '#123456'}),seen=[];
-  painter.baseTile=function(){seen.push(this.microtile)};
+  painter.baseTile=function(ctx,tx,ty){seen.push(this.microtile);ctx.floorCells.push([tx,ty])};
   const canvas=painter.build(room,{isDone:()=>false},640,360),maps=painter.lastMaterialMaps;
+  assertRowReads(painter,canvas,0,0,40,19);assert.strictEqual(maps.normal.ctx.reads.length,0);assert.strictEqual(maps.spec.ctx.reads.length,0);
   assert.strictEqual(seen.length,760);assert(seen.every(n=>n===([-1,'0'].includes(value)?4:value)));
   for(const c of [canvas,maps.normal,maps.spec])c.width=c.height=1;buildCases++;
 }
@@ -83,3 +116,4 @@ assert.strictEqual(Validation.validate(shipped,story).filter(d=>d.code==='INVALI
 console.log('FLOOR MICROTILE REGRESSION 4.15 PASS');
 console.log('  authority cases:',authorityCases,'; build entry cases:',buildCases,'; finite primitive instructions:',instructions,'; capped legacy instructions:',legacyCappedInstructions);
 console.log('  raw source preserved; story/map-only invalid diagnostics; bounded legacy-loop controls; exact supported fractional composition');
+console.log('  discarded color synchronization reads:',discardedReads.length,'; explicit false policy; one pixel per row; material contexts unread; poisoned return data');

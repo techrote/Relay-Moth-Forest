@@ -428,6 +428,10 @@ def measure_source(args, root, validate_static=True):
                         fractional = native_width % 640 != 0 or native_height % 360 != 0
                         scratch_mode = "native-clip" if fractional else "local"
                         regions = static.get("regions") or []
+                        sync_reads = sum(region["ty1"] - region["ty0"] for region in regions)
+                        assert static.get("colorPolicy") == "canvas2d-row-sync-v1", (scenario, "unexpected static color policy", static)
+                        assert sync_reads > 0 and all(static.get(key) == sync_reads for key in ("colorSyncAttempts", "colorSyncReads", "colorSyncPixels", "readbackPixels")), (scenario, "color synchronization is not one pixel per painted floor row", static)
+                        assert isinstance(static.get("colorSyncMs"), (int, float)) and math.isfinite(static["colorSyncMs"]) and static["colorSyncMs"] >= 0, (scenario, "missing color synchronization timing", static)
                         assert static.get("mode") == "patch", (scenario, "static backing did not use a bounded patch", static)
                         assert record.get("phaseCalls", {}).get("static.build", 0) == 0, (scenario, "small terrain edit invoked full painter")
                         assert 0 < static.get("rasterCells", 10**12) <= 40 * 19 * .35, (scenario, "unbounded floor raster", static)
