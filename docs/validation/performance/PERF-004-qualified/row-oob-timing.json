@@ -1,0 +1,2201 @@
+{
+  "diagnosticOnly": true,
+  "qualifiedForProduction": false,
+  "source": {
+    "commit": "65261997810fea05f57e32fe2121995d7e37e4b1",
+    "tree": "436eebad5e5da4e9738c5b6f925c2ac820c6a3b3",
+    "trackedDirty": false,
+    "manifestSha256": "ddc05f8fe199fb3b1dc7ec1e17c6a28d0c1ea2212985c88b0fc23124af148877",
+    "experimentBase": "d8456ff3afe7b61a7a5aa6ec9eb45a84bcfb6008",
+    "frozenInputSha256": {
+      "game.js": "d7da5d34fcc16e018e501b363275347fbbdf6cdc66cc2749ea955c104c90efe1",
+      "static_terrain.js": "bd3573efd69ec1187f0e357c5fe3a6a38b7704ff1e3d62883189af17bfe37ad8",
+      "tests/current/static_terrain_browser_415.js": "17e6b9bb9c20195036e80b90346278a10b8e358e635998ba723cab1d84cc1050",
+      "tests/current/state_change_performance_415.py": "0db33f90fa6a41de1cc44e2f7bda0c21b398acca8bf52fd414fa0f8dca7446fd",
+      "tests/current/browser_render_regression_414.py": "0584f88df80cbbc6316fad1fae2485e9b6c8f3d52ae26690fb2fd7669ff70c99",
+      ".github/workflows/validate.yml": "72c85f2b350c1c5816b57cc0663ed4ef4c5e45b755f90625b42794571c8687e9"
+    },
+    "runId": "41594561195",
+    "runAttempt": "1",
+    "jobName": "diagnose",
+    "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+    "python": "3.12.15",
+    "node": "v22.23.4",
+    "diagnosticOnly": true
+  },
+  "browserVersion": "156.0.8078.0",
+  "statuses": {
+    "nativeOob": "passed",
+    "inbounds": "passed",
+    "oob": "passed"
+  },
+  "rows": [
+    {
+      "cpuThrottle": 1,
+      "scenario": "editor-water",
+      "metrics": {
+        "syncMs": {
+          "inbounds": {
+            "median": 233.70000000001164,
+            "minimum": 221.89999999996508,
+            "maximum": 593
+          },
+          "oob": {
+            "median": 223.40000000002328,
+            "minimum": 221.90000000002328,
+            "maximum": 243.79999999993015
+          },
+          "ratio": 0.9559264013693288
+        },
+        "firstFrameAfterMs": {
+          "inbounds": {
+            "median": 238.5,
+            "minimum": 227.09999999997672,
+            "maximum": 605.1999999999534
+          },
+          "oob": {
+            "median": 231.59999999997672,
+            "minimum": 226.5,
+            "maximum": 260.29999999993015
+          },
+          "ratio": 0.9710691823898395
+        },
+        "frameGapMs": {
+          "inbounds": {
+            "median": 238.59999999997672,
+            "minimum": 227.29999999998836,
+            "maximum": 605.5
+          },
+          "oob": {
+            "median": 231.79999999993015,
+            "minimum": 226.59999999997672,
+            "maximum": 260.5999999999767
+          },
+          "ratio": 0.9715004191112857
+        },
+        "diagnosticStaticCombinedMs": {
+          "inbounds": {
+            "median": 154.10000000003492,
+            "minimum": 144.09999999997672,
+            "maximum": 505.79999999998836
+          },
+          "oob": {
+            "median": 25.5,
+            "minimum": 21.79999999993015,
+            "maximum": 25.79999999993015
+          },
+          "ratio": 0.1654769630109943
+        },
+        "diagnosticEventOutsideStaticMs": {
+          "inbounds": {
+            "median": 87.20000000001164,
+            "minimum": 67.79999999993015,
+            "maximum": 89.60000000003492
+          },
+          "oob": {
+            "median": 200.10000000009313,
+            "minimum": 197.90000000002328,
+            "maximum": 218.0
+          },
+          "ratio": 2.2947247706429637
+        }
+      },
+      "phases": {
+        "diagnostic.gl.getError": {
+          "inbounds": {
+            "median": 58,
+            "minimum": 29,
+            "maximum": 71
+          },
+          "oob": {
+            "median": 165,
+            "minimum": 156.59999999997672,
+            "maximum": 176.90000000002328
+          }
+        },
+        "diagnostic.gl.isContextLost": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "diagnostic.releaseCanvasBacking": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.1000000000349246
+          },
+          "oob": {
+            "median": 0.10000000009313226,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.10000000009313226
+          }
+        },
+        "editor.overlay.render": {
+          "inbounds": {
+            "median": 0.20000000001164153,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.29999999998835847
+          },
+          "oob": {
+            "median": 0.19999999995343387,
+            "minimum": 0.09999999997671694,
+            "maximum": 3.199999999953434
+          }
+        },
+        "editor.room.rebind": {
+          "inbounds": {
+            "median": 0.29999999998835847,
+            "minimum": 0.29999999998835847,
+            "maximum": 0.3999999999650754
+          },
+          "oob": {
+            "median": 0.40000000002328306,
+            "minimum": 0.40000000002328306,
+            "maximum": 0.8999999999068677
+          }
+        },
+        "editor.selection.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.19999999995343387
+          }
+        },
+        "editor.status.update": {
+          "inbounds": {
+            "median": 20.600000000034925,
+            "minimum": 15.900000000023283,
+            "maximum": 32
+          },
+          "oob": {
+            "median": 30.800000000046566,
+            "minimum": 16.900000000023283,
+            "maximum": 39.300000000046566
+          }
+        },
+        "foliage.descriptor.build": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "foliage.descriptor.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "foliage.grass-descriptor.build": {
+          "inbounds": {
+            "median": 0.1000000000349246,
+            "minimum": 0,
+            "maximum": 0.1000000000349246
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "static.patch.build": {
+          "inbounds": {
+            "median": 138,
+            "minimum": 137.70000000001164,
+            "maximum": 492.5
+          },
+          "oob": {
+            "median": 15.29999999993015,
+            "minimum": 14.199999999953434,
+            "maximum": 16.100000000093132
+          }
+        },
+        "static.patch.color-sync": {
+          "inbounds": {
+            "median": 129.10000000003492,
+            "minimum": 126.59999999991851,
+            "maximum": 479.30000000004657
+          },
+          "oob": {
+            "median": 1.7999999999301508,
+            "minimum": 1.7000000001862645,
+            "maximum": 2.2000000001862645
+          }
+        },
+        "static.patch.floor": {
+          "inbounds": {
+            "median": 136.10000000003492,
+            "minimum": 135.79999999998836,
+            "maximum": 489.79999999998836
+          },
+          "oob": {
+            "median": 11.599999999976717,
+            "minimum": 11.20000000006985,
+            "maximum": 13.29999999993015
+          }
+        },
+        "static.patch.footer": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.10000000009313226
+          }
+        },
+        "static.patch.overlays-materials": {
+          "inbounds": {
+            "median": 1.7000000000116415,
+            "minimum": 1.5,
+            "maximum": 2.2000000000116415
+          },
+          "oob": {
+            "median": 2.799999999930151,
+            "minimum": 2.3999999999068677,
+            "maximum": 2.900000000023283
+          }
+        },
+        "static.patch.scratch": {
+          "inbounds": {
+            "median": 0.20000000001164153,
+            "minimum": 0.19999999995343387,
+            "maximum": 0.30000000004656613
+          },
+          "oob": {
+            "median": 0.2000000000698492,
+            "minimum": 0.19999999995343387,
+            "maximum": 0.5999999999767169
+          }
+        },
+        "static.patch.upload.color": {
+          "inbounds": {
+            "median": 0.20000000001164153,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.29999999998835847
+          },
+          "oob": {
+            "median": 0.2999999999301508,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.5
+          }
+        },
+        "static.plan": {
+          "inbounds": {
+            "median": 13,
+            "minimum": 6.2999999999883585,
+            "maximum": 15.900000000023283
+          },
+          "oob": {
+            "median": 9.099999999976717,
+            "minimum": 7.5,
+            "maximum": 10
+          }
+        },
+        "surface.grass.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "surface.water.acquire.downsample": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.10000000009313226
+          }
+        },
+        "surface.water.acquire.read-mask": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.1000000000349246
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.19999999995343387
+          }
+        },
+        "surface.water.distance": {
+          "inbounds": {
+            "median": 0.5,
+            "minimum": 0.29999999998835847,
+            "maximum": 2.5
+          },
+          "oob": {
+            "median": 1.599999999976717,
+            "minimum": 0.2000000000698492,
+            "maximum": 6.400000000023283
+          }
+        },
+        "surface.water.encode": {
+          "inbounds": {
+            "median": 1.400000000023283,
+            "minimum": 0.29999999998835847,
+            "maximum": 3.7999999999883585
+          },
+          "oob": {
+            "median": 0.5,
+            "minimum": 0.2999999999301508,
+            "maximum": 2
+          }
+        },
+        "surface.water.plan": {
+          "inbounds": {
+            "median": 0.20000000001164153,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.8000000000465661
+          },
+          "oob": {
+            "median": 0.30000000004656613,
+            "minimum": 0.09999999997671694,
+            "maximum": 1.1999999999534339
+          }
+        },
+        "surface.water.total": {
+          "inbounds": {
+            "median": 5,
+            "minimum": 1.099999999976717,
+            "maximum": 5.5
+          },
+          "oob": {
+            "median": 2.6000000000931323,
+            "minimum": 1.1000000000931323,
+            "maximum": 13.399999999906868
+          }
+        },
+        "surface.water.upload": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "ui.update": {
+          "inbounds": {
+            "median": 0.19999999995343387,
+            "minimum": 0,
+            "maximum": 0.20000000001164153
+          },
+          "oob": {
+            "median": 0.19999999995343387,
+            "minimum": 0,
+            "maximum": 0.2999999999301508
+          }
+        },
+        "water.acquire.read-mask": {
+          "inbounds": {
+            "median": 0.1000000000349246,
+            "minimum": 0.1000000000349246,
+            "maximum": 0.20000000001164153
+          },
+          "oob": {
+            "median": 0.19999999995343387,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.19999999995343387
+          }
+        },
+        "water.authority.diff": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.20000000001164153
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "water.mask.patch": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.10000000009313226
+          }
+        },
+        "water.refresh.total": {
+          "inbounds": {
+            "median": 5.100000000034925,
+            "minimum": 1.3999999999650754,
+            "maximum": 5.899999999965075
+          },
+          "oob": {
+            "median": 2.800000000046566,
+            "minimum": 2.5,
+            "maximum": 15.79999999993015
+          }
+        },
+        "water.upload": {
+          "inbounds": {
+            "median": 0.29999999998835847,
+            "minimum": 0.1000000000349246,
+            "maximum": 0.29999999998835847
+          },
+          "oob": {
+            "median": 0.30000000004656613,
+            "minimum": 0.09999999997671694,
+            "maximum": 1.3999999999068677
+          }
+        },
+        "water.upload.texture": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.10000000009313226
+          }
+        }
+      }
+    },
+    {
+      "cpuThrottle": 1,
+      "scenario": "editor-path",
+      "metrics": {
+        "syncMs": {
+          "inbounds": {
+            "median": 193.5,
+            "minimum": 190.29999999998836,
+            "maximum": 199.10000000003492
+          },
+          "oob": {
+            "median": 206.5,
+            "minimum": 187.80000000004657,
+            "maximum": 221.5
+          },
+          "ratio": 1.0671834625322998
+        },
+        "firstFrameAfterMs": {
+          "inbounds": {
+            "median": 204.79999999998836,
+            "minimum": 201.70000000001164,
+            "maximum": 209.20000000001164
+          },
+          "oob": {
+            "median": 211.70000000006985,
+            "minimum": 201.90000000002328,
+            "maximum": 226.09999999997672
+          },
+          "ratio": 1.0336914062504
+        },
+        "frameGapMs": {
+          "inbounds": {
+            "median": 204.90000000002328,
+            "minimum": 201.70000000001164,
+            "maximum": 209.20000000001164
+          },
+          "oob": {
+            "median": 211.80000000004657,
+            "minimum": 202,
+            "maximum": 226.20000000006985
+          },
+          "ratio": 1.0336749633968887
+        },
+        "diagnosticStaticCombinedMs": {
+          "inbounds": {
+            "median": 144.10000000003492,
+            "minimum": 135.9000000000815,
+            "maximum": 145.79999999998836
+          },
+          "oob": {
+            "median": 21.800000000046566,
+            "minimum": 16.899999999906868,
+            "maximum": 23.5
+          },
+          "ratio": 0.15128383067343013
+        },
+        "diagnosticEventOutsideStaticMs": {
+          "inbounds": {
+            "median": 53.300000000046566,
+            "minimum": 49.399999999965075,
+            "maximum": 54.39999999990687
+          },
+          "oob": {
+            "median": 183.0,
+            "minimum": 166.0,
+            "maximum": 204.60000000009313
+          },
+          "ratio": 3.433395872417263
+        }
+      },
+      "phases": {
+        "diagnostic.gl.getError": {
+          "inbounds": {
+            "median": 26.5,
+            "minimum": 23.900000000023283,
+            "maximum": 28.599999999976717
+          },
+          "oob": {
+            "median": 139.30000000004657,
+            "minimum": 138.5,
+            "maximum": 154
+          }
+        },
+        "diagnostic.gl.isContextLost": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "diagnostic.releaseCanvasBacking": {
+          "inbounds": {
+            "median": 0.1000000000349246,
+            "minimum": 0.1000000000349246,
+            "maximum": 0.20000000001164153
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.2000000000698492
+          }
+        },
+        "editor.overlay.render": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.20000000001164153
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "editor.room.rebind": {
+          "inbounds": {
+            "median": 0.20000000001164153,
+            "minimum": 0.20000000001164153,
+            "maximum": 0.5999999999767169
+          },
+          "oob": {
+            "median": 0.2999999999301508,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.8000000000465661
+          }
+        },
+        "editor.selection.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "editor.status.update": {
+          "inbounds": {
+            "median": 24.199999999953434,
+            "minimum": 24,
+            "maximum": 25.5
+          },
+          "oob": {
+            "median": 42.29999999993015,
+            "minimum": 25.70000000006985,
+            "maximum": 49.40000000002328
+          }
+        },
+        "foliage.descriptor.build": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "foliage.descriptor.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "foliage.grass-descriptor.build": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "static.patch.build": {
+          "inbounds": {
+            "median": 136,
+            "minimum": 129.90000000002328,
+            "maximum": 138.79999999998836
+          },
+          "oob": {
+            "median": 12.300000000046566,
+            "minimum": 11.099999999976717,
+            "maximum": 15.800000000046566
+          }
+        },
+        "static.patch.color-sync": {
+          "inbounds": {
+            "median": 128.29999999993015,
+            "minimum": 120.20000000001164,
+            "maximum": 130.5999999999185
+          },
+          "oob": {
+            "median": 1.6999999998370185,
+            "minimum": 1.400000000023283,
+            "maximum": 1.8000000001629815
+          }
+        },
+        "static.patch.floor": {
+          "inbounds": {
+            "median": 134,
+            "minimum": 126.5,
+            "maximum": 136.40000000002328
+          },
+          "oob": {
+            "median": 8.800000000046566,
+            "minimum": 8.199999999953434,
+            "maximum": 11.199999999953434
+          }
+        },
+        "static.patch.footer": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "static.patch.overlays-materials": {
+          "inbounds": {
+            "median": 2.099999999976717,
+            "minimum": 1.7000000000116415,
+            "maximum": 3
+          },
+          "oob": {
+            "median": 3.199999999953434,
+            "minimum": 2.700000000069849,
+            "maximum": 4.200000000069849
+          }
+        },
+        "static.patch.scratch": {
+          "inbounds": {
+            "median": 0.19999999995343387,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.20000000001164153
+          },
+          "oob": {
+            "median": 0.2000000000698492,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.30000000004656613
+          }
+        },
+        "static.patch.upload.color": {
+          "inbounds": {
+            "median": 0.20000000001164153,
+            "minimum": 0.20000000001164153,
+            "maximum": 0.30000000004656613
+          },
+          "oob": {
+            "median": 0.19999999995343387,
+            "minimum": 0.19999999995343387,
+            "maximum": 0.2000000000698492
+          }
+        },
+        "static.plan": {
+          "inbounds": {
+            "median": 6.7999999999883585,
+            "minimum": 5.7000000000116415,
+            "maximum": 7.900000000023283
+          },
+          "oob": {
+            "median": 7.5,
+            "minimum": 5.599999999976717,
+            "maximum": 9.29999999993015
+          }
+        },
+        "surface.grass.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "surface.water.total": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.10000000009313226
+          }
+        },
+        "ui.update": {
+          "inbounds": {
+            "median": 0.20000000001164153,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.20000000001164153
+          },
+          "oob": {
+            "median": 0.19999999995343387,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.19999999995343387
+          }
+        },
+        "water.authority.diff": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "water.mask.patch": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.1000000000349246
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "water.refresh.total": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.1000000000349246
+          },
+          "oob": {
+            "median": 0.2000000000698492,
+            "minimum": 0,
+            "maximum": 0.2000000000698492
+          }
+        },
+        "water.upload": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.1000000000349246
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        }
+      }
+    },
+    {
+      "cpuThrottle": 1,
+      "scenario": "control-full-static",
+      "metrics": {
+        "syncMs": {
+          "inbounds": {
+            "median": 1370.1999999999534,
+            "minimum": 1368.5999999999767,
+            "maximum": 1384.7999999999884
+          },
+          "oob": {
+            "median": 1208.9000000000233,
+            "minimum": 1205.3000000000466,
+            "maximum": 1217.1000000000931
+          },
+          "ratio": 0.8822799591301009
+        },
+        "firstFrameAfterMs": {
+          "inbounds": {
+            "median": 1377.2999999999884,
+            "minimum": 1375.7999999999884,
+            "maximum": 1390.399999999965
+          },
+          "oob": {
+            "median": 1212.9000000000233,
+            "minimum": 1211,
+            "maximum": 1228
+          },
+          "ratio": 0.8806360270093905
+        },
+        "frameGapMs": {
+          "inbounds": {
+            "median": 1377.5,
+            "minimum": 1375.9000000000233,
+            "maximum": 1390.5
+          },
+          "oob": {
+            "median": 1212.9000000000233,
+            "minimum": 1211,
+            "maximum": 1228.0999999999767
+          },
+          "ratio": 0.8805081669691639
+        },
+        "diagnosticStaticCombinedMs": {
+          "inbounds": {
+            "median": 1191.5999999999767,
+            "minimum": 1169.5,
+            "maximum": 1195.7000000000116
+          },
+          "oob": {
+            "median": 287.20000000006985,
+            "minimum": 283.70000000006985,
+            "maximum": 310.5999999998603
+          },
+          "ratio": 0.24102047667008683
+        },
+        "diagnosticEventOutsideStaticMs": {
+          "inbounds": {
+            "median": 193.20000000001164,
+            "minimum": 174.4999999999418,
+            "maximum": 199.09999999997672
+          },
+          "oob": {
+            "median": 918.0999999999767,
+            "minimum": 898.300000000163,
+            "maximum": 933.4000000000233
+          },
+          "ratio": 4.752070393374335
+        }
+      },
+      "phases": {
+        "diagnostic.gl.getError": {
+          "inbounds": {
+            "median": 192.10000000003492,
+            "minimum": 173.70000000001164,
+            "maximum": 198.39999999996508
+          },
+          "oob": {
+            "median": 917.0999999999767,
+            "minimum": 897.5,
+            "maximum": 932.5999999999767
+          }
+        },
+        "diagnostic.gl.isContextLost": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "diagnostic.releaseCanvasBacking": {
+          "inbounds": {
+            "median": 0.29999999998835847,
+            "minimum": 0.19999999995343387,
+            "maximum": 0.29999999998835847
+          },
+          "oob": {
+            "median": 0.30000000004656613,
+            "minimum": 0.2000000000698492,
+            "maximum": 0.5
+          }
+        },
+        "static.build": {
+          "inbounds": {
+            "median": 1187,
+            "minimum": 1164.600000000035,
+            "maximum": 1191.0999999999767
+          },
+          "oob": {
+            "median": 282.70000000006985,
+            "minimum": 280,
+            "maximum": 305.5999999999767
+          }
+        },
+        "static.full.color-sync": {
+          "inbounds": {
+            "median": 985.6999999999534,
+            "minimum": 976.6000000000349,
+            "maximum": 993.800000000163
+          },
+          "oob": {
+            "median": 50.900000000256114,
+            "minimum": 48.4000000001397,
+            "maximum": 59.999999999883585
+          }
+        },
+        "static.full.floor": {
+          "inbounds": {
+            "median": 1158.9000000000233,
+            "minimum": 1141.7999999999884,
+            "maximum": 1164.399999999965
+          },
+          "oob": {
+            "median": 265.5999999999767,
+            "minimum": 263.19999999995343,
+            "maximum": 287.70000000006985
+          }
+        },
+        "static.full.footer": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.1000000000349246
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "static.full.overlays-materials": {
+          "inbounds": {
+            "median": 26.400000000023283,
+            "minimum": 21.70000000001164,
+            "maximum": 27.70000000001164
+          },
+          "oob": {
+            "median": 17.300000000046566,
+            "minimum": 14.099999999976717,
+            "maximum": 18.5
+          }
+        },
+        "static.full.scratch": {
+          "inbounds": {
+            "median": 0.29999999998835847,
+            "minimum": 0.20000000001164153,
+            "maximum": 0.9000000000232831
+          },
+          "oob": {
+            "median": 0.2000000000698492,
+            "minimum": 0.19999999995343387,
+            "maximum": 0.6999999999534339
+          }
+        },
+        "static.plan": {
+          "inbounds": {
+            "median": 3.5,
+            "minimum": 3.5,
+            "maximum": 3.8999999999650754
+          },
+          "oob": {
+            "median": 3.400000000023283,
+            "minimum": 2.900000000023283,
+            "maximum": 3.8999999999068677
+          }
+        },
+        "static.upload.color": {
+          "inbounds": {
+            "median": 0.9000000000232831,
+            "minimum": 0.7999999999883585,
+            "maximum": 1
+          },
+          "oob": {
+            "median": 1,
+            "minimum": 0.8000000000465661,
+            "maximum": 1.099999999976717
+          }
+        },
+        "static.upload.normal": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "static.upload.specular": {
+          "inbounds": {
+            "median": 0.1000000000349246,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.20000000001164153
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "ui.update": {
+          "inbounds": {
+            "median": 0.29999999998835847,
+            "minimum": 0.20000000001164153,
+            "maximum": 0.29999999998835847
+          },
+          "oob": {
+            "median": 0.19999999995343387,
+            "minimum": 0.10000000009313226,
+            "maximum": 0.2000000000698492
+          }
+        }
+      }
+    },
+    {
+      "cpuThrottle": 4,
+      "scenario": "editor-water",
+      "metrics": {
+        "syncMs": {
+          "inbounds": {
+            "median": 394.5,
+            "minimum": 390.5999999999767,
+            "maximum": 475.4000000000233
+          },
+          "oob": {
+            "median": 374.0999999999767,
+            "minimum": 351.69999999995343,
+            "maximum": 376.20000000006985
+          },
+          "ratio": 0.9482889733839714
+        },
+        "firstFrameAfterMs": {
+          "inbounds": {
+            "median": 415.9000000000233,
+            "minimum": 411.19999999995343,
+            "maximum": 500.6000000000349
+          },
+          "oob": {
+            "median": 394.20000000006985,
+            "minimum": 377,
+            "maximum": 396.30000000004657
+          },
+          "ratio": 0.9478239961530363
+        },
+        "frameGapMs": {
+          "inbounds": {
+            "median": 416.69999999995343,
+            "minimum": 411.29999999993015,
+            "maximum": 503.79999999998836
+          },
+          "oob": {
+            "median": 395,
+            "minimum": 377.0999999999767,
+            "maximum": 396.4000000000233
+          },
+          "ratio": 0.9479241660668206
+        },
+        "diagnosticStaticCombinedMs": {
+          "inbounds": {
+            "median": 264.4000000000233,
+            "minimum": 248.39999999990687,
+            "maximum": 309.0
+          },
+          "oob": {
+            "median": 63.199999999953434,
+            "minimum": 56.800000000046566,
+            "maximum": 69.99999999988358
+          },
+          "ratio": 0.2390317700451886
+        },
+        "diagnosticEventOutsideStaticMs": {
+          "inbounds": {
+            "median": 142.20000000006985,
+            "minimum": 130.09999999997672,
+            "maximum": 166.40000000002328
+          },
+          "oob": {
+            "median": 306.20000000018626,
+            "minimum": 294.89999999990687,
+            "maximum": 310.9000000000233
+          },
+          "ratio": 2.1533052039383676
+        }
+      },
+      "phases": {
+        "diagnostic.gl.getError": {
+          "inbounds": {
+            "median": 30.79999999993015,
+            "minimum": 29.099999999976717,
+            "maximum": 81.29999999998836
+          },
+          "oob": {
+            "median": 195.10000000009313,
+            "minimum": 189.69999999995343,
+            "maximum": 232.80000000004657
+          }
+        },
+        "diagnostic.gl.isContextLost": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.10000000009313226
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "diagnostic.releaseCanvasBacking": {
+          "inbounds": {
+            "median": 0.19999999995343387,
+            "minimum": 0.10000000009313226,
+            "maximum": 0.3999999999650754
+          },
+          "oob": {
+            "median": 0.8000000000465661,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.8999999999068677
+          }
+        },
+        "editor.overlay.render": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.6999999999534339
+          },
+          "oob": {
+            "median": 0.10000000009313226,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.19999999995343387
+          }
+        },
+        "editor.room.rebind": {
+          "inbounds": {
+            "median": 1.5,
+            "minimum": 0.7000000000698492,
+            "maximum": 4.099999999976717
+          },
+          "oob": {
+            "median": 0.30000000004656613,
+            "minimum": 0.2000000000698492,
+            "maximum": 1.1000000000931323
+          }
+        },
+        "editor.selection.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "editor.status.update": {
+          "inbounds": {
+            "median": 97.09999999997672,
+            "minimum": 71.40000000002328,
+            "maximum": 104.60000000009313
+          },
+          "oob": {
+            "median": 94.09999999997672,
+            "minimum": 66.59999999997672,
+            "maximum": 101.29999999993015
+          }
+        },
+        "foliage.descriptor.build": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.8000000000465661
+          }
+        },
+        "foliage.descriptor.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.8000000000465661
+          }
+        },
+        "foliage.grass-descriptor.build": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.5
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.10000000009313226
+          }
+        },
+        "static.patch.build": {
+          "inbounds": {
+            "median": 244.80000000004657,
+            "minimum": 228,
+            "maximum": 289.6000000000349
+          },
+          "oob": {
+            "median": 45.5,
+            "minimum": 41.699999999953434,
+            "maximum": 48.300000000046566
+          }
+        },
+        "static.patch.color-sync": {
+          "inbounds": {
+            "median": 207.79999999993015,
+            "minimum": 191.5,
+            "maximum": 227.39999999996508
+          },
+          "oob": {
+            "median": 7.400000000139698,
+            "minimum": 3,
+            "maximum": 8.199999999953434
+          }
+        },
+        "static.patch.floor": {
+          "inbounds": {
+            "median": 236.40000000002328,
+            "minimum": 221.20000000006985,
+            "maximum": 281.79999999998836
+          },
+          "oob": {
+            "median": 36.199999999953434,
+            "minimum": 31.70000000006985,
+            "maximum": 38.09999999997672
+          }
+        },
+        "static.patch.footer": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.1000000000349246
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "static.patch.overlays-materials": {
+          "inbounds": {
+            "median": 7.2999999999883585,
+            "minimum": 6.5,
+            "maximum": 7.5
+          },
+          "oob": {
+            "median": 9.699999999953434,
+            "minimum": 6.300000000046566,
+            "maximum": 10.5
+          }
+        },
+        "static.patch.scratch": {
+          "inbounds": {
+            "median": 0.40000000002328306,
+            "minimum": 0.19999999995343387,
+            "maximum": 0.8000000000465661
+          },
+          "oob": {
+            "median": 0.9000000000232831,
+            "minimum": 0.19999999995343387,
+            "maximum": 1.099999999976717
+          }
+        },
+        "static.patch.upload.color": {
+          "inbounds": {
+            "median": 0.7999999999301508,
+            "minimum": 0.5,
+            "maximum": 1
+          },
+          "oob": {
+            "median": 0.2999999999301508,
+            "minimum": 0.2000000000698492,
+            "maximum": 1.400000000023283
+          }
+        },
+        "static.plan": {
+          "inbounds": {
+            "median": 19.099999999976717,
+            "minimum": 18.399999999965075,
+            "maximum": 19.599999999976717
+          },
+          "oob": {
+            "median": 20.099999999976717,
+            "minimum": 8.29999999993015,
+            "maximum": 24.199999999953434
+          }
+        },
+        "surface.grass.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "surface.water.acquire.downsample": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.7999999999301508
+          }
+        },
+        "surface.water.acquire.read-mask": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.1000000000349246
+          },
+          "oob": {
+            "median": 0.5,
+            "minimum": 0.09999999997671694,
+            "maximum": 1
+          }
+        },
+        "surface.water.distance": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.6999999999534339
+          },
+          "oob": {
+            "median": 1.2999999999301508,
+            "minimum": 0.10000000009313226,
+            "maximum": 1.5
+          }
+        },
+        "surface.water.encode": {
+          "inbounds": {
+            "median": 0.30000000004656613,
+            "minimum": 0.30000000004656613,
+            "maximum": 2.5
+          },
+          "oob": {
+            "median": 1.099999999976717,
+            "minimum": 1.099999999976717,
+            "maximum": 3.199999999953434
+          }
+        },
+        "surface.water.plan": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 1.400000000023283
+          },
+          "oob": {
+            "median": 0.10000000009313226,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.19999999995343387
+          }
+        },
+        "surface.water.total": {
+          "inbounds": {
+            "median": 1,
+            "minimum": 0.8000000000465661,
+            "maximum": 7.900000000023283
+          },
+          "oob": {
+            "median": 3.799999999930151,
+            "minimum": 3.799999999930151,
+            "maximum": 5.5
+          }
+        },
+        "surface.water.upload": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "ui.update": {
+          "inbounds": {
+            "median": 0.19999999995343387,
+            "minimum": 0.19999999995343387,
+            "maximum": 0.29999999998835847
+          },
+          "oob": {
+            "median": 0.5,
+            "minimum": 0.2000000000698492,
+            "maximum": 1.2999999999301508
+          }
+        },
+        "water.acquire.read-mask": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0.2000000000698492,
+            "minimum": 0.10000000009313226,
+            "maximum": 0.7000000000698492
+          }
+        },
+        "water.authority.diff": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.29999999998835847
+          },
+          "oob": {
+            "median": 0.9000000000232831,
+            "minimum": 0.40000000002328306,
+            "maximum": 1.8000000000465661
+          }
+        },
+        "water.mask.patch": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "water.refresh.total": {
+          "inbounds": {
+            "median": 1.099999999976717,
+            "minimum": 0.9000000000232831,
+            "maximum": 8.200000000011642
+          },
+          "oob": {
+            "median": 4.5,
+            "minimum": 4.199999999953434,
+            "maximum": 6.400000000023283
+          }
+        },
+        "water.upload": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.20000000001164153
+          },
+          "oob": {
+            "median": 0.7000000000698492,
+            "minimum": 0.2000000000698492,
+            "maximum": 0.9000000000232831
+          }
+        },
+        "water.upload.texture": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.6999999999534339
+          }
+        }
+      }
+    },
+    {
+      "cpuThrottle": 4,
+      "scenario": "editor-path",
+      "metrics": {
+        "syncMs": {
+          "inbounds": {
+            "median": 434.5,
+            "minimum": 394.70000000006985,
+            "maximum": 439.9000000000233
+          },
+          "oob": {
+            "median": 371.19999999995343,
+            "minimum": 348.5,
+            "maximum": 399.4000000000233
+          },
+          "ratio": 0.8543153049481091
+        },
+        "firstFrameAfterMs": {
+          "inbounds": {
+            "median": 455.9000000000233,
+            "minimum": 411.70000000006985,
+            "maximum": 461.5999999999767
+          },
+          "oob": {
+            "median": 392.69999999995343,
+            "minimum": 369.9000000000233,
+            "maximum": 421.9000000000233
+          },
+          "ratio": 0.8613731081376034
+        },
+        "frameGapMs": {
+          "inbounds": {
+            "median": 456.0999999999767,
+            "minimum": 411.80000000004657,
+            "maximum": 461.79999999993015
+          },
+          "oob": {
+            "median": 392.69999999995343,
+            "minimum": 370,
+            "maximum": 422.9000000000233
+          },
+          "ratio": 0.8609953957464886
+        },
+        "diagnosticStaticCombinedMs": {
+          "inbounds": {
+            "median": 349.10000000009313,
+            "minimum": 221.19999999995343,
+            "maximum": 350.5999999999767
+          },
+          "oob": {
+            "median": 59.60000000009313,
+            "minimum": 52.0,
+            "maximum": 72.59999999997672
+          },
+          "ratio": 0.1707247207106194
+        },
+        "diagnosticEventOutsideStaticMs": {
+          "inbounds": {
+            "median": 89.30000000004657,
+            "minimum": 85.39999999990687,
+            "maximum": 173.50000000011642
+          },
+          "oob": {
+            "median": 298.5999999999767,
+            "minimum": 288.89999999990687,
+            "maximum": 347.4000000000233
+          },
+          "ratio": 3.3437849943988915
+        }
+      },
+      "phases": {
+        "diagnostic.gl.getError": {
+          "inbounds": {
+            "median": 23.199999999953434,
+            "minimum": 21.099999999976717,
+            "maximum": 53.699999999953434
+          },
+          "oob": {
+            "median": 224.19999999995343,
+            "minimum": 181.59999999997672,
+            "maximum": 286.80000000004657
+          }
+        },
+        "diagnostic.gl.isContextLost": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "diagnostic.releaseCanvasBacking": {
+          "inbounds": {
+            "median": 0.5999999999767169,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.7000000000698492
+          },
+          "oob": {
+            "median": 0.5,
+            "minimum": 0.10000000009313226,
+            "maximum": 0.5
+          }
+        },
+        "editor.overlay.render": {
+          "inbounds": {
+            "median": 0.8000000000465661,
+            "minimum": 0.10000000009313226,
+            "maximum": 8.29999999993015
+          },
+          "oob": {
+            "median": 0.5,
+            "minimum": 0.2000000000698492,
+            "maximum": 0.7999999999301508
+          }
+        },
+        "editor.room.rebind": {
+          "inbounds": {
+            "median": 0.19999999995343387,
+            "minimum": 0.10000000009313226,
+            "maximum": 0.2000000000698492
+          },
+          "oob": {
+            "median": 0.2000000000698492,
+            "minimum": 0.19999999995343387,
+            "maximum": 1.099999999976717
+          }
+        },
+        "editor.selection.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.10000000009313226
+          }
+        },
+        "editor.status.update": {
+          "inbounds": {
+            "median": 65,
+            "minimum": 58.59999999997672,
+            "maximum": 107.40000000002328
+          },
+          "oob": {
+            "median": 73.19999999995343,
+            "minimum": 57.10000000009313,
+            "maximum": 104.30000000004657
+          }
+        },
+        "foliage.descriptor.build": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.7000000000698492
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "foliage.descriptor.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "foliage.grass-descriptor.build": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.6999999999534339
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "static.patch.build": {
+          "inbounds": {
+            "median": 323.9000000000233,
+            "minimum": 195.19999999995343,
+            "maximum": 325.4000000000233
+          },
+          "oob": {
+            "median": 45.90000000002328,
+            "minimum": 45.5,
+            "maximum": 54.70000000006985
+          }
+        },
+        "static.patch.color-sync": {
+          "inbounds": {
+            "median": 293.4000000000233,
+            "minimum": 162.59999999997672,
+            "maximum": 294.60000000009313
+          },
+          "oob": {
+            "median": 5.500000000116415,
+            "minimum": 3.7000000001862645,
+            "maximum": 7.500000000116415
+          }
+        },
+        "static.patch.floor": {
+          "inbounds": {
+            "median": 313.5999999999767,
+            "minimum": 187.80000000004657,
+            "maximum": 315.60000000009313
+          },
+          "oob": {
+            "median": 40.79999999993015,
+            "minimum": 34.09999999997672,
+            "maximum": 44.800000000046566
+          }
+        },
+        "static.patch.footer": {
+          "inbounds": {
+            "median": 0.10000000009313226,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.40000000002328306
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.5
+          }
+        },
+        "static.patch.overlays-materials": {
+          "inbounds": {
+            "median": 8.29999999993015,
+            "minimum": 7,
+            "maximum": 9.099999999976717
+          },
+          "oob": {
+            "median": 7.600000000093132,
+            "minimum": 4.400000000023283,
+            "maximum": 8.300000000046566
+          }
+        },
+        "static.patch.scratch": {
+          "inbounds": {
+            "median": 1,
+            "minimum": 0.2999999999301508,
+            "maximum": 1.099999999976717
+          },
+          "oob": {
+            "median": 0.19999999995343387,
+            "minimum": 0.10000000009313226,
+            "maximum": 4.099999999976717
+          }
+        },
+        "static.patch.upload.color": {
+          "inbounds": {
+            "median": 0.6999999999534339,
+            "minimum": 0.5999999999767169,
+            "maximum": 0.8000000000465661
+          },
+          "oob": {
+            "median": 0.2999999999301508,
+            "minimum": 0.2000000000698492,
+            "maximum": 1.099999999976717
+          }
+        },
+        "static.plan": {
+          "inbounds": {
+            "median": 24.5,
+            "minimum": 24.400000000023283,
+            "maximum": 25.400000000023283
+          },
+          "oob": {
+            "median": 13.900000000023283,
+            "minimum": 5.800000000046566,
+            "maximum": 16.79999999993015
+          }
+        },
+        "surface.grass.refresh": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "surface.water.total": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "ui.update": {
+          "inbounds": {
+            "median": 0.5,
+            "minimum": 0.09999999997671694,
+            "maximum": 1.3000000000465661
+          },
+          "oob": {
+            "median": 0.2999999999301508,
+            "minimum": 0.09999999997671694,
+            "maximum": 1
+          }
+        },
+        "water.authority.diff": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.7000000000698492
+          }
+        },
+        "water.mask.patch": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "water.refresh.total": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.2999999999301508
+          }
+        },
+        "water.upload": {
+          "inbounds": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.2999999999301508
+          }
+        }
+      }
+    },
+    {
+      "cpuThrottle": 4,
+      "scenario": "control-full-static",
+      "metrics": {
+        "syncMs": {
+          "inbounds": {
+            "median": 2339,
+            "minimum": 2321.4000000000233,
+            "maximum": 2345.4000000000233
+          },
+          "oob": {
+            "median": 2043,
+            "minimum": 1766.1999999999534,
+            "maximum": 2066.0999999999767
+          },
+          "ratio": 0.8734501923899102
+        },
+        "firstFrameAfterMs": {
+          "inbounds": {
+            "median": 2352.8000000000466,
+            "minimum": 2343.9000000000233,
+            "maximum": 2359.79999999993
+          },
+          "oob": {
+            "median": 2065.5,
+            "minimum": 1780.5999999999767,
+            "maximum": 2084.1999999999534
+          },
+          "ratio": 0.8778901734103872
+        },
+        "frameGapMs": {
+          "inbounds": {
+            "median": 2353,
+            "minimum": 2344,
+            "maximum": 2359.899999999907
+          },
+          "oob": {
+            "median": 2065.5999999999767,
+            "minimum": 1780.6999999999534,
+            "maximum": 2084.3000000000466
+          },
+          "ratio": 0.8778580535486514
+        },
+        "diagnosticStaticCombinedMs": {
+          "inbounds": {
+            "median": 2111.9000000000233,
+            "minimum": 2104.9000000000233,
+            "maximum": 2118.5
+          },
+          "oob": {
+            "median": 1004.3999999999069,
+            "minimum": 955.5000000001164,
+            "maximum": 1051.0999999999767
+          },
+          "ratio": 0.4755907003172005
+        },
+        "diagnosticEventOutsideStaticMs": {
+          "inbounds": {
+            "median": 220.5,
+            "minimum": 216.5,
+            "maximum": 233.5
+          },
+          "oob": {
+            "median": 1061.7000000000698,
+            "minimum": 715.0999999999767,
+            "maximum": 1087.4999999998836
+          },
+          "ratio": 4.814965986394874
+        }
+      },
+      "phases": {
+        "diagnostic.gl.getError": {
+          "inbounds": {
+            "median": 217.59999999997672,
+            "minimum": 213.5,
+            "maximum": 230.5
+          },
+          "oob": {
+            "median": 1058.5,
+            "minimum": 711.5999999999767,
+            "maximum": 1084
+          }
+        },
+        "diagnostic.gl.isContextLost": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.19999999995343387
+          },
+          "oob": {
+            "median": 0,
+            "minimum": 0,
+            "maximum": 0
+          }
+        },
+        "diagnostic.releaseCanvasBacking": {
+          "inbounds": {
+            "median": 1.3000000000465661,
+            "minimum": 0.6999999999534339,
+            "maximum": 1.400000000023283
+          },
+          "oob": {
+            "median": 1.599999999976717,
+            "minimum": 1.2000000000698492,
+            "maximum": 2.200000000069849
+          }
+        },
+        "static.build": {
+          "inbounds": {
+            "median": 2091.8000000000466,
+            "minimum": 2085.70000000007,
+            "maximum": 2101.100000000093
+          },
+          "oob": {
+            "median": 996,
+            "minimum": 948.0999999999767,
+            "maximum": 1042.9000000000233
+          }
+        },
+        "static.full.color-sync": {
+          "inbounds": {
+            "median": 1280.6000000000931,
+            "minimum": 1266.5000000003492,
+            "maximum": 1305.7999999998137
+          },
+          "oob": {
+            "median": 191.89999999990687,
+            "minimum": 180.50000000023283,
+            "maximum": 211.39999999967404
+          }
+        },
+        "static.full.floor": {
+          "inbounds": {
+            "median": 1987.6999999999534,
+            "minimum": 1987.2999999999302,
+            "maximum": 2004.8000000000466
+          },
+          "oob": {
+            "median": 926.0999999999767,
+            "minimum": 881.4000000000233,
+            "maximum": 971.5
+          }
+        },
+        "static.full.footer": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0.09999999997671694,
+            "maximum": 0.10000000009313226
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.10000000009313226
+          }
+        },
+        "static.full.overlays-materials": {
+          "inbounds": {
+            "median": 96.70000000006985,
+            "minimum": 95.89999999990687,
+            "maximum": 102.70000000006985
+          },
+          "oob": {
+            "median": 66.59999999997672,
+            "minimum": 63.79999999993015,
+            "maximum": 70.90000000002328
+          }
+        },
+        "static.full.scratch": {
+          "inbounds": {
+            "median": 1.2000000000698492,
+            "minimum": 0.2000000000698492,
+            "maximum": 1.7000000000698492
+          },
+          "oob": {
+            "median": 2,
+            "minimum": 0.19999999995343387,
+            "maximum": 3.099999999976717
+          }
+        },
+        "static.plan": {
+          "inbounds": {
+            "median": 15,
+            "minimum": 13.199999999953434,
+            "maximum": 15.5
+          },
+          "oob": {
+            "median": 7,
+            "minimum": 6.200000000069849,
+            "maximum": 7.299999999930151
+          }
+        },
+        "static.upload.color": {
+          "inbounds": {
+            "median": 3.8999999999068677,
+            "minimum": 3,
+            "maximum": 4.099999999976717
+          },
+          "oob": {
+            "median": 1,
+            "minimum": 1,
+            "maximum": 1.099999999976717
+          }
+        },
+        "static.upload.normal": {
+          "inbounds": {
+            "median": 0.30000000004656613,
+            "minimum": 0.09999999997671694,
+            "maximum": 1.099999999976717
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.10000000009313226
+          }
+        },
+        "static.upload.specular": {
+          "inbounds": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.40000000002328306
+          },
+          "oob": {
+            "median": 0.09999999997671694,
+            "minimum": 0,
+            "maximum": 0.09999999997671694
+          }
+        },
+        "ui.update": {
+          "inbounds": {
+            "median": 0.9000000000232831,
+            "minimum": 0.9000000000232831,
+            "maximum": 1.1999999999534339
+          },
+          "oob": {
+            "median": 0.40000000002328306,
+            "minimum": 0.40000000002328306,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  ],
+  "metricScope": "CPU synchronous event and render-loop frame markers; no GPU-completion or display-scanout measurement."
+}

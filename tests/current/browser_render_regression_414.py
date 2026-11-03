@@ -7,6 +7,7 @@ Requires Playwright + Chromium. Run separately: python ... --out <evidence-dir>.
 """
 from __future__ import annotations
 import argparse, base64, json, re, shutil, sys, time
+from contextlib import contextmanager
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 SETUP=r'''window.requestAnimationFrame=()=>1;
@@ -171,9 +172,80 @@ WATER_FAULT_CASE=r'''()=>{
   return results;
 }'''
 
+
+def boot_offline_runtime(page, html):
+    """Boot an independent production runtime with the existing asset transport."""
+    page.set_content(html);page.add_style_tag(content=(ROOT/'style.css').read_text())
+    page.evaluate('(d)=>{window.__json=d;window.__assets={}}',{f.name:json.loads(f.read_text()) for f in ROOT.glob('*.json')})
+    meta=json.loads((ROOT/'hd_remake_atlas.json').read_text())
+    page.evaluate("()=>{const i=document.createElement('input');i.id='auditAsset';i.type='file';i.style.display='none';document.body.appendChild(i)}")
+    for key in ('image','specular_image','normal_image'):
+        name=meta[key];page.locator('#auditAsset').set_input_files(str(ROOT/name))
+        page.evaluate('(name)=>{window.__assets[name]=URL.createObjectURL(document.querySelector("#auditAsset").files[0])}',name)
+    page.add_script_tag(content=SETUP)
+    for name in ('surfacefx.js','sprite_material.js','foliagefx.js','procedural_decor.js','static_terrain.js','editor_identity.js','editor_validation.js','editor.js','game.js'):
+        source=(ROOT/name).read_text()
+        if name=='game.js':source=source.replace('img.src=url','img.src=window.__assets[url]||url')
+        page.add_script_tag(content=source)
+    page.wait_for_function("document.body.dataset.ready==='1'",timeout=60000)
+
+
+def run_final_native_gates(page, export_page_factory, export_check, result, out=None, runtime_errors=None):
+    """Collect both strict gates before failing; never reuse a failed renderer."""
+    failures=[];statuses={}
+    result['native_gate_status']=statuses;result['native_gate_failures']=failures
+    diagnostic_names={'static_terrain':'static_raster_failure.json','raster_export_415':'raster_export_failure.json'}
+    if out:out.mkdir(parents=True,exist_ok=True)
+
+    def failure(name, stage, error, target):
+        statuses[name]='failed'
+        entry={'gate':name,'stage':stage,'type':type(error).__name__,'error':str(error)}
+        failures.append(entry)
+        if out:
+            if target is not None:
+                try:
+                    diagnostic=target.evaluate('window.__staticRasterDiagnostics||null')
+                    if diagnostic:
+                        filename=diagnostic_names[name]
+                        (out/filename).write_text(json.dumps(diagnostic,indent=2))
+                        entry['diagnostic']=filename
+                except Exception as diagnostic_error:
+                    # A broken/closed context must not hide the original gate
+                    # failure or prevent the other independent runtime from booting.
+                    entry['diagnostic_error']=str(diagnostic_error)
+            try:
+                (out/(name+'_errors.json')).write_text(json.dumps([item for item in failures if item['gate']==name],indent=2))
+            except Exception as artifact_error:
+                entry['artifact_error']=str(artifact_error)
+
+    def collect(name, target, check):
+        try:
+            result[name]=check()
+            statuses[name]='passed'
+        except Exception as error:
+            failure(name,'fixture',error,target)
+
+    print('NATIVE WEBGL bounded static color/material textures',flush=True)
+    collect('static_terrain',page,lambda:page.evaluate('()=>auditStaticTerrain.run()'))
+    print('NATIVE WEBGL raster export snapshots, cache pressure and immediate terrain parity (isolated runtime)',flush=True)
+    export_page=None
+    try:
+        with export_page_factory() as export_page:
+            collect('raster_export_415',export_page,lambda:export_check(export_page))
+    except Exception as error:
+        failure('raster_export_415','isolated runtime setup/teardown',error,export_page)
+    result['runtime_errors']=list(runtime_errors or [])
+    if out:(out/'browser_results.json').write_text(json.dumps(result,indent=2))
+    if failures or result['runtime_errors']:
+        messages=[item['gate']+' ['+item['stage']+']: '+item['error'] for item in failures]
+        if result['runtime_errors']:messages.append('Runtime errors: '+json.dumps(result['runtime_errors']))
+        raise AssertionError('NATIVE BROWSER GATES FAILED:\n'+'\n\n'.join(messages))
+
+
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--out',type=Path);ap.add_argument('--chromium');args=ap.parse_args()
     from playwright.sync_api import sync_playwright
+    from raster_export_browser_415 import run_raster_export_checks
     if args.out:args.out.mkdir(parents=True,exist_ok=True)
     html=re.sub(r'<script\b[^>]*>.*?</script>','',(ROOT/'index.html').read_text(),flags=re.S)
     html=re.sub(r'<link[^>]*rel="stylesheet"[^>]*>','',html)
@@ -185,19 +257,7 @@ def main():
         page=browser.new_page(viewport={'width':960,'height':680});logs=[]
         page.on('pageerror',lambda e:logs.append(str(e)))
         page.on('console',lambda m:logs.append(m.type+': '+m.text) if m.type=='error' else None)
-        page.set_content(html);page.add_style_tag(content=(ROOT/'style.css').read_text())
-        page.evaluate('(d)=>{window.__json=d;window.__assets={}}',{f.name:json.loads(f.read_text()) for f in ROOT.glob('*.json')})
-        meta=json.loads((ROOT/'hd_remake_atlas.json').read_text())
-        page.evaluate("()=>{const i=document.createElement('input');i.id='auditAsset';i.type='file';i.style.display='none';document.body.appendChild(i)}")
-        for key in ('image','specular_image','normal_image'):
-            name=meta[key];page.locator('#auditAsset').set_input_files(str(ROOT/name))
-            page.evaluate('(name)=>{window.__assets[name]=URL.createObjectURL(document.querySelector("#auditAsset").files[0])}',name)
-        page.add_script_tag(content=SETUP)
-        for name in ('surfacefx.js','sprite_material.js','foliagefx.js','procedural_decor.js','static_terrain.js','editor_identity.js','editor_validation.js','editor.js','game.js'):
-            source=(ROOT/name).read_text()
-            if name=='game.js':source=source.replace('img.src=url','img.src=window.__assets[url]||url')
-            page.add_script_tag(content=source)
-        page.wait_for_function("document.body.dataset.ready==='1'",timeout=60000)
+        boot_offline_runtime(page,html)
         result={'rooms':[],'native_webgl':True,'asset_transport':'offline injected, normal renderer',
             'browserVersion':browser.version,'userAgent':page.evaluate('navigator.userAgent')}
         result['driver']=page.evaluate("(()=>{const g=game.renderer.gl,d=g.getExtension('WEBGL_debug_renderer_info');return {version:g.getParameter(g.VERSION),vendor:d?g.getParameter(d.UNMASKED_VENDOR_WEBGL):g.getParameter(g.VENDOR),renderer:d?g.getParameter(d.UNMASKED_RENDERER_WEBGL):g.getParameter(g.RENDERER)}})()")
@@ -323,19 +383,24 @@ def main():
         result['waterfield_fallbacks']=page.evaluate(WATER_FALLBACK_CASE)
         result['waterfield_optional_effect_faults']=page.evaluate(WATER_FAULT_CASE)
         page.add_script_tag(content=(ROOT/'tests/current/static_terrain_browser_415.js').read_text())
-        print('NATIVE WEBGL bounded static color/material textures',flush=True)
-        try:
-            result['static_terrain']=page.evaluate('()=>auditStaticTerrain.run()')
-        except Exception:
-            if args.out:
-                try:
-                    diagnostic=page.evaluate('window.__staticRasterDiagnostics||null')
-                    if diagnostic:(args.out/'static_raster_failure.json').write_text(json.dumps(diagnostic,indent=2))
-                except Exception:
-                    pass  # Preserve the original native assertion/driver error.
-            raise
-        result['runtime_errors']=logs;assert not logs,logs
-        if args.out:(args.out/'browser_results.json').write_text(json.dumps(result,indent=2))
-        print('NATIVE BROWSER WEBGL2 PASS: nine rooms, material/quality toggles, same-count invalidation, v4.15 right-click/inspector/cycle/recovery/dirty interactions, ghost geometry, UI input and q1-q4 bounded-water GPU/collision/history/fallback parity; '+result['driver']['renderer'],flush=True)
+        @contextmanager
+        def export_runtime():
+            # Static failure diagnostics and their cleanup may alter caches or
+            # leave a damaged GL context. Boot the same production sources in a
+            # new context; do not warm, retry or relocate the export test cases.
+            context=browser.new_context(viewport={'width':1280,'height':800})
+            try:
+                export_page=context.new_page()
+                export_page.on('pageerror',lambda e:logs.append('export runtime: '+str(e)))
+                export_page.on('console',lambda m:logs.append('export runtime '+m.type+': '+m.text) if m.type=='error' else None)
+                boot_offline_runtime(export_page,html)
+                export_page.add_script_tag(content=(ROOT/'tests/current/static_terrain_browser_415.js').read_text())
+                result['raster_export_runtime']=export_page.evaluate("(()=>{const g=game.renderer.gl,d=g.getExtension('WEBGL_debug_renderer_info');return {isolatedContext:true,initialRoom:game.room.key,native:[game.renderer.nativeW,game.renderer.nativeH],userAgent:navigator.userAgent,driver:{version:g.getParameter(g.VERSION),vendor:d?g.getParameter(d.UNMASKED_VENDOR_WEBGL):g.getParameter(g.VENDOR),renderer:d?g.getParameter(d.UNMASKED_RENDERER_WEBGL):g.getParameter(g.RENDERER)}}})()")
+                result['raster_export_runtime']['browserVersion']=browser.version
+                yield export_page
+            finally:
+                context.close()
+        run_final_native_gates(page,export_runtime,run_raster_export_checks,result,args.out,logs)
+        print('NATIVE BROWSER WEBGL2 PASS: nine rooms, material/quality toggles, same-count invalidation, v4.15 right-click/inspector/cycle/recovery/dirty interactions, ghost geometry, UI input, q1-q4 bounded-water GPU/collision/history/fallback parity, bounded static textures and raster export/cache-pressure terrain parity; '+result['driver']['renderer'],flush=True)
         browser.close()
 if __name__=='__main__':main()

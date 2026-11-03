@@ -24,6 +24,15 @@ Owns room-space content such as:
 
 The current runtime has nine rooms on a 40×19 grid.
 
+`floor_microtile` controls visual floor tessellation within the 16px gameplay
+grid. When present, it must be a finite numeric value from 3 through 16,
+inclusive; fractional values in that range are supported. Missing or invalid
+runtime values use the established 4px default. Normalization does not rewrite
+the source map. The editor validator reports `INVALID_FLOOR_MICROTILE` for an
+invalid supplied value, including in rooms outside the current story list.
+Bounded terrain patches are separately qualified for sizes 4, 8 and 16; other
+valid sizes use the full renderer.
+
 ### Important editor fields
 
 Optional fields added by the WYSIWYG editor include:

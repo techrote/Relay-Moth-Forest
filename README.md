@@ -99,6 +99,12 @@ In Quiet Nest, SELECT targets the transparent moon/star pattern `nest:swirl`; SH
 
 See [Editor](docs/EDITOR.md).
 
+**F8** exports a 640×360 room-background PNG and a matching JSON sidecar,
+including persistent decoration and the current objective, robot, gate and bridge
+state. It works while the editor is open and flushes pending edits before capture.
+See [Raster export](docs/RASTER_EXPORT.md) for the included layers and snapshot
+behavior.
+
 ## Data authority
 
 The game deliberately keeps content in external JSON rather than burying it in code:

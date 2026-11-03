@@ -85,6 +85,45 @@ Each candidate water/path timing record also includes `staticParity`: an exact c
 
 The appended `control-full-static` scenario measures a forced full static refresh in a warmed `quiet_nest` room on both sources, without changing the original ten scenarios or their order. Candidate validation requires one full build, three uploads/native canvases, 760 floor inputs, 19 successful row reads, no retained scratch and exact post-timing texture parity. Review its complete event/frame times and planning-plus-build-plus-upload cost before accepting the row policy; partial-path savings do not establish full-refresh performance. This control does not measure cold room loading.
 
+## Retained performance evidence
+
+The retained [PERF-004 paired study](validation/performance/PERF-004-qualified/performance-review.md)
+can be reproduced with `tools/summarize_perf004.py`; the
+[qualification record](validation/performance/PERF-004.md#retained-evidence-and-reproduction)
+gives the exact command and source commits. The parser rejects mismatched source
+or environments, missing full controls, invalid work/capacity geometry and
+nonzero texture differences. Its 13 positive and 119 negative synthetic controls
+run in `self_test.py`. Preserve the recorded full-refresh regression alongside
+the bounded-edit gains; frame timings are CPU render-loop markers rather than
+GPU-completion or display-scanout measurements.
+
+## Raster snapshots and imported floor detail
+
+`raster_export_regression_415.js` exercises production F8 snapshot composition,
+persistent content and progression, runtime rotation geometry, metadata capture
+before asynchronous encoding, concurrent requests, failure cleanup/retry and
+editor keyboard routing. Private-cache lifecycle cases exercise real tint and
+normal transforms, eviction, runtime source ownership and cleanup before
+encoding. `floor_microtile_regression_415.js` exercises loaded
+rooms and direct painter inputs, accepts finite numeric detail sizes from 3
+through 16, checks validation against unchanged source data, and rejects the
+old unbounded/nonfinite drawing behavior. Both run in `self_test.py`.
+
+`raster_export_browser_415.py` runs inside the existing native browser harness
+in a fresh browser context, independently of the static terrain gate. It decodes
+a real exported PNG and checks pixels, captured metadata, delayed navigation,
+failure and rotation. Its private cache-pressure case exports many distinct
+tints, checks bounded eviction and cleanup while preserving runtime cache
+entries, order and backings, and immediately paints terrain before any reference
+rebuild. That edit must
+retain bounded color-only work and match all three complete GPU textures exactly.
+The stage records its results alongside the ordinary browser evidence and saves
+its own diagnostics on failure, including private-cache ownership evidence on a
+failed terrain comparison. Either native gate failing remains fatal.
+Both native contexts record the running browser version, user agent and WebGL
+vendor/renderer. Performance environment records include the running browser
+version as well, so installer logs are not the only browser provenance.
+
 ## Continuous integration
 
 [Validate source and runtime](../.github/workflows/validate.yml) uses one GitHub-hosted Ubuntu 24.04 job with Python 3.12 and Node 22. It runs for PRs targeting `main`, main pushes and manual dispatch. It checks the exact PR head, records the actual tested commit/tree separately from the event SHA and cancels stale runs for the same PR/ref. There is no parallel test matrix or duplicate feature-branch push run.

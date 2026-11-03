@@ -1,0 +1,111 @@
+{
+  "independentReview": "passed",
+  "scope": "source binding, native exactness, forwarded coordinate controls and cleanup; no timing speedup qualification",
+  "artifact": {
+    "bytes": 269392,
+    "sha256": "6520a33b7f827ec26054e8b077e4a73e72f9e724cc6161175c155db1ed978b39",
+    "extractedPayloadFilesVerified": 10
+  },
+  "source": {
+    "commit": "65261997810fea05f57e32fe2121995d7e37e4b1",
+    "tree": "436eebad5e5da4e9738c5b6f925c2ac820c6a3b3",
+    "trackedDirty": false,
+    "manifestSha256": "ddc05f8fe199fb3b1dc7ec1e17c6a28d0c1ea2212985c88b0fc23124af148877",
+    "experimentBase": "d8456ff3afe7b61a7a5aa6ec9eb45a84bcfb6008",
+    "frozenInputSha256": {
+      "game.js": "d7da5d34fcc16e018e501b363275347fbbdf6cdc66cc2749ea955c104c90efe1",
+      "static_terrain.js": "bd3573efd69ec1187f0e357c5fe3a6a38b7704ff1e3d62883189af17bfe37ad8",
+      "tests/current/static_terrain_browser_415.js": "17e6b9bb9c20195036e80b90346278a10b8e358e635998ba723cab1d84cc1050",
+      "tests/current/state_change_performance_415.py": "0db33f90fa6a41de1cc44e2f7bda0c21b398acca8bf52fd414fa0f8dca7446fd",
+      "tests/current/browser_render_regression_414.py": "0584f88df80cbbc6316fad1fae2485e9b6c8f3d52ae26690fb2fd7669ff70c99",
+      ".github/workflows/validate.yml": "72c85f2b350c1c5816b57cc0663ed4ef4c5e45b755f90625b42794571c8687e9"
+    },
+    "runId": "41594561195",
+    "runAttempt": "1",
+    "jobName": "diagnose",
+    "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+    "python": "3.12.15",
+    "node": "v22.23.4",
+    "diagnosticOnly": true
+  },
+  "onlyChangedPaths": [
+    ".github/workflows/row-sync-diagnostic.yml",
+    "SHA256SUMS.txt",
+    "tests/current/row_oob_diagnostic_415.js",
+    "tests/current/row_oob_diagnostic_415.py",
+    "tests/current/row_oob_scope_regression_415.js"
+  ],
+  "native": {
+    "cases": 112,
+    "modes": {
+      "patch": 69,
+      "noop": 6,
+      "full": 31,
+      "live": 6
+    },
+    "failures": 0,
+    "diagnosticRepairs": 0,
+    "exactMapComparisons": 336,
+    "selectedPolicyWarmCold": {
+      "roomSizePairs": 27,
+      "exactMapComparisons": 162
+    },
+    "defaultCompatibility": {
+      "defaultCompatibility": {
+        "qualified": 27,
+        "maximumRGBA": [
+          1,
+          1,
+          1,
+          0
+        ],
+        "differingColorPixels": 10,
+        "affectedRoomSizes": 6
+      },
+      "coldDefaultCompatibility": {
+        "qualified": 27,
+        "maximumRGBA": [
+          1,
+          1,
+          1,
+          0
+        ],
+        "differingColorPixels": 10,
+        "affectedRoomSizes": 6
+      }
+    },
+    "singleBitCorruptionsRejected": 3,
+    "legacyPolicyControls": 5,
+    "productionBuilds": 316,
+    "actualOutOfBoundsRowCalls": 5092,
+    "transparentFourByteReturns": 5092,
+    "independentInBoundsReferenceContexts": 54,
+    "independentInBoundsReferenceCalls": 1026,
+    "pageErrors": [],
+    "hooksRestored": true,
+    "contextClosed": true
+  },
+  "timedExactnessControls": {
+    "inbounds": {
+      "events": 18,
+      "exactMapComparisons": 54,
+      "actualEventRowCalls": 174,
+      "inBoundsPostTimingReferenceCalls": 342,
+      "errors": [],
+      "hooksRestored": true,
+      "contextClosed": true
+    },
+    "oob": {
+      "events": 18,
+      "exactMapComparisons": 54,
+      "actualEventRowCalls": 174,
+      "inBoundsPostTimingReferenceCalls": 342,
+      "errors": [],
+      "hooksRestored": true,
+      "contextClosed": true
+    }
+  },
+  "browserVersion": "156.0.8078.0",
+  "qualifiedForProduction": false,
+  "interpretation": "Exactness verified only for this pinned Chromium/ANGLE llvmpipe host. OOB remains an implementation-specific diagnostic; transparent zeros do not prove a portable flush or avoided physical work."
+}

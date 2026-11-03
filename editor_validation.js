@@ -85,6 +85,14 @@
     const regionExists=name=>!!(name&&regions&&Object.prototype.hasOwnProperty.call(regions,name));
     const emit=(severity,code,roomKey,message,ref)=>diagnostics.push(diag(severity,code,roomKey,message,ref));
 
+    // Check every authored map room, including rooms absent from the story.
+    // Runtime normalization is a rendering safeguard, not a source rewrite.
+    for(const [roomKey,room] of Object.entries(rooms))if(room&&Object.prototype.hasOwnProperty.call(room,'floor_microtile')){
+      const value=room.floor_microtile;
+      if(typeof value!=='number'||!Number.isFinite(value)||value<3||value>16)
+        emit('error','INVALID_FLOOR_MICROTILE',roomKey,'Floor microtile must be a finite number from 3 through 16.',{type:'room',id:roomKey,field:'floor_microtile'});
+    }
+
     // Reuse the E415-04 identity authority rather than growing a second ID scanner.
     const idReport=Identity?.scan?Identity.scan(maps):null;
     const dupCodes={moth:'DUPLICATE_MOTH_ID',robot:'DUPLICATE_ROBOT_ID',wildlife:'DUPLICATE_WILDLIFE_ID',mini:'DUPLICATE_MINI_ID'};

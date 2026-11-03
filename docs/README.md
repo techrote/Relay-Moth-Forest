@@ -13,6 +13,7 @@ Documentation is organised by subsystem. Version-specific implementation notes, 
 | [RENDERING.md](RENDERING.md) | Frame order, sprite materials, shadows, sorting, tree splits and post-processing |
 | [SURFACE_AND_FOLIAGE.md](SURFACE_AND_FOLIAGE.md) | WaterField, GrassField and FoliageFX contracts and budgets |
 | [EDITOR.md](EDITOR.md) | F2 WYSIWYG editor, object layer, save behavior and authoring fields |
+| [RASTER_EXPORT.md](RASTER_EXPORT.md) | F8 background PNG/JSON snapshots, included layers and export lifecycle |
 | [DATA_FORMATS.md](DATA_FORMATS.md) | JSON authorities, map fields and schema responsibilities |
 | [ASSET_PIPELINE.md](ASSET_PIPELINE.md) | Sprite sheets, atlas generation, normal/specular derivation and tree splits |
 | [TESTING.md](TESTING.md) | Automated tests, rendered-pixel validation, browser evidence and limits |
@@ -39,7 +40,7 @@ The archive is retained as evidence of how the project evolved. It is **not** th
 - gameplay grid: **40×19 at 16 px per tile**;
 - rooms: **9**;
 - staged traversal routes exercised by the suite: **27**;
-- primary runtime scripts: `surfacefx.js`, `sprite_material.js`, `foliagefx.js`, `procedural_decor.js`, `editor_identity.js`, `editor_validation.js`, `editor.js`, `game.js`.
+- primary runtime scripts: `surfacefx.js`, `sprite_material.js`, `foliagefx.js`, `procedural_decor.js`, `static_terrain.js`, `editor_identity.js`, `editor_validation.js`, `editor.js`, `game.js`.
 
 The project intentionally keeps gameplay authority separate from rendering subsystems. SurfaceFX, FoliageFX and sprite material code may consume visual descriptors and actor positions, but do not own story completion, collision or save progression.
 

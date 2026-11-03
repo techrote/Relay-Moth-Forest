@@ -1,0 +1,264 @@
+{
+  "schema": "relay-moth-perf-004-qualified-evidence/v1",
+  "repository": "techrote/Relay-Moth-Forest",
+  "qualifiedProduction": {
+    "commit": "afabaa080489c980157306667ea03817e1827c29",
+    "mergedAs": "f61a49d6ba09d17a4b7b04328a76056a89f84118",
+    "mergeTreeIdenticalToQualifiedTree": true,
+    "tree": "ab3bbbd50cbf30366f10b66370d05c97cebcd7df",
+    "baseline": {
+      "commit": "5e6ea67c0ca8ba4d00b35d0e68ac4bb4d573680d",
+      "tree": "bc51d8dc9d5fac881966cebe554b7b1475fee62a",
+      "trackedDirty": false,
+      "manifestSha256": "8cfb1fc277f8aedee2a54d25d18730d3a26c22645acffd1bd6408383e6253aa1"
+    },
+    "runId": 41590918373,
+    "runAttempt": 1,
+    "jobId": 125767197872,
+    "artifact": {
+      "id": 13210242035,
+      "name": "relay-moth-validation-41590918373-1",
+      "bytes": 4916190,
+      "sha256": "1d99e37dfd420a1f270bffa79986b0952c7cefd09244aa342b590a1be2ed1132",
+      "localZipDigestVerified": true
+    },
+    "browserVersion": "155.0.8059.0",
+    "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+    "payloadOrigins": {
+      "performance.json": "artifact:performance.json",
+      "source.json": "artifact:source.json",
+      "native-qualification.json": "derived extraction of artifact:browser/browser_results.json"
+    },
+    "nativeSourcePayloadSha256": "922e63ac53c128681e3fdf58045f022b0719fc618aa77b07f85f5cb24fdd7c24",
+    "requiredReviewCommand": [
+      "python3",
+      "tools/summarize_perf004.py",
+      "docs/validation/performance/PERF-004-qualified/performance.json",
+      "--source-record",
+      "docs/validation/performance/PERF-004-qualified/source.json",
+      "--expect-baseline",
+      "5e6ea67c0ca8ba4d00b35d0e68ac4bb4d573680d",
+      "--expect-candidate",
+      "afabaa080489c980157306667ea03817e1827c29",
+      "--require-full-control",
+      "--all-scenarios"
+    ],
+    "qualification": "Selected-policy whole-texture parity remains exact; original default-renderer comparison is a separately labeled maximum-one-RGB-step bound with exact alpha/materials. Full-refresh regression remains reported alongside bounded-edit gains."
+  },
+  "rowOobDiagnostic": {
+    "commit": "65261997810fea05f57e32fe2121995d7e37e4b1",
+    "tree": "436eebad5e5da4e9738c5b6f925c2ac820c6a3b3",
+    "experimentBase": "d8456ff3afe7b61a7a5aa6ec9eb45a84bcfb6008",
+    "runId": 41594561195,
+    "runAttempt": 1,
+    "artifact": {
+      "id": 13212520827,
+      "name": "relay-row-oob-diagnostic-41594561195-1",
+      "bytes": 269392,
+      "sha256": "6520a33b7f827ec26054e8b077e4a73e72f9e724cc6161175c155db1ed978b39",
+      "localZipDigestVerified": true
+    },
+    "browserVersion": "156.0.8078.0",
+    "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+    "diagnosticOnly": true,
+    "qualifiedForProduction": false,
+    "productionDecision": "rejected",
+    "decisionReasons": [
+      "Complete synchronous full-refresh medians improved about 12 percent (11.8 percent at 1x and 12.7 percent at 4x); large static-scope reductions largely reappeared as measured blocking time in GL validation (gl.getError).",
+      "Small-edit results were mixed: the 1x path event became slower; other measured small-edit medians improved. Three samples do not establish tail latency or a universal benefit.",
+      "A completely outside getImageData request has no canvas-pixel dependency. Pinned Gecko returns before taking a snapshot; WebKit behavior depends on its backend. Transparent-zero results do not establish a portable flush. The in-bounds production policy is retained."
+    ],
+    "fullControlObservation": [
+      {
+        "cpuThrottle": 1,
+        "scenario": "control-full-static",
+        "syncChangePercent": -11.772,
+        "syncMs": {
+          "inbounds": {
+            "median": 1370.1999999999534,
+            "minimum": 1368.5999999999767,
+            "maximum": 1384.7999999999884
+          },
+          "oob": {
+            "median": 1208.9000000000233,
+            "minimum": 1205.3000000000466,
+            "maximum": 1217.1000000000931
+          },
+          "ratio": 0.8822799591301009
+        },
+        "firstFrameAfterMs": {
+          "inbounds": {
+            "median": 1377.2999999999884,
+            "minimum": 1375.7999999999884,
+            "maximum": 1390.399999999965
+          },
+          "oob": {
+            "median": 1212.9000000000233,
+            "minimum": 1211,
+            "maximum": 1228
+          },
+          "ratio": 0.8806360270093905
+        },
+        "staticScopesMs": {
+          "inbounds": {
+            "median": 1191.5999999999767,
+            "minimum": 1169.5,
+            "maximum": 1195.7000000000116
+          },
+          "oob": {
+            "median": 287.20000000006985,
+            "minimum": 283.70000000006985,
+            "maximum": 310.5999999998603
+          },
+          "ratio": 0.24102047667008683
+        },
+        "glGetErrorMs": {
+          "inbounds": {
+            "median": 192.10000000003492,
+            "minimum": 173.70000000001164,
+            "maximum": 198.39999999996508
+          },
+          "oob": {
+            "median": 917.0999999999767,
+            "minimum": 897.5,
+            "maximum": 932.5999999999767
+          }
+        }
+      },
+      {
+        "cpuThrottle": 4,
+        "scenario": "control-full-static",
+        "syncChangePercent": -12.655,
+        "syncMs": {
+          "inbounds": {
+            "median": 2339,
+            "minimum": 2321.4000000000233,
+            "maximum": 2345.4000000000233
+          },
+          "oob": {
+            "median": 2043,
+            "minimum": 1766.1999999999534,
+            "maximum": 2066.0999999999767
+          },
+          "ratio": 0.8734501923899102
+        },
+        "firstFrameAfterMs": {
+          "inbounds": {
+            "median": 2352.8000000000466,
+            "minimum": 2343.9000000000233,
+            "maximum": 2359.79999999993
+          },
+          "oob": {
+            "median": 2065.5,
+            "minimum": 1780.5999999999767,
+            "maximum": 2084.1999999999534
+          },
+          "ratio": 0.8778901734103872
+        },
+        "staticScopesMs": {
+          "inbounds": {
+            "median": 2111.9000000000233,
+            "minimum": 2104.9000000000233,
+            "maximum": 2118.5
+          },
+          "oob": {
+            "median": 1004.3999999999069,
+            "minimum": 955.5000000001164,
+            "maximum": 1051.0999999999767
+          },
+          "ratio": 0.4755907003172005
+        },
+        "glGetErrorMs": {
+          "inbounds": {
+            "median": 217.59999999997672,
+            "minimum": 213.5,
+            "maximum": 230.5
+          },
+          "oob": {
+            "median": 1058.5,
+            "minimum": 711.5999999999767,
+            "maximum": 1084
+          }
+        }
+      }
+    ],
+    "smallEditObservation": [
+      {
+        "cpuThrottle": 1,
+        "scenario": "editor-water",
+        "syncChangePercent": -4.4074
+      },
+      {
+        "cpuThrottle": 1,
+        "scenario": "editor-path",
+        "syncChangePercent": 6.7183
+      },
+      {
+        "cpuThrottle": 4,
+        "scenario": "editor-water",
+        "syncChangePercent": -5.1711
+      },
+      {
+        "cpuThrottle": 4,
+        "scenario": "editor-path",
+        "syncChangePercent": -14.5685
+      }
+    ],
+    "payloadOrigins": {
+      "row-oob-timing.json": "byte-exact copy of the derived timing review-summary.json",
+      "row-oob-native.json": "byte-exact copy of independent source/exactness review"
+    },
+    "sourcePayloadSha256": {
+      "source.json": "78ae56aa9546d8637853a54fde19654d22ac0a9999a308f4d1cd701d1924f808",
+      "native-oob.json": "6cb940f5550e58d8dc0a47fff61eb095d1e9b8c79fed1b44eefd63f6f47745c9",
+      "performance-inbounds.json": "c8f95bc607a3abbc1d8baeedb5b39387830d0a234e50c3cd2b09235ccd5854bb",
+      "performance-oob.json": "547e253630395eb3de84a8f2e4c89c50e3a75a9cb2cffb61459361d7588f6f1b"
+    },
+    "portabilityPrimarySources": [
+      "https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-getimagedata",
+      "https://github.com/mozilla-firefox/firefox/blob/112b98932d21154eb1c2019faedbe336edac4ab6/dom/canvas/CanvasRenderingContext2D.cpp#L6887-L6905",
+      "https://github.com/WebKit/WebKit/blob/a1f5a43971c50800685b42d104586d884efcd713/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.cpp#L79-L107"
+    ]
+  },
+  "measurementLimits": [
+    "Each study uses three samples per source or variant, scenario and CPU-throttle rate. Preserve medians with their minimum/maximum ranges; these are not confidence intervals, p95/p99 values or physical-device guarantees.",
+    "Compare only the embedded same-host baseline/candidate pair or the same-host in-bounds/OOB pair within its own study. Qualified PERF24 and the later diagnostic use different browser versions/host records; do not compare their absolute timings as a paired experiment.",
+    "syncMs measures the synchronous JavaScript event. firstFrameAfterMs and frameGapMs are CPU render-loop completion markers from RelayPerfProbe.framePresented, not GPU-completion fences or display-scanout latency.",
+    "Phase components may overlap their parents. Combined static time is computed per record without parent/child double counting; diagnostic attribution scopes are nonadditive. A cheaper read call or static scope does not prove that work disappeared.",
+    "The native evidence qualifies the recorded Chromium/ANGLE llvmpipe environments. An in-bounds pixel read is also not a standards-defined whole-canvas GPU fence."
+  ],
+  "payloadSha256": {
+    "performance.json": {
+      "bytes": 745423,
+      "sha256": "ccf95d5410eb5378e17a4d99fa1c6f91e9e615e88a42f2262a983d383d6b6895",
+      "byteExactCopy": true
+    },
+    "source.json": {
+      "bytes": 353,
+      "sha256": "38244f93b4e436fcf1489f534fe68af0ebc6af6e3bc9983d3eaac85420309b54",
+      "byteExactCopy": true
+    },
+    "native-qualification.json": {
+      "bytes": 366215,
+      "sha256": "3bd0df9dab4fcaf5a676cd1ad00a7630d24dcb48b95b66c60c06403dd32f99ab",
+      "byteExactCopy": true
+    },
+    "row-oob-timing.json": {
+      "bytes": 61907,
+      "sha256": "5421ef4a9b38634c59dfd99dac4f4fdba972090b40c01b85a4759a3c8dfbfe7b",
+      "byteExactCopy": true
+    },
+    "row-oob-native.json": {
+      "bytes": 3717,
+      "sha256": "9f657b25d4f32b22328f802a6e7227d5e3fc646376757a90ba17ef8245375db4",
+      "byteExactCopy": true
+    },
+    "performance-review.md": {
+      "bytes": 18205,
+      "sha256": "e6f7ddcc6946fe5e0b80a550c99c7a077213784a9a2dc333b53cc61906adbf62",
+      "generatedBy": "tools/summarize_perf004.py",
+      "generatorSha256": "ff5196678090866bd07f6e2177e1179e23054c35a89cc768d381cc722b56dea8"
+    }
+  },
+  "integrityNote": "Payload hashes cover the six companion files. This provenance document does not contain an artifact download URL and does not recursively hash itself."
+}

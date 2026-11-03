@@ -3,6 +3,130 @@
 Issue: [#37](https://github.com/techrote/Relay-Moth-Forest/issues/37).
 Accepted starting source: `5e6ea67c0ca8ba4d00b35d0e68ac4bb4d573680d`.
 
+## Completed qualification and acceptance decision
+
+[PR #38](https://github.com/techrote/Relay-Moth-Forest/pull/38) merged as
+`f61a49d6ba09d17a4b7b04328a76056a89f84118`. Its tree is identical to qualified
+candidate `afabaa080489c980157306667ea03817e1827c29`, tree
+`ab3bbbd50cbf30366f10b66370d05c97cebcd7df`.
+[Exact-head run 41590918373](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41590918373)
+passed the full deterministic/GLES, native, performance-work/pixel and manifest
+gates. The selected production policy remains `canvas2d-row-sync-v1`.
+
+**The bounded-edit objective is complete; warmed full refreshes are slower.**
+This measured tradeoff is accepted for the small-terrain-edit scope and tracked
+separately in [PERF-005, #41](https://github.com/techrote/Relay-Moth-Forest/issues/41).
+There is no claim that every static refresh or editor operation is faster.
+
+Two design refinements remain explicit. Dependency-qualified changes preserve
+the existing normal/specular textures instead of rerasterizing them; every byte
+still equals a clean full build. Row synchronization also revises the original
+default color baseline by at most one RGB quantization step, with exact alpha
+and material bytes. Partial-versus-selected-full checks remain strictly exact.
+
+### Native and work results
+
+| Check | Qualified result |
+| --- | --- |
+| Complete native matrix | 112/112: 69 patch, 31 full/fallback, 6 no-op, 6 live |
+| Whole color/normal/specular textures | 336 comparisons, zero differing bytes |
+| Exterior where a prior image was captured | 243 comparisons across 81 cases, zero differences |
+| Frozen independently synchronized full reference | 162 exact map comparisons across nine rooms, three sizes, warm/cold sources |
+| Original default-context compatibility | All 54 comparisons pass the separate maximum-one-RGB-step bound; alpha/material exact |
+| Post-timing water/path/full-control textures | 54/54 exact map comparisons |
+| Representative water/path work | 30/25 floor cells, five row reads, one color upload, no full build or replacement |
+| Water/path upload bytes | 10,508/5,772 at the original 1278×718 benchmark size |
+| Retained room scratch after refresh | Zero |
+
+The former 1280×720 bottom-cell failure is exact after retaining the native
+target. Its output `(640,576,38,36)`, overlay-expanded guard
+`(592,544,128,112)`, 15 floor inputs, three row reads and 5,472-byte color upload
+remain unchanged. It uses one 3,686,400-byte transient color canvas. Full cases
+without captured exterior fields are not reported as exterior comparisons.
+
+### Paired performance, including the full-refresh cost
+
+The accepted study used Chrome 155.0.8059.0, ANGLE and Mesa llvmpipe LLVM 20.1.2.
+Each condition has three samples on the same runner. These are diagnostic
+medians in milliseconds; the retained report includes every raw sample and
+minimum/maximum range.
+
+| Rate and event | Complete synchronous event, baseline → candidate | Combined static scopes | First post-event frame marker |
+| --- | ---: | ---: | ---: |
+| 1× water | 662.7 → 186.4 | 651.0 → 139.8 | 814.4 → 204.4 |
+| 1× path | 663.0 → 159.6 | 652.7 → 121.3 | 745.2 → 172.0 |
+| 4× water | 726.5 → 285.5 | 667.8 → 157.9 | 764.6 → 317.6 |
+| 4× path | 1,112.7 → 266.8 | 1,072.7 → 142.4 | 1,144.1 → 285.0 |
+| 1× warmed full control | 480.2 → 861.5 | 479.6 → 710.8 | 632.2 → 868.1 |
+| 4× warmed full control | 801.4 → 1,330.5 | 799.1 → 1,196.5 | 840.7 → 1,355.7 |
+
+Bounded complete-event medians improve 60.7–76.0%; their static scopes improve
+76.4–86.7%. Full-control complete-event medians regress 79.4% and 66.0%, while
+combined static scopes regress 48.2% and 49.7%. These costs remain part of the
+acceptance record. The full control is warmed `quiet_nest`, not cold room entry.
+
+`firstFrameAfterMs` and `frameGapMs` use markers after the JavaScript render
+loop. They are not GPU-completion fences or display-scanout measurements.
+Nested floor/synchronization timings are already inside build time. The study
+does not establish hardware latency, confidence intervals or tail percentiles;
+absolute timings from different runs or browser versions must not be paired.
+
+### Cheaper outside-read experiment: not adopted
+
+[Diagnostic #40](https://github.com/techrote/Relay-Moth-Forest/pull/40),
+[run 41594561195](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41594561195),
+changed no production source. On identical source/browser/host it redirected
+only actual production row requests to `getImageData(-1,-1,1,1)`. The frozen
+reference retained its in-bounds reads. All 112 native cases, 162 independent
+frozen-reference map comparisons and 54 post-timing maps per variant passed.
+Actual forwarded coordinates and incoming audit requests were recorded separately.
+
+Full complete-event medians improved only 11.8%/12.7%, and small-edit results
+were mixed, including a 1× path regression. Most apparent static-scope savings
+reappeared in the final GL validation call: full `getError` medians increased
+from 192.1 to 917.1 ms at 1× and 217.6 to 1,058.5 ms at 4×. After subtracting
+static scopes and that call per record, only 0.7–1.1/2.9–3.5 ms remained.
+Canvas cleanup was negligible. Deferred synchronization is the supported
+interpretation, not a proven description of a particular GPU fence.
+
+The [Canvas algorithm](https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-getimagedata)
+requires transparent outside pixels, not a flush. The inspected
+[Gecko implementation](https://github.com/mozilla-firefox/firefox/blob/112b98932d21154eb1c2019faedbe336edac4ab6/dom/canvas/CanvasRenderingContext2D.cpp#L6887-L6905)
+returns before snapshot access for a fully outside rectangle. The modest and
+mixed total benefit does not justify adopting that implementation dependency.
+The in-bounds policy and GL error checks remain. An in-bounds read is also not a
+standards-defined whole-canvas GPU fence; native qualification establishes the
+recorded implementation's behavior.
+
+### Retained evidence and reproduction
+
+The [paired report](PERF-004-qualified/performance-review.md),
+[raw performance samples](PERF-004-qualified/performance.json),
+[source record](PERF-004-qualified/source.json),
+[compact native qualification](PERF-004-qualified/native-qualification.json),
+[outside-read timing summary](PERF-004-qualified/row-oob-timing.json),
+[independent diagnostic audit](PERF-004-qualified/row-oob-native.json) and
+[provenance with artifact/payload hashes](PERF-004-qualified/provenance.json)
+are retained together. The qualified artifact ZIP digest is
+`1d99e37dfd420a1f270bffa79986b0952c7cefd09244aa342b590a1be2ed1132`.
+
+Reproduce the report from the repository root:
+
+```sh
+python3 tools/summarize_perf004.py \
+  docs/validation/performance/PERF-004-qualified/performance.json \
+  --expect-baseline 5e6ea67c0ca8ba4d00b35d0e68ac4bb4d573680d \
+  --expect-candidate afabaa080489c980157306667ea03817e1827c29 \
+  --require-full-control --all-scenarios
+```
+
+The tool checks source identity, paired environments, work/capacity geometry,
+synchronization, full controls and exact texture results before calculating
+medians/ranges. Its self-test includes 13 synthetic positive cases and 119
+negative controls. The stored comparison is specifically the original
+pre-PERF-004 baseline versus qualified candidate; it is not silently reused as
+a later authoring-only comparison whose baseline already contains this feature.
+
 ## Problem and contract
 
 After PERF-003 removed the water-mask readback stall, small editor terrain
@@ -57,7 +181,7 @@ existing policies. The common full/patch builder applies the same policy during
 repair. Its identifier is captured separately from source-resource identity;
 changing it forces a full rebuild without evicting unchanged art.
 
-This completes pending color work at row boundaries. Diagnostic 22 reproduced
+In the qualified browser this partitions color work at row boundaries. Diagnostic 22 reproduced
 exact full-frame patch reconstruction for both the disjoint edit and independent
 export-to-path edit. The old default renderer changed distant unchanged floor
 pixels; the synchronized controls did not. The two renderers differed in a few
@@ -84,9 +208,11 @@ attributes. This explains the setting, not the exact driver mechanism.
 
 One returned pixel does not make synchronization free: it can wait for all
 pending clipped floor work. Counts, successful pixels, failed attempts and time
-are reported. No returned pixel enters rendering, no full image is read back,
-and no synchronization bitmap is retained. The unchanged benchmark must measure
-this cost; diagnostic wall times are not performance qualification.
+are reported. No returned pixel enters rendering, each synchronization request
+asks for only one pixel, and no synchronization bitmap is retained. Physical
+GPU readback volume is not measured by those API counts. The unchanged benchmark measures
+this cost in the completed qualification above; diagnostic wall times alone
+are not performance qualification.
 
 ### Resource policy and the revised capacity ceiling
 
@@ -275,10 +401,12 @@ charges guarded redraw areas independently of allocation capacity.
 `colorSyncAttempts` includes failed reads; `colorSyncReads`, `colorSyncPixels`
 and `readbackPixels` count successful one-pixel color reads. `colorSyncMs`
 includes time in failed reads. Failed patch and full-repair work both accumulate.
+These counters describe requested/returned API pixels, not independently
+observed physical GPU transfers.
 
 The opt-in probe separates planning, allocation, floor, color synchronization, overlays/materials,
 footer and uploads. To summarize the complete static event, sum nonoverlapping
-parent phases: full `static.build` plus three uploads; or `static.plan`,
+parent phases: full `static.plan`, `static.build` and three uploads; or `static.plan`,
 `static.patch.build` and color subupload. Do not double-count scratch/floor/overlay
 children already included in the build parent. `static.full.color-sync` and
 `static.patch.color-sync` are nested within floor/build; their time includes
@@ -429,7 +557,7 @@ Diagnostic 21 tested commit `54d3a79edeeaec3888542c62afd5d470198cf201`, tree
 SHA-256 `a9d7fee5dcc3279727be8d7eeef0321cd44d8b1ab7b2c0ca1512097c280e734d`.
 No production context setting, original coordinates, exact-zero tolerance or
 performance gate changed in these diagnostics. Native correctness and the
-same-host performance comparison remain outstanding.
+same-host performance comparison were still outstanding at that stage.
 
 ### GPU synchronization controls and the selected candidate
 
@@ -478,8 +606,8 @@ Full-native target controls with the same 15 floor inputs matched exactly when
 overlays were unclipped or enclosed by the larger diagnostic clip. Full-native
 floor-only with the original guard also matched. The precise production
 combination of bounded inputs, original overlay-enclosing guard and full-native
-target still requires the complete candidate-24 matrix; these controls do not
-substitute for it.
+target subsequently passed the complete candidate-24 matrix reported above;
+the diagnostic controls alone did not substitute for that qualification.
 
 The correction therefore applies by dimensions, not room or sprite category:
 only original 640×360 uses local targets. Other sizes use the existing native
@@ -498,8 +626,8 @@ Its independent same-host performance run passed all 36 water/path texture
 checks. Static event medians were 1,370.2→206.1 ms and 1,068.7→188.2 ms at 1×
 CPU throttling, and 1,626.6→245.7 ms and 1,139.6→207.8 ms at 4×, for water and
 path respectively. These are preliminary measurements of the failed candidate,
-not final-head acceptance. The unchanged benchmark remains at 1278×718 and must
-be repeated after the correction. The artifact is `13209452399`, SHA-256
+not final-head acceptance. The unchanged benchmark remained at 1278×718 and was
+repeated after the correction. The artifact is `13209452399`, SHA-256
 `eb1b01a2919af1b679ec234e5cc07395eaa45600dd4b1bab0f9c064f827cc259`.
 
 CI now preserves native failure evidence immediately before the independent

@@ -64,6 +64,10 @@ Current mutable classes include generated and authored editor decor, unrecruited
 
 Small ground/path/water edits recompose bounded native color regions through the same painter. Neighboring floor marks and all overlapping static overlays are replayed into guarded scratch surfaces with the original native transform and draw order. Floor primitives affect color only; every dependency that can change a static material sprite must match before taking this path. The existing normal/specular textures therefore remain byte-for-byte intact. Color subuploads commit synchronously, with a complete three-map rebuild on dependency changes or patch failure. No full-room CPU canvases are retained. [PERF-004](validation/performance/PERF-004.md) documents the authority proof, raster halos and exact comparisons of all three textures against full rebuilds.
 
+Partial redraws use a translated local canvas only at the original 640×360 target. Every other native size retains a color canvas at full native dimensions, clipped to the guarded redraw region. The partial path allows 1 MiB peak local capacity, 4 MiB peak native capacity and 8 MiB cumulative color allocation per refresh; exceeding these or the redraw-work limits selects a full rebuild.
+
+Full and partial color builds share `canvas2d-row-sync-v1`: explicit `willReadFrequently:false` for the color context and one discarded native pixel read after each painted floor row. Under this policy, partial-versus-full comparisons require zero differing color, normal or specular bytes. Compatibility with the original default GPU policy is measured separately and allows at most one quantization step per RGB channel, with exact alpha and normal/specular bytes. See the [row policy and comparison requirements](validation/performance/PERF-004.md#explicit-color-row-synchronization).
+
 Rendered-pixel tests compare mutable tinted output against the equivalent static colour/normal/specular composition.
 
 ## Tree splits

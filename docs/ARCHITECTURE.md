@@ -6,21 +6,20 @@ Relay Moth Forest is a browser game built around a 640×360 logical scene, a 640
 
 The runtime is intentionally small and explicit:
 
-```text
-index.html / style.css
-        |
-        +-- surfacefx.js         WaterField + fine GrassField
-        +-- sprite_material.js   shared sprite material math
-        +-- foliagefx.js         physical readable foliage
-        +-- procedural_decor.js  shared reserved-surface decor enumeration
-        +-- editor_identity.js   cross-room persistent identity scan/allocation
-        +-- editor_validation.js deterministic semantic validation + fingerprints
-        +-- editor.js            F2 WYSIWYG authoring overlay
-        +-- game.js              world, gameplay, renderer orchestration
-        |
-        +-- relay_moth_*.json    maps/story/LUTs/effects/sprites
-        +-- hd_remake_atlas.json atlas regions/roles/material metadata
-```
+| Module | Responsibility |
+| --- | --- |
+| `index.html` / `style.css` | Page structure and presentation |
+| `surfacefx.js` | WaterField and fine GrassField |
+| `sprite_material.js` | Shared sprite material math |
+| `foliagefx.js` | Rooted foliage rendering |
+| `procedural_decor.js` | Shared decor enumeration with reserved surfaces |
+| `static_terrain.js` | Immutable static terrain authority and bounded redraw/upload planning |
+| `editor_identity.js` | Cross-room persistent identity scanning and allocation |
+| `editor_validation.js` | Deterministic semantic validation and fingerprints |
+| `editor.js` | F2 WYSIWYG authoring overlay |
+| `game.js` | World, gameplay and renderer orchestration |
+| `relay_moth_*.json` | Map, story, LUT, effect and sprite authorities |
+| `hd_remake_atlas.json` | Atlas regions, roles and material metadata |
 
 The local Python launcher serves the files and exposes the map-save endpoint used by the editor.
 

@@ -20,6 +20,7 @@ Press **F2** to edit on the normal rendered game canvas. Gameplay simulation is 
 | Hide/show editor chrome | Tab or HIDE UI; Tab restores the toolbar/palette |
 | Cancel current edit | Escape; cancels an active gesture or inspector edit before closing |
 | Close editor | F2; Escape when no edit is active |
+| Export a room-background snapshot | F8; available outside text/form inputs |
 
 The item policy distinguishes **terrain**, **decor**, **gameplay** and **structural/protected** capabilities. Full-size decorative/recruitable robot placements are in SELECT's decor scope, even when they carry persistent IDs. OBJECT is not the tool for room-pattern art. Protected structural geometry is not a generic movable/copyable object; terrain painting is not a guarantee of safe bridge/gate editing, so validate layout changes.
 
@@ -73,13 +74,20 @@ Mutations update the same in-memory map used by gameplay. Invalidation is coales
 
 Generated decor also renders through the mutable layer, so moving an objective immediately re-evaluates its reserved tile without a static bake. Pattern suppression and genuinely structural terrain can still require static reconstruction. Terrain changes refresh dependent static/water/foliage geometry; unrelated edits do not restart unrelated ambient simulations. Same-count water/grass edits still invalidate geometry-sensitive caches.
 
-Small ground, path and water changes use bounded static color/material updates when the other room dependencies remain unchanged. This also applies to undo/redo and final gesture/persistence flushes. Replacing a blocker/tree, changing scenery or making a large stroke can still rebuild the room. The final map data determines eligibility, so brush names alone do not imply a partial update.
+When the other room dependencies remain unchanged, small ground, path and water changes update bounded static color regions and preserve the existing normal/specular textures. This also applies to undo/redo and final gesture/persistence flushes. Replacing a blocker/tree, changing scenery or making a large stroke can still rebuild the room. The final map data determines eligibility, so brush names alone do not imply a partial update.
 
 ## Validation and dirty state
 
 **VALIDATE** opens deterministic errors/warnings with codes, room and item references. The shared validator checks duplicate persistent IDs, story/map objective joins and approachability, coordinates, sprite/variant references, malformed groups, bridge/gate integrity and stale hidden/suppressed metadata. It is not a complete route/GPU proof; also run the repository tests.
 
 The toolbar shows **CLEAN**, **DIRTY PROJECT**, or **DIRTY PROJECT/ROOM**, plus error/warning counts. Clean means map data matches the loaded/saved/exported baseline, not that the map has no validation errors. Undo back to the baseline becomes clean; Redo away from it becomes dirty. Switching rooms does not mark changes saved. The browser receives a before-unload warning request when the project is dirty.
+
+Imported `floor_microtile` values must be finite numbers from 3 through 16,
+inclusive; supported fractional values remain valid. If the field is present but
+invalid, validation reports `INVALID_FLOOR_MICROTILE`. The runtime renders with
+the existing 4px default so invalid data cannot stall the floor loop. It leaves
+the imported value untouched for correction and export. An absent field keeps
+the default without a validation error.
 
 ## Save and export
 
@@ -90,6 +98,16 @@ Errors stop the first Save/Download attempt and expose **SAVE ANYWAY** or **DOWN
 **DOWNLOAD JSON** is the explicit fallback for a hosted/static build. The editor marks an issued download as its clean exported baseline, but cannot verify the browser's eventual download destination or completion. Downloading does **not** write the project file: keep the file and replace the local map deliberately. Successful project saves establish the saved baseline. Active pointer gestures are cancelled and field edits are committed before validation/persistence.
 
 While a project save is pending, its button shows **SAVING…** and prevents a second overlapping request. Editing and Download JSON remain available. Success acknowledges the exact map snapshot sent: edits made while waiting remain dirty and retain the navigation warning. A newer explicit export baseline is preserved if its download was issued before the older project-save response arrived. Failed saves restore the button and leave the previous baseline unchanged.
+
+**F8** creates a room-background PNG and semantic JSON sidecar. Pending gestures
+and field edits are resolved through the same persistence flush before capture.
+The export includes current persistent decoration and progression visuals, with
+pixels, filenames and metadata captured together before PNG encoding. Navigation
+or further editing while encoding cannot change that snapshot. Only one export
+runs at a time, held-key repeats are suppressed, and a failed
+encoder issues neither file. F8 leaves the project's dirty baseline unchanged;
+use Save to Project or Download JSON to preserve map data. See
+[Raster export](RASTER_EXPORT.md) for the complete layer contract.
 
 ## Optional metadata and compatibility
 
