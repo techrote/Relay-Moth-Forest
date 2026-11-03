@@ -22,19 +22,20 @@ water and foliage before returning to gameplay. Same-count movement, painting,
 clearing, undo/redo, cancellation and final pointerup/save flushes use the same
 authoritative comparison. Brush names do not establish eligibility.
 
-## Preserve fractional target dimensions, not just the transform
+## Preserve scaled target dimensions, not just the transform
 
 Native qualification rejected both translated small surfaces and untranslated
-prefix surfaces. Keeping the Canvas2D transform identical was insufficient:
-the GPU projection also depends on the actual target dimensions.
+prefix surfaces. It also rejected a local surface at exact 2× scale. Keeping
+the Canvas2D transform identical, or making the scale an integer, was
+insufficient: the GPU projection also depends on actual target dimensions.
 
 | Surface mode | Canvas | Transform | Explicit redraw |
 | --- | --- | --- | --- |
-| Both native scales are integers | Local guarded color surface | Native scale plus integer translation | Local guarded surface |
-| Either scale is fractional | One transient color surface at full native dimensions | Full renderer's origin and scale, without translation | Integer native clip around the guarded dirty region |
+| Original 640×360 logical and native dimensions | Local guarded color surface | Unit scale plus integer translation | Local guarded surface |
+| Any other native dimensions, including integer 2× | One transient color surface at full native dimensions | Full renderer's origin and scale, without translation | Integer native clip around the guarded dirty region |
 
 Both modes draw only the floor inputs needed by the guarded region, then replay
-unchanged static overlays and footer in their established order. Fractional
+unchanged static overlays and footer in their established order. Native-target
 mode applies its clip before scaling. It does not repaint all floor cells or
 replace a complete GPU texture. Each surface is released immediately after its
 region is uploaded; no room-sized CPU backing or multiroom canvas cache remains.
@@ -90,8 +91,8 @@ this cost; diagnostic wall times are not performance qualification.
 ### Resource policy and the revised capacity ceiling
 
 The initial design imposed a universal 1 MiB color-scratch ceiling. Native tests
-showed that smaller fractional targets can change legacy pixels. This design
-**revises that ceiling for fractional rendering**. Issue #37 requires bounded
+showed that smaller fractional and integer 2× targets can change legacy pixels.
+This design **revises that ceiling for scaled rendering**. Issue #37 requires bounded
 scratch and forbids retaining three full native CPU backings; it does not
 prescribe that initial numeric ceiling.
 
@@ -103,7 +104,7 @@ prescribe that initial numeric ceiling.
 | Summed guarded redraw area | At most 20%, counting overlaps separately |
 | Floor inputs | At most 35% of 760 cells, counting repeated inputs separately |
 | Peak local color capacity | 262,144 pixels / 1 MiB |
-| Peak fractional native color capacity | 1,048,576 pixels / 4 MiB |
+| Peak scaled native color capacity | 1,048,576 pixels / 4 MiB |
 | Cumulative allocated color capacity per planned partial refresh | 2,097,152 pixels / 8 MiB |
 | Retained room scratch after completion | Zero |
 
@@ -111,8 +112,10 @@ At 997×563, fractional color capacity is 2,245,244 bytes (about 2.141 MiB).
 At the unchanged 1278×718 benchmark resolution it is 3,670,416 bytes (about
 3.500 MiB), versus 11,011,248 bytes for the former simultaneous three-map full
 build. These are nominal RGBA canvas capacities, not total process or driver
-memory. Larger fractional targets select the existing full renderer before any
-partial allocation. Integer scales retain the local 1 MiB ceiling.
+memory. At exact 1280×720, native color capacity is 3,686,400 bytes; integer
+scale no longer selects a differently sized local target. Larger scaled targets
+select the existing full renderer before any partial allocation. Original
+640×360 rendering retains the local 1 MiB ceiling.
 
 **A small clip does not make allocation free.** Creating a native-sized canvas
 may initialize or clear its entire backing. The 20% limit describes explicit
@@ -227,8 +230,8 @@ ordinary noops, dependency fallbacks and forced builds skip this additional
 replay. No room-name or sprite-category fallback substitutes for geometry.
 
 Floor inputs replay in original row-major order. Alignment preserves device-
-coordinate gradient-dither phase in local integer-scale surfaces. Fractional
-surfaces retain both the target dimensions and origin of the full renderer.
+coordinate gradient-dither phase in local 640×360 surfaces. Every other native
+size retains both the target dimensions and origin of the full renderer.
 
 | Region fields | Meaning |
 | --- | --- |
@@ -293,6 +296,16 @@ event/frame interval. A mismatch fails validation and retains raster diagnostics
 PR CI measures accepted base then candidate on one host with identical scenarios,
 three samples and 1x/4x throttling. Software-rendered milliseconds are evidence,
 not a universal latency gate or physical-device guarantee.
+
+An appended `control-full-static` scenario measures a forced full static refresh
+after the same warmed `quiet_nest` setup on both sources. It leaves all ten
+original scenarios, their order, coordinates and timing boundaries unchanged.
+The control checks one full build, all three uploads, 760 floor inputs, three
+native canvases, 19 successful row reads and exact post-timing texture parity.
+Candidate combined static time includes planning plus the build and three
+uploads; the old full renderer has no planning phase. Nested synchronization
+time remains nonadditive. This control measures the new policy's cost on a full
+refresh; it does not measure cold room loading or claim hardware frame latency.
 
 ## Native investigation record
 
@@ -448,6 +461,51 @@ collection. Repairs never count as successful bounded work. Artifacts retain
 measured failures, separate repairs and the completed/partial matrix. Seventeen
 focused control-flow cases and negative mutation controls verify this reporting.
 
+### Integer 2× target qualification
+
+[Candidate 23](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41587933348)
+completed the matrix: 111 of 112 cases passed. The only failure was the open
+bottom-row cell at 1280×720. Its tight output was `(640,576,38,36)`; the local
+canvas and guard were `(592,544,128,112)`, with 15 floor inputs and three row
+reads. Color differed in 11 bytes across eight pixels, maximum one. Normal,
+specular and every actual exterior byte were unchanged. The exact full repair
+passed. This remains a failed native qualification.
+
+Stage isolation showed zero floor-only and floor-plus-pattern differences.
+Adding blockers introduced all 11 bytes; omitting sprites removed them.
+Changing the local guard or quantizing sprite translations did not fix them.
+Full-native target controls with the same 15 floor inputs matched exactly when
+overlays were unclipped or enclosed by the larger diagnostic clip. Full-native
+floor-only with the original guard also matched. The precise production
+combination of bounded inputs, original overlay-enclosing guard and full-native
+target still requires the complete candidate-24 matrix; these controls do not
+substitute for it.
+
+The correction therefore applies by dimensions, not room or sprite category:
+only original 640×360 uses local targets. Other sizes use the existing native
+clip path and unchanged output, redraw, floor-input and capacity ceilings. A
+1920×1080 target exceeds the fixed 4 MiB partial capacity and falls back before
+allocation; two 1280×720 regions fit the existing cumulative 8 MiB ceiling,
+while three do not. No output padding, coordinate change or pixel tolerance is
+introduced.
+
+Candidate 23 separately passed all 162 selected-policy full-reference map
+comparisons and all 54 warm/cold comparisons with the original default policy.
+The latter differed by at most six color bytes in four pixels per comparison,
+with maximum RGB difference one and exact alpha/material bytes.
+
+Its independent same-host performance run passed all 36 water/path texture
+checks. Static event medians were 1,370.2→206.1 ms and 1,068.7→188.2 ms at 1×
+CPU throttling, and 1,626.6→245.7 ms and 1,139.6→207.8 ms at 4×, for water and
+path respectively. These are preliminary measurements of the failed candidate,
+not final-head acceptance. The unchanged benchmark remains at 1278×718 and must
+be repeated after the correction. The artifact is `13209452399`, SHA-256
+`eb1b01a2919af1b679ec234e5cc07395eaa45600dd4b1bab0f9c064f827cc259`.
+
+CI now preserves native failure evidence immediately before the independent
+performance step, with source identity and a unique run/attempt artifact name.
+The final complete artifact and every failure outcome remain required.
+
 ## Stable transformed-normal sources
 
 The previous 64-entry FIFO cache could churn its own room working set: Dawn
@@ -464,8 +522,8 @@ Terrain patches keep material contexts detached and do not advance it.
 ## Executable acceptance and limits
 
 - Planner: immutable authority, same-count/history, dependencies/identities,
-  full-grid floor envelopes, separate clip/canvas geometry, single-axis fractional
-  scales, complete primitive bounds, nonrecursive guards, unchanged work and
+  full-grid floor envelopes, separate clip/canvas geometry, integer/fractional
+  and anisotropic scales, complete primitive bounds, nonrecursive guards, unchanged work and
   peak/cumulative budgets, and malformed/stale inputs.
 - Runtime: real Game/StaticPainter/GLRenderer methods; full/partial command
   traces; independent allocation, clip, crop and material observations; unpack
@@ -481,7 +539,7 @@ Local Chromium is blocked by this environment's socket policy. Local
 deterministic/GLES results do not replace hosted browser qualification. A missing
 or failed native result is not a rendered pass.
 
-Large strokes, structural changes, fragmentation and fractional targets over the
+Large strokes, structural changes, fragmentation and scaled targets over the
 fixed capacity ceiling intentionally rebuild. Overlay command replay and native
 allocation/initialization still have cost. Linux software rendering does not
 certify Windows/Firefox drivers, high-DPI performance or physical low-end frame

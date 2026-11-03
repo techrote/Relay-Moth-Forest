@@ -168,14 +168,19 @@ function refresh(g,options){
   if(result.mode==='patch'||result.mode==='noop')assertMaterialsRetained(g.renderer,materials);
   else assert.deepStrictEqual(g.renderer.gl.uploads.slice(-3).map(u=>[u.mode,u.texture]),[['full','color'],['full','normal'],['full','specular']],'every full dependency refresh or repair replaces all three channels');
   if(result.mode==='patch'){
+    const nativeTarget=g.renderer.nativeW!==640||g.renderer.nativeH!==360;
+    assert.strictEqual(result.scratchMode,nativeTarget?'native-clip':'local','only the qualified original 640x360 target may use local scratch');
+    assert(result.scratchPixels<=(nativeTarget?1048576:262144)&&result.scratchAllocationPixels<=2097152,'peak and cumulative capacity remain bounded independently of target scale');
     assert(g.renderer.gl.uploads.slice(beforeUploads).every(u=>u.texture===g.renderer.bgTex),'eligible terrain patches upload color only');
     assert.strictEqual(created.length,regions.length,'one color canvas per region, without material or crop canvases');
     regions.forEach((region,i)=>{const canvas=created[i];
+      assert.strictEqual(region.canvasMode,nativeTarget?'native-clip':'local');
+      assert.deepStrictEqual([region.canvasX,region.canvasY,region.canvasWidth,region.canvasHeight],nativeTarget?[0,0,g.renderer.nativeW,g.renderer.nativeH]:[region.rasterX,region.rasterY,region.rasterWidth,region.rasterHeight],'source target policy is independent of whether scale factors are integral');
       assert.strictEqual(canvas.originalWidth,region.canvasWidth);assert.strictEqual(canvas.originalHeight,region.canvasHeight);
       assert.strictEqual(canvas.contextRequests[0].options.alpha,false,'patch allocates only opaque color');
       assert.deepStrictEqual(canvas.context.transforms[0],[g.renderer.nativeW/640,0,0,g.renderer.nativeH/360,region.canvasX?-region.canvasX:0,region.canvasY?-region.canvasY:0],'drawing uses actual canvas origin, independently of output and guarded clip');
       if(region.canvasMode==='native-clip')assert.deepStrictEqual(canvas.context.clips,[{rectangle:[region.rasterX,region.rasterY,region.rasterX+region.rasterWidth,region.rasterY+region.rasterHeight],matrix:[1,0,0,1,0,0],bounds:[region.rasterX,region.rasterY,region.rasterX+region.rasterWidth,region.rasterY+region.rasterHeight]}],'native target receives the local guard as an integer clip before scaling');
-      else assert.deepStrictEqual(canvas.context.clips,[],'local canvas bounds already clip the integer-scale raster');
+      else assert.deepStrictEqual(canvas.context.clips,[],'local canvas bounds already clip the original 640x360 raster');
     });
   }
   return result;
@@ -295,7 +300,11 @@ function nativeClipMatchesFullCommands(){
     {label:'rotated-subrect',width:997,height:563,cell:'10,7'},
     {label:'footer-imported-scale',width:997,height:563,cell:'38,18'},
     {label:'fractional-x',width:997,height:360,cell:'19,10'},
-    {label:'fractional-y',width:640,height:563,cell:'19,10'}
+    {label:'fractional-y',width:640,height:563,cell:'19,10'},
+    {label:'integer-2x-mounted',width:1280,height:720,cell:'10,7'},
+    {label:'integer-x',width:1280,height:360,cell:'19,10'},
+    {label:'integer-y',width:640,height:720,cell:'19,10'},
+    {label:'integer-2x-open-footer',width:1280,height:720,cell:'20,18'}
   ];
   const canonical=commands=>commands.map(({clip,...command})=>command);
   const withoutNativeClip=ctx=>{
@@ -310,6 +319,17 @@ function nativeClipMatchesFullCommands(){
       g.room.decorLamps=[];
       for(const name of ['gear','orb_cyan']){g.art.regions[name]=[...artManifest.regions[name]];g.art.meta[name]={...artManifest.region_meta[name],tint_strength:0}}
       g.art.meta.gear.world_scale=4;
+    }
+    if(test.label==='integer-2x-open-footer'){
+      // The native failure was the color projection of unchanged border art
+      // beside an open bottom tile. Keep real color/specular atlas commands;
+      // transformed-normal sampling is qualified separately by native pixels.
+      g.room.decorLamps=[];g.art.normalImg=null;g.room.border.add('19,18');g.room.border.add('21,18');
+      for(const name of ['blocker_mixed_27','gear','orb_cyan']){g.art.regions[name]=[...artManifest.regions[name]];g.art.meta[name]={...artManifest.region_meta[name],tint_strength:0}}
+      g.art.roles.blockers=['blocker_mixed_27'];
+      // Keep the actual tinted source, allocated before the transient-scratch
+      // observer starts. Source-cache ownership is distinct from scratch.
+      g.art.tintedRegion('blocker_mixed_27',g.luts.hex('blockers',145),.18);
     }
     if(test.label==='rotated-subrect'){
       g.art.normalImg=null;const drawDecor=g.painter.drawDecor;
@@ -337,7 +357,7 @@ function nativeClipMatchesFullCommands(){
       assert.deepStrictEqual(withoutNativeClip(ctx),canonical(fullCtx.commands),'native coordinates, gradients, atlas transforms and footer commands equal the accepted full sequence');
       assert.deepStrictEqual(ctx.commands.slice(0,5).map(c=>[c.name,c.args]),[['save',[]],['beginPath',[]],['rect',[region.rasterX,region.rasterY,region.rasterWidth,region.rasterHeight]],['clip',[]],['scale',[test.width/640,test.height/360]]],'native setup cannot issue an extra identity translation');
       assert.deepStrictEqual(ctx.images,fullCtx.images,'actual HDArtSheet source rectangles, destination corners and transformations match full drawing');
-      assert.strictEqual(ctx.images.length,test.label==='floor-only'?0:test.label==='rotated-subrect'?3:2);
+      assert.strictEqual(ctx.images.length,test.label==='floor-only'?0:test.label==='rotated-subrect'?3:test.label==='integer-2x-open-footer'?4:2);
       if(test.label==='objective-substitution')assert.deepStrictEqual(ctx.images[1].source,artManifest.regions.lamp_orange);
       const expectedCells=[],guard=[region.rasterX,region.rasterY,region.rasterX+region.rasterWidth,region.rasterY+region.rasterHeight];
       for(let y=region.ty0;y<region.ty1;y++)for(let x=region.tx0;x<region.tx1;x++)expectedCells.push(x+','+y);
@@ -361,7 +381,7 @@ function nativeClipMatchesFullCommands(){
         scenarios++;
       }
       const count=allocations.length,uploads=g.renderer.gl.uploads.length;assert.strictEqual(refresh(g).mode,'noop');assert.strictEqual(allocations.length,count);assert.strictEqual(g.renderer.gl.uploads.length,uploads);assert.strictEqual(actorState(g),actors);scenarios+=2;
-    }finally{traceCanvases=false}
+    }finally{traceCanvases=false;for(const canvas of g.art.tintCache.values())canvas.width=canvas.height=1;g.art.tintCache.clear()}
   }
 }
 
@@ -382,11 +402,14 @@ function nativeClipCapacityAndFallbacks(){
   const eligible=[
     {width:997,height:563,cells:['19,10']},{width:997,height:360,cells:['19,10']},{width:640,height:563,cells:['19,10']},
     {width:997,height:563,cells:['10,7']},{width:997,height:563,cells:['3,3','13,3','23,3']},
-    {width:1278,height:718,cells:['3,3','13,3']},{width:1024,height:1024,cells:['3,3','13,3']}
+    {width:1278,height:718,cells:['3,3','13,3']},{width:1024,height:1024,cells:['3,3','13,3']},
+    {width:1280,height:720,cells:['3,3','13,3']},
+    {width:1280,height:360,cells:['3,3','13,3','23,3','33,3']},
+    {width:640,height:720,cells:['3,3','13,3','23,3','33,3']}
   ];
   for(const test of eligible){
     const g=spriteFixture(test.width,test.height);g.room.decorLamps=[{tile:[10,8]}];refresh(g);g.room.water=new Set(test.cells);const stats=refresh(g);
-    assert.strictEqual(stats.mode,'patch','ordinary local drawing budgets must permit fractional far/mounted/multi-region edits');assert.strictEqual(stats.scratchMode,'native-clip');assert.strictEqual(stats.regions.length,test.cells.length);
+    assert.strictEqual(stats.mode,'patch','bounded drawing and native capacity must permit qualified far/mounted/multi-region edits');assert.strictEqual(stats.scratchMode,'native-clip');assert.strictEqual(stats.regions.length,test.cells.length);
     assert.strictEqual(stats.scratchPixels,test.width*test.height);assert.strictEqual(stats.scratchAllocationPixels,test.width*test.height*test.cells.length);
     assert(stats.scratchPixels<=1048576&&stats.scratchAllocationPixels<=2097152,'native peak and cumulative capacity stay independently bounded');
     assert(stats.rasterPixels<=test.width*test.height*.20&&stats.rasterCells<=760*.35,'local drawing budgets retain their original limits');scenarios++;
@@ -396,7 +419,13 @@ function nativeClipCapacityAndFallbacks(){
     {label:'native-peak-large-target',width:2000,height:1000,cells:['14,6'],reason:'scratch-budget'},
     {label:'997-four-allocations',width:997,height:563,cells:['3,3','13,3','23,3','33,3'],reason:'scratch-allocation-budget'},
     {label:'benchmark-three-allocations',width:1278,height:718,cells:['3,3','13,3','23,3'],reason:'scratch-allocation-budget'},
-    {label:'native-cap-three-allocations',width:1024,height:1024,cells:['3,3','13,3','23,3'],reason:'scratch-allocation-budget'}
+    {label:'native-cap-three-allocations',width:1024,height:1024,cells:['3,3','13,3','23,3'],reason:'scratch-allocation-budget'},
+    {label:'integer-3x-native-peak',width:1920,height:1080,cells:['19,10'],reason:'scratch-budget'},
+    {label:'integer-anisotropic-native-peak',width:1920,height:720,cells:['19,10'],reason:'scratch-budget'},
+    {label:'integer-4x-native-peak',width:2560,height:1440,cells:['19,10'],reason:'scratch-budget'},
+    {label:'integer-2x-three-allocations',width:1280,height:720,cells:['3,3','13,3','23,3'],reason:'scratch-allocation-budget'},
+    {label:'integer-x-five-allocations',width:1280,height:360,cells:['3,3','13,3','23,3','33,3','3,13'],reason:'scratch-allocation-budget'},
+    {label:'integer-y-five-allocations',width:640,height:720,cells:['3,3','13,3','23,3','33,3','3,13'],reason:'scratch-allocation-budget'}
   ];
   for(const test of fallbacks){
     const g=spriteFixture(test.width,test.height);refresh(g);const previous=g.staticTerrainSnapshot,actors=actorState(g),first=allocations.length,attemptStart=allocationAttempts.length,uploads=g.renderer.gl.uploads.length,phaseStart=phases.length,build=g.painter.build;
@@ -410,9 +439,9 @@ function nativeClipCapacityAndFallbacks(){
     assert.strictEqual(stats.scratchAllocationPixels,test.width*test.height*3);assert(!phases.slice(phaseStart).some(name=>name.startsWith('static.patch.')));
     assert.deepStrictEqual(g.staticTerrainSnapshot.dependencies,previous.dependencies);assert.deepStrictEqual(g.staticTerrainSnapshot.references,previous.references);assert.strictEqual(actorState(g),actors);scenarios++;
   }
-  // Integer native scales continue to allocate only the local guard, even when
-  // the full native frame is larger than the fractional-capacity policy permits.
-  for(const [width,height] of [[640,360],[1280,720],[2560,1440]]){
+  // Only the original 640x360 target keeps the qualified small local surface.
+  // Other integral scales obey the same native capacity gates as fractional ones.
+  for(const [width,height] of [[640,360]]){
     const g=spriteFixture(width,height);refresh(g);g.room.water.add('19,10');const stats=refresh(g),region=stats.regions[0];
     assert.strictEqual(stats.mode,'patch');assert.strictEqual(stats.scratchMode,'local');assert(region.rasterX>0&&region.rasterY>0);assert.strictEqual(stats.uploadCalls,1);
     assert.deepStrictEqual([region.canvasX,region.canvasY,region.canvasWidth,region.canvasHeight],[region.rasterX,region.rasterY,region.rasterWidth,region.rasterHeight]);
@@ -742,7 +771,7 @@ console.log('STATIC TERRAIN RUNTIME REGRESSION PERF-004 PASS');
 console.log('  production Game / StaticPainter / GLRenderer scenarios:',scenarios);
 console.log('  color-only guarded-raster uploads, preserved material handles/bytes, full material-dependency refreshes, asymmetric flipped crops and exact scratch/raster accounting');
 console.log('  coherent snapshot/revision commits, unpack restoration, upload / GL error / context-loss repair, failed repair invalidation, allocation/raster cleanup, zero retained scratch');
-console.log('  fractional native targets use bounded clips and accepted full floor/atlas command traces; local integer rasters, exact capacity/attempt accounting and early peak/cumulative fallbacks');
-console.log('  far and mounted edits remain eligible, fractional capacity is capped at 4 MiB peak / 8 MiB cumulative, and every surface is released before the next allocation');
+console.log('  every target other than 640x360 uses bounded native clips and accepted full floor/atlas command traces, including 2x and anisotropic integer scales');
+console.log('  original-size local scratch, 4 MiB native peak / 8 MiB cumulative limits, early integer/fractional capacity fallbacks, and release before each next allocation');
 console.log('  dry whole-primitive bounds agree with actual atlas quads/circles/rounded pixels across all rooms, anchors, flips, rotations and imported footer scales; no source/cache/LUT/material mutations');
 console.log('  explicit-false color policy; separate observed one-pixel row synchronization counts/time, discarded pixels, policy-only full invalidation without cache clears, failed read/repair accounting and cleanup');

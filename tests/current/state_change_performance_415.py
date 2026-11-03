@@ -5,6 +5,8 @@ This is diagnostic evidence, not a universal CI latency benchmark. It drives the
 production WebGL2 runtime from a localhost origin so localStorage, Canvas2D,
 texture uploads, editor invalidation and the animation loop are real browser
 operations. Chromium CPU throttling can be used to expose low-end sensitivity.
+The final control repeats a warmed room's full static refresh on both sources;
+it exposes full rebuild and row synchronization costs separately from edits.
 """
 from __future__ import annotations
 
@@ -34,6 +36,7 @@ SCENARIOS = [
     "editor-water",
     "editor-path",
     "control-wildlife",
+    "control-full-static",
 ]
 
 SCENARIO_JS = r"""
@@ -192,6 +195,23 @@ async (name) => {
       rmfEditor.queueInvalidation(RelayEditorInvalidation.CREATURES,{sync:true});
     });
   }
+  if(name==='control-full-static'){
+    // enterRoom has built the room and reset waits two animation frames. The
+    // legacy baseline's method always rebuilds and ignores this argument;
+    // planner-enabled sources need force to avoid an unchanged-authority noop.
+    await reset('quiet_nest');
+    const record=await manual('control-full-static',{
+      room:game.room.key,mutation:'none',refresh:'forced-static',warmup:'room-entry-two-frames'
+    },()=>game.refreshEditorStatic({force:true}));
+    return {...record,fullStaticControl:{
+      backgroundKeyMatches:game.bgKey===game.editorBackgroundKey(),
+      retainedCurrentStatic:!!game.currentStatic,
+      retainedMaterialMaps:!!game.painter.lastMaterialMaps,
+      colorPolicy:game.painter.colorPolicy??null,
+      hasStaticPlanner:typeof globalThis.RelayStaticTerrain?.capture==='function'&&
+        typeof globalThis.RelayStaticTerrain?.plan==='function'
+    }};
+  }
   throw Error('Unknown scenario '+name);
 }
 """
@@ -303,6 +323,64 @@ def source_identity(root):
     return record
 
 
+def validate_full_static_control(record, native, validate_static):
+    """Validate actual full work, with synchronization nested in the build time."""
+    assert record.get("name") == "control-full-static", ("wrong full control record", record)
+    assert record.get("meta") == {
+        "room": "quiet_nest", "mutation": "none", "refresh": "forced-static",
+        "warmup": "room-entry-two-frames",
+    }, ("wrong full control preparation", record.get("meta"))
+    control = record.get("fullStaticControl") or {}
+    assert set(control) == {"backgroundKeyMatches", "retainedCurrentStatic", "retainedMaterialMaps", "colorPolicy", "hasStaticPlanner"}, ("missing full control capability evidence", control)
+    assert control["backgroundKeyMatches"] is True and control["retainedCurrentStatic"] is False and control["retainedMaterialMaps"] is False, ("full control left an invalid key or retained CPU surfaces", control)
+    # Baseline identifies the paired source, not its implementation vintage.
+    # An already-optimized baseline must satisfy the same known-policy work
+    # accounting as the candidate; missing diagnostics cannot downgrade it.
+    synchronized = control["colorPolicy"] == "canvas2d-row-sync-v1"
+    if synchronized:
+        assert control["hasStaticPlanner"] is True, ("known color policy lacks its planner", control)
+    else:
+        assert not validate_static and control["colorPolicy"] is None and control["hasStaticPlanner"] is False and record.get("staticDiagnostics") is None, ("unknown or incomplete full control policy", control, record.get("staticDiagnostics"))
+    calls, phases = record.get("phaseCalls", {}), record.get("phases", {})
+    full_phases = ("static.build", "static.upload.color", "static.upload.normal", "static.upload.specular")
+    for phase in full_phases:
+        assert calls.get(phase) == 1, ("full control requires one build and all three uploads", phase, calls)
+        assert isinstance(phases.get(phase), (int, float)) and math.isfinite(phases[phase]) and phases[phase] >= 0, ("missing full control phase time", phase, phases)
+    assert all(not key.startswith("static.patch.") or count == 0 for key, count in calls.items()), ("full control also performed a patch", calls)
+    assert calls.get("static.plan", 0) == (1 if synchronized else 0), ("unexpected full control planning", calls)
+    assert record.get("waterWorkDelta") == {
+        "fullRebuilds": 0, "boundedUpdates": 0,
+        "fullLegacyUploads": 0, "boundedLegacyUploads": 0,
+    }, ("static-only full control also refreshed water", record.get("waterWorkDelta"))
+    if validate_static or "staticParity" in record:
+        parity = record.get("staticParity") or {}
+        maps = parity.get("maps") or {}
+        assert parity.get("native") == list(native) and set(maps) == {"color", "normal", "specular"}, ("missing full control native texture oracle", parity)
+        assert all(maps[channel].get(key) == 0 for channel in maps for key in ("bytes", "pixels", "max")), ("full control texture differs from clean full build", parity)
+    if not synchronized:
+        assert calls.get("static.full.color-sync", 0) == 0, ("legacy baseline unexpectedly synchronized floor rows", calls)
+        return
+
+    area = native[0] * native[1]
+    static = record.get("staticDiagnostics") or {}
+    expected = {
+        "mode": "full", "reason": "forced", "colorPolicy": "canvas2d-row-sync-v1",
+        "changedCells": 0, "scratchMode": "full", "regions": [],
+        "rasterCells": 40 * 19, "pixels": area, "rasterPixels": area,
+        "scratchPixels": area, "scratchBytes": area * 12,
+        "scratchAllocationAttempts": 3, "scratchAllocations": 3,
+        "scratchAllocationPixels": area * 3, "scratchAllocationBytes": area * 12,
+        "uploadCalls": 3, "uploadBytes": area * 12, "retainedScratchPixels": 0,
+        "colorSyncAttempts": 19, "colorSyncReads": 19, "colorSyncPixels": 19,
+        "readbackPixels": 19,
+    }
+    for key, value in expected.items():
+        assert static.get(key) == value, ("full control accounting mismatch", key, value, static)
+    assert calls.get("static.full.color-sync") == 19, ("full control did not synchronize each of 19 floor rows", calls)
+    for source, key in ((static, "colorSyncMs"), (phases, "static.full.color-sync"), (phases, "static.plan")):
+        assert isinstance(source.get(key), (int, float)) and math.isfinite(source[key]) and source[key] >= 0, ("invalid full control timing", key, source)
+
+
 def measure_source(args, root, validate_static=True):
     if args.samples < 1:
         raise SystemExit("--samples must be >= 1")
@@ -368,7 +446,7 @@ def measure_source(args, root, validate_static=True):
                 records = []
                 for sample in range(args.samples):
                     record = page.evaluate(SCENARIO_JS, scenario)
-                    if validate_static and scenario in {"editor-water", "editor-path"}:
+                    if validate_static and scenario in {"editor-water", "editor-path", "control-full-static"}:
                         # The event and first post-event frame have finished. Verify
                         # every GPU byte at the actual responsive native size with
                         # the probe disabled; the next reset reenables measurement.
@@ -425,8 +503,8 @@ def measure_source(args, root, validate_static=True):
                         static = record.get("staticDiagnostics") or {}
                         native_width, native_height = env["native"]
                         native_area = native_width * native_height
-                        fractional = native_width % 640 != 0 or native_height % 360 != 0
-                        scratch_mode = "native-clip" if fractional else "local"
+                        native_target = (native_width, native_height) != (640, 360)
+                        scratch_mode = "native-clip" if native_target else "local"
                         regions = static.get("regions") or []
                         sync_reads = sum(region["ty1"] - region["ty0"] for region in regions)
                         assert static.get("colorPolicy") == "canvas2d-row-sync-v1", (scenario, "unexpected static color policy", static)
@@ -442,20 +520,23 @@ def measure_source(args, root, validate_static=True):
                         assert static.get("uploadBytes") == static.get("pixels", -1) * 4, (scenario, "color upload byte accounting differs", static)
                         capacities = []
                         for region in regions:
-                            canvas_x, canvas_y = (0, 0) if fractional else (region["rasterX"], region["rasterY"])
-                            canvas_width, canvas_height = env["native"] if fractional else (region["rasterWidth"], region["rasterHeight"])
+                            canvas_x, canvas_y = (0, 0) if native_target else (region["rasterX"], region["rasterY"])
+                            canvas_width, canvas_height = env["native"] if native_target else (region["rasterWidth"], region["rasterHeight"])
                             assert region.get("canvasMode") == scratch_mode and region.get("canvasX") == canvas_x and region.get("canvasY") == canvas_y, (scenario, "wrong source canvas mode or origin", region)
                             assert region.get("canvasWidth") == canvas_width and region.get("canvasHeight") == canvas_height, (scenario, "wrong source canvas dimensions", region)
                             capacities.append(canvas_width * canvas_height)
                         assert static.get("scratchMode") == scratch_mode, (scenario, "wrong scratch policy for native scale", static)
                         assert static.get("scratchPixels") == max(capacities) and static.get("scratchBytes") == max(capacities) * 4, (scenario, "peak source canvas capacity accounting differs", static)
-                        assert max(capacities) <= (1048576 if fractional else 262144), (scenario, "source canvas exceeds native4MiB/local1MiB capacity", static)
+                        assert max(capacities) <= (1048576 if native_target else 262144), (scenario, "source canvas exceeds native4MiB/local1MiB capacity", static)
                         assert static.get("scratchAllocationAttempts") == len(regions) and static.get("scratchAllocations") == len(regions), (scenario, "unexpected scratch allocation count", static)
                         assert static.get("scratchAllocationPixels") == sum(capacities) and static.get("scratchAllocationBytes") == sum(capacities) * 4, (scenario, "cumulative source canvas allocation accounting differs", static)
                         assert sum(capacities) <= 2097152, (scenario, "source canvas allocations exceed8MiB cumulative capacity", static)
                         assert static.get("rasterPixels") == sum(region["rasterWidth"] * region["rasterHeight"] for region in regions), (scenario, "clipped redraw area conflates canvas capacity", static)
                         assert record.get("phaseCalls", {}).get("static.patch.upload.normal", 0) == 0 and record.get("phaseCalls", {}).get("static.patch.upload.specular", 0) == 0, (scenario, "unchanged material textures were uploaded", static)
                         assert static.get("retainedScratchPixels") == 0, (scenario, "retained scratch", static)
+                if scenario == "control-full-static":
+                    for record in records:
+                        validate_full_static_control(record, env["native"], validate_static)
                 run["scenarios"][scenario] = {
                     "summary": summarize(records),
                     "records": records,
