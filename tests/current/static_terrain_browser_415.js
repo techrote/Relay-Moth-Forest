@@ -63,17 +63,97 @@
 
   function uploadReference(g,source,w,h){
     const binding=g.getParameter(g.TEXTURE_BINDING_2D),flip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL);
-    const premultiply=g.getParameter(g.UNPACK_PREMULTIPLY_ALPHA_WEBGL),texture=g.createTexture();
+    const premultiply=g.getParameter(g.UNPACK_PREMULTIPLY_ALPHA_WEBGL),skipPixels=g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows=g.getParameter(g.UNPACK_SKIP_ROWS),texture=g.createTexture();
     try{
       g.bindTexture(g.TEXTURE_2D,texture);
       g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);
       g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);
       g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);g.pixelStorei(g.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
+      g.pixelStorei(g.UNPACK_SKIP_PIXELS,0);g.pixelStorei(g.UNPACK_SKIP_ROWS,0);
       g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,source);
       return readTexture(g,texture,w,h);
     }finally{
       g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,flip);g.pixelStorei(g.UNPACK_PREMULTIPLY_ALPHA_WEBGL,premultiply);
+      g.pixelStorei(g.UNPACK_SKIP_PIXELS,skipPixels);g.pixelStorei(g.UNPACK_SKIP_ROWS,skipRows);
       g.bindTexture(g.TEXTURE_2D,binding);g.deleteTexture(texture);
+    }
+  }
+
+  function uploadCroppedReference(g,source,region){
+    const binding=g.getParameter(g.TEXTURE_BINDING_2D),flip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels=g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows=g.getParameter(g.UNPACK_SKIP_ROWS);
+    const texture=g.createTexture(),{x,y,width,height}=region,rx=region.rasterX??x,ry=region.rasterY??y,rh=region.rasterHeight??height;
+    try{
+      g.bindTexture(g.TEXTURE_2D,texture);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);
+      g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);
+      g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false);g.pixelStorei(g.UNPACK_SKIP_PIXELS,0);g.pixelStorei(g.UNPACK_SKIP_ROWS,0);
+      g.texImage2D(g.TEXTURE_2D,0,g.RGBA,width,height,0,g.RGBA,g.UNSIGNED_BYTE,null);
+      g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);g.pixelStorei(g.UNPACK_SKIP_PIXELS,x-rx);g.pixelStorei(g.UNPACK_SKIP_ROWS,rh-(y-ry)-height);
+      g.texSubImage2D(g.TEXTURE_2D,0,0,0,width,height,g.RGBA,g.UNSIGNED_BYTE,source);
+      return readTexture(g,texture,width,height);
+    }finally{
+      g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,flip);g.pixelStorei(g.UNPACK_SKIP_PIXELS,skipPixels);g.pixelStorei(g.UNPACK_SKIP_ROWS,skipRows);
+      g.bindTexture(g.TEXTURE_2D,binding);g.deleteTexture(texture);
+    }
+  }
+
+  function nativeCropCases(){
+    const g=game.renderer.gl,width=19,height=17,textures=[],canvases=[],expected=[],out=[];
+    const saved={binding:g.getParameter(g.TEXTURE_BINDING_2D),flip:g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels:g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows:g.getParameter(g.UNPACK_SKIP_ROWS),image:g.texImage2D,sub:g.texSubImage2D};
+    const unpack=()=>({flip:g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels:g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows:g.getParameter(g.UNPACK_SKIP_ROWS)});
+    const pattern=(w,h,map,seed)=>{
+      const bytes=new Uint8Array(w*h*4);for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+        const i=(y*w+x)*4;bytes[i]=(37*x+11*y+53*map+seed)%256;bytes[i+1]=(7*x+41*y+29*map+seed*3)%256;bytes[i+2]=(73*x+5*y+47*map+seed*7)%256;bytes[i+3]=255;
+      }return bytes;
+    };
+    const cases=[
+      ['interior',{x:6,y:6,width:5,height:4,rasterX:3,rasterY:2,rasterWidth:12,rasterHeight:11}],
+      ['clipped-top',{x:2,y:0,width:6,height:3,rasterX:0,rasterY:0,rasterWidth:11,rasterHeight:8}],
+      ['clipped-bottom',{x:10,y:14,width:7,height:3,rasterX:7,rasterY:11,rasterWidth:12,rasterHeight:6}]
+    ];
+    try{
+      g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false);g.pixelStorei(g.UNPACK_SKIP_PIXELS,0);g.pixelStorei(g.UNPACK_SKIP_ROWS,0);
+      for(let map=0;map<3;map++){
+        const texture=g.createTexture(),bytes=pattern(width,height,map,193);textures.push(texture);expected.push(bytes.slice());
+        g.bindTexture(g.TEXTURE_2D,texture);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.NEAREST);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.NEAREST);
+        g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);
+        g.texImage2D(g.TEXTURE_2D,0,g.RGBA,width,height,0,g.RGBA,g.UNSIGNED_BYTE,bytes);
+      }
+      const renderer=Object.create(game.renderer);Object.assign(renderer,{nativeW:width,nativeH:height,bgTex:textures[0],bgNormalTex:textures[1],bgSpecTex:textures[2],backgroundReady:true,backgroundSize:[width,height],backgroundRevision:0,backgroundUploadCalls:0,backgroundUploadBytes:0});
+      for(let index=0;index<cases.length;index++){
+        const [label,region]=cases[index],sources=[],sourcePixels=[];
+        for(let map=0;map<3;map++){
+          const canvas=new OffscreenCanvas(region.rasterWidth,region.rasterHeight),ctx=canvas.getContext('2d'),bytes=pattern(canvas.width,canvas.height,map,17+index*31),pixels=ctx.createImageData(canvas.width,canvas.height);
+          // Opaque bytes make this a crop/addressing oracle; fractional-alpha
+          // composition remains covered by the full production material suite.
+          pixels.data.set(bytes);ctx.putImageData(pixels,0,0);canvases.push(canvas);sources.push(canvas);sourcePixels.push(bytes);
+        }
+        const desired={flip:index===1,skipPixels:index+1,skipRows:4-index};
+        g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,desired.flip);g.pixelStorei(g.UNPACK_SKIP_PIXELS,desired.skipPixels);g.pixelStorei(g.UNPACK_SKIP_ROWS,desired.skipRows);
+        let fullUploads=0;const uploads=[];
+        g.texImage2D=function(...args){if(textures.includes(g.getParameter(g.TEXTURE_BINDING_2D)))fullUploads++;return saved.image.apply(this,args)};
+        g.texSubImage2D=function(...args){const map=textures.indexOf(g.getParameter(g.TEXTURE_BINDING_2D));if(map>=0)uploads.push({map,argumentCount:args.length,x:args[2],y:args[3],width:args[4],height:args[5],...unpack()});return saved.sub.apply(this,args)};
+        try{renderer.patchBackground(region,sources[0],{normal:sources[1],spec:sources[2]})}
+        catch(error){root.__staticRasterDiagnostics={kind:'native-asymmetric-crop',label,region,desiredState:desired,restoredState:unpack(),uploads,error:String(error)};throw error}
+        finally{g.texImage2D=saved.image;g.texSubImage2D=saved.sub}
+        check(JSON.stringify(unpack())===JSON.stringify(desired),'native '+label+' crop did not restore nondefault unpack state');
+        check(fullUploads===0&&uploads.length===3&&uploads.every(u=>u.argumentCount===9&&u.flip===true&&u.x===region.x&&u.y===height-region.y-region.height&&u.width===region.width&&u.height===region.height&&u.skipPixels===region.x-region.rasterX&&u.skipRows===region.rasterHeight-(region.y-region.rasterY)-region.height),'native '+label+' crop used incorrect upload bounds/state');
+        const maps={};
+        for(let map=0;map<3;map++){
+          for(let y=0;y<region.height;y++)for(let x=0;x<region.width;x++){
+            const source=((region.y-region.rasterY+y)*region.rasterWidth+region.x-region.rasterX+x)*4;
+            const target=((height-1-region.y-y)*width+region.x+x)*4;
+            expected[map].set(sourcePixels[map].subarray(source,source+4),target);
+          }
+          const diff=differences(readTexture(g,textures[map],width,height),expected[map],width);maps[channels[map]]=diff;
+          check(diff.bytes===0,'native '+label+' '+channels[map]+' asymmetric crop differs '+JSON.stringify(diff));
+        }
+        check(g.getError()===g.NO_ERROR,'native '+label+' crop WebGL error');out.push({label,region,unpackRestored:true,restoredState:unpack(),uploads,maps});
+        for(const canvas of sources)release(canvas);
+      }
+      return{native:[width,height],cases:out};
+    }finally{
+      g.texImage2D=saved.image;g.texSubImage2D=saved.sub;g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,saved.flip);g.pixelStorei(g.UNPACK_SKIP_PIXELS,saved.skipPixels);g.pixelStorei(g.UNPACK_SKIP_ROWS,saved.skipRows);
+      g.bindTexture(g.TEXTURE_2D,saved.binding);for(const texture of textures)g.deleteTexture(texture);for(const canvas of canvases)release(canvas);
     }
   }
 
@@ -197,9 +277,14 @@
     const width=actual.width,height=actual.height,sx=width/640,sy=height/360;
     const upload=uploads.find(item=>item.channel==='color');if(!upload)return[];
     const original={x:upload.x,y:height-upload.y-upload.height,width:upload.width,height:upload.height};
-    const inputs=rect=>({...rect,
-      tx0:Math.max(0,Math.floor((rect.x/sx-4-2/sx)/16)),ty0:Math.max(0,Math.floor((rect.y/sy-4-2/sy)/16)),
-      tx1:Math.min(40,Math.ceil(((rect.x+rect.width)/sx+4+2/sx)/16)),ty1:Math.min(19,Math.ceil(((rect.y+rect.height)/sy+4+2/sy)/16))});
+    const inputs=(rect,padding=0)=>{
+      const rx=padding?Math.max(0,Math.floor((rect.x-padding)/16)*16):rect.x,ry=padding?Math.max(0,Math.floor((rect.y-padding)/16)*16):rect.y;
+      const right=padding?Math.min(width,Math.ceil((rect.x+rect.width+padding)/16)*16):rect.x+rect.width;
+      const bottom=padding?Math.min(height,Math.ceil((rect.y+rect.height+padding)/16)*16):rect.y+rect.height;
+      return{...rect,rasterX:rx,rasterY:ry,rasterWidth:right-rx,rasterHeight:bottom-ry,
+        tx0:Math.max(0,Math.floor((rx/sx-4-2/sx)/16)),ty0:Math.max(0,Math.floor((ry/sy-4-2/sy)/16)),
+        tx1:Math.min(40,Math.ceil((right/sx+4+2/sx)/16)),ty1:Math.min(19,Math.ceil((bottom/sy+4+2/sy)/16))};
+    };
     const aligned=(grid,bottomOrigin)=>{
       const x0=Math.max(0,Math.floor(original.x/grid)*grid),x1=Math.min(width,Math.ceil((original.x+original.width)/grid)*grid);
       const y0=bottomOrigin?Math.max(0,height-Math.ceil((height-original.y)/grid)*grid):Math.max(0,Math.floor(original.y/grid)*grid);
@@ -210,19 +295,22 @@
       const out=new Uint8Array(w*h*4);for(let row=0;row<h;row++)out.set(bytes.subarray(((y+row)*sourceWidth+x)*4,((y+row)*sourceWidth+x+w)*4),row*w*4);return out;
     };
     const originalExpected=expected.map(bytes=>crop(bytes,width,original.x,height-original.y-original.height,original.width,original.height));
-    const variants=[['original-1',original,false],['original-2',original,false],['aligned-8-top',aligned(8,false),false],['aligned-16-top',aligned(16,false),false],
-      ['aligned-8-bottom',aligned(8,true),false],['aligned-16-bottom',aligned(16,true),false],['original-cpu',original,true]];
+    const production=game.staticRefreshStats?.regions?.find(rect=>rect.x===original.x&&rect.y===original.y&&rect.width===original.width&&rect.height===original.height)||inputs(original,32);
+    const variants=[['production-1',production,false],['production-2',production,false],['unguarded-original',inputs(original),false],
+      ['guard-16',inputs(original,16),false],['guard-32',inputs(original,32),false],['guard-64',inputs(original,64),false],
+      ['unguarded-8-top',inputs(aligned(8,false)),false],['unguarded-16-top',inputs(aligned(16,false)),false],
+      ['unguarded-8-bottom',inputs(aligned(8,true)),false],['unguarded-16-bottom',inputs(aligned(16,true)),false],['production-cpu',production,true]];
     const out=[];
-    for(const [name,rectangle,forceCPU] of variants){
-      const region=inputs(rectangle),painter=new StaticPainter(game.art,game.luts),prototype=OffscreenCanvas.prototype,getContext=prototype.getContext;
+    for(const [name,region,forceCPU] of variants){
+      const painter=new StaticPainter(game.art,game.luts),prototype=OffscreenCanvas.prototype,getContext=prototype.getContext;
       const generationBefore=game.art.normalTransformGeneration;let color=null,maps=null;
-      if(forceCPU)prototype.getContext=function(type,options){return getContext.call(this,type,type==='2d'&&this.width===region.width&&this.height===region.height?{...options,willReadFrequently:true}:options)};
+      if(forceCPU)prototype.getContext=function(type,options){return getContext.call(this,type,type==='2d'&&this.width===(region.rasterWidth??region.width)&&this.height===(region.rasterHeight??region.height)?{...options,willReadFrequently:true}:options)};
       try{
         color=painter.buildPatch(game.room,game.state,width,height,region);maps=painter.lastMaterialMaps;
         const sources=[color,maps.normal,maps.spec],entry={name,region,forceCPU,generationBefore,generationAfter:game.art.normalTransformGeneration,
           colorAttributes:color.getContext('2d').getContextAttributes(),maps:{}};
         for(let c=0;c<channels.length;c++){
-          const bytes=uploadReference(game.renderer.gl,sources[c],region.width,region.height);
+          const bytes=uploadCroppedReference(game.renderer.gl,sources[c],region);
           const fullCrop=crop(expected[c],width,region.x,height-region.y-region.height,region.width,region.height);
           const originalCrop=crop(bytes,region.width,original.x-region.x,region.y+region.height-original.y-original.height,original.width,original.height);
           entry.maps[channels[c]]={wholeRegion:differences(bytes,fullCrop,region.width),originalCrop:differences(originalCrop,originalExpected[c],original.width)};
@@ -265,6 +353,8 @@
   function instrument(action){
     const r=game.renderer,g=r.gl,painter=game.painter,canvasRefs=[];
     const stats={fullBuilds:0,patchBuilds:0,floorCalls:0,fullUploads:[],subUploads:[],readbacks:[],patchCanvases:[],actorInitializations:0};
+    const unpack=()=>({flipY:g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels:g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows:g.getParameter(g.UNPACK_SKIP_ROWS)});
+    stats.unpackBefore=unpack();
     const original={build:painter.build,patch:painter.buildPatch,tile:painter.baseTile,image:g.texImage2D,sub:g.texSubImage2D,
       creature:game.creatures.init,mini:game.miniGuides.init};
     const contextPrototype=Object.getPrototypeOf(new OffscreenCanvas(1,1).getContext('2d'));
@@ -281,8 +371,9 @@
     painter.baseTile=function(...args){stats.floorCalls++;return original.tile.apply(this,args)};
     g.texImage2D=function(...args){const name=channel();if(name)stats.fullUploads.push({channel:name});return original.image.apply(this,args)};
     g.texSubImage2D=function(...args){
-      const name=channel();if(name){const source=args.length===7?args[6]:null;
-        stats.subUploads.push({channel:name,x:args[2],y:args[3],width:source?source.width:args[4],height:source?source.height:args[5]});
+      const name=channel();if(name){const source=args.length===7?args[6]:args[8],dom=source&&Number.isFinite(source.width)&&Number.isFinite(source.height);
+        stats.subUploads.push({channel:name,x:args[2],y:args[3],width:args.length===7?source.width:args[4],height:args.length===7?source.height:args[5],
+          argumentCount:args.length,sourceWidth:dom?source.width:null,sourceHeight:dom?source.height:null,...unpack()});
       }
       return original.sub.apply(this,args);
     };
@@ -294,6 +385,7 @@
       g.texImage2D=original.image;g.texSubImage2D=original.sub;contextPrototype.getImageData=original.read;
       game.creatures.init=original.creature;game.miniGuides.init=original.mini;
       stats.releasedPatchCanvases=canvasRefs.every(c=>c.width===1&&c.height===1);
+      stats.unpackAfter=unpack();stats.unpackRestored=JSON.stringify(stats.unpackBefore)===JSON.stringify(stats.unpackAfter);
     }
     stats.actorsUnchanged=stats.actorInitializations===0&&actors.creatures===game.creatures.units&&actors.mini===game.miniGuides.units&&
       actors.creatureData===JSON.stringify(game.creatures.units)&&actors.miniData===JSON.stringify(game.miniGuides.units);
@@ -325,6 +417,7 @@
       check(work.fullBuilds===0&&work.fullUploads.length===0,label+' full build or texture replacement in eligible edit');
       check(work.patchBuilds>0&&work.floorCalls>0&&work.floorCalls<760,label+' floor raster work is not bounded');
       check(work.releasedPatchCanvases,label+' retained static scratch backing');
+      check(work.unpackRestored,label+' changed WebGL unpack state');
       check(work.patchCanvases.length===work.patchBuilds*3&&work.patchCanvases.every(c=>c.width*c.height<area),label+' scratch map dimensions are not bounded');
       check(work.readbacks.every(c=>c.width*c.height<area),label+' full-size Canvas2D readback');
       check(!game.currentStatic&&!game.painter.lastMaterialMaps,label+' retained full static backing');
@@ -334,9 +427,20 @@
         check(uploads.length>0&&pixels>0&&pixels<area,label+' '+name+' uploads are not bounded');
         check(uploads.every(u=>Number.isInteger(u.x)&&Number.isInteger(u.y)&&u.x>=0&&u.y>=0&&u.width>0&&u.height>0&&u.x+u.width<=r.nativeW&&u.y+u.height<=r.nativeH),label+' '+name+' invalid native upload rectangle');
         check(JSON.stringify(shape(name))===JSON.stringify(shape('color')),label+' incoherent color/material output regions');
+        for(const upload of uploads){
+          const top=r.nativeH-upload.y-upload.height,region=work.diagnostics.regions.find(rect=>rect.x===upload.x&&rect.y===top&&rect.width===upload.width&&rect.height===upload.height);
+          check(region&&upload.argumentCount===9&&upload.flipY===true,label+' did not use the explicit DOM-source crop overload');
+          check(upload.sourceWidth===region.rasterWidth&&upload.sourceHeight===region.rasterHeight&&upload.skipPixels===region.x-region.rasterX&&
+            upload.skipRows===region.rasterHeight-(region.y-region.rasterY)-region.height,label+' canvas crop disagrees with raster/output bounds');
+          const left=upload.skipPixels,right=upload.sourceWidth-left-upload.width,bottom=upload.skipRows,above=upload.sourceHeight-bottom-upload.height;
+          check(left>=Math.min(32,upload.x)&&right>=Math.min(32,r.nativeW-upload.x-upload.width)&&above>=Math.min(32,top)&&bottom>=Math.min(32,upload.y),label+' upload reaches an unguarded scratch edge');
+        }
       }
       check(work.diagnostics.rasterCells===work.floorCalls&&work.diagnostics.uploadCalls===work.subUploads.length&&
         work.diagnostics.uploadBytes===work.subUploads.reduce((n,u)=>n+u.width*u.height*4,0),label+' bounded-work diagnostics do not match executed work');
+      check(work.diagnostics.rasterPixels===work.patchCanvases.reduce((n,c)=>n+c.width*c.height,0)/3&&
+        work.diagnostics.scratchPixels===Math.max(...work.patchCanvases.map(c=>c.width*c.height))&&
+        work.diagnostics.pixels===work.subUploads.filter(u=>u.channel==='color').reduce((n,u)=>n+u.width*u.height,0),label+' raster/output/scratch metrics conflate guarded source with uploaded pixels');
       check(work.diagnostics.retainedScratchPixels===0,label+' reports retained static scratch');
       check(work.waterFullRebuilds===0&&work.waterFullUploads===0,label+' regressed PERF-003 bounded water');
     }else if(mode==='noop')check(work.fullBuilds===0&&work.patchBuilds===0&&work.fullUploads.length===0&&work.subUploads.length===0,label+' unchanged authority did rendering work');
@@ -598,7 +702,7 @@
       rectOwn:Object.prototype.hasOwnProperty.call(r.c,'getBoundingClientRect'),rect:r.c.getBoundingClientRect,choice:e.choice};
     const sourceMaps=structuredClone(root.__json?.['relay_moth_maps.json']||saved.maps);
     try{
-      const result={oracle:'clean full StaticPainter composition with production source canvases; all color/normal/specular GPU bytes; exact equality',legacyCompatibility:legacyCompatibility(sourceMaps),negativeControls:negativeControls(sourceMaps),native:[],naturalRooms:[],fallbacks:[],recovery:[],liveOwnership:[]};
+      const result={oracle:'clean full StaticPainter composition with production source canvases; all color/normal/specular GPU bytes; exact equality',nativeCrop:nativeCropCases(),legacyCompatibility:legacyCompatibility(sourceMaps),negativeControls:negativeControls(sourceMaps),native:[],naturalRooms:[],fallbacks:[],recovery:[],liveOwnership:[]};
       for(const [width,height] of [[640,360],[997,563]])result.native.push(eligibleCases(width,height,sourceMaps));
       result.naturalRooms=naturalCases(sourceMaps);
       result.fallbacks=fallbackCases(sourceMaps);result.recovery=recoveryCases(sourceMaps);result.liveOwnership=ownershipCases(sourceMaps);
@@ -612,5 +716,5 @@
     }
   }
 
-  root.auditStaticTerrain={run,legacyCompatibility,negativeControls,eligibleCases,naturalCases,fallbackCases,recoveryCases,ownershipCases,capture,parity,instrument};
+  root.auditStaticTerrain={run,nativeCropCases,legacyCompatibility,negativeControls,eligibleCases,naturalCases,fallbackCases,recoveryCases,ownershipCases,capture,parity,instrument};
 })(globalThis);

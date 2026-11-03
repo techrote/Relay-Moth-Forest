@@ -387,6 +387,7 @@ def measure_source(args, root, validate_static=True):
                         assert static.get("mode") == "patch", (scenario, "static backing did not use a bounded patch", static)
                         assert record.get("phaseCalls", {}).get("static.build", 0) == 0, (scenario, "small terrain edit invoked full painter")
                         assert 0 < static.get("rasterCells", 10**12) < 40 * 19, (scenario, "unbounded floor raster", static)
+                        assert 0 < static.get("rasterPixels", 10**12) <= env["native"][0] * env["native"][1] * .20, (scenario, "unbounded guarded raster", static)
                         assert 0 < static.get("uploadBytes", 10**12) < env["native"][0] * env["native"][1] * 12, (scenario, "full static upload", static)
                         assert static.get("uploadCalls") == len(static.get("regions", [])) * 3, (scenario, "incomplete material upload", static)
                         assert static.get("scratchPixels", 10**12) <= 262144 and static.get("retainedScratchPixels") == 0, (scenario, "unbounded or retained scratch", static)

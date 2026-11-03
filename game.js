@@ -351,7 +351,10 @@ class StaticPainter{
   }
   persistentObjective(ctx,obj,x,y,roomDone){if(obj.kind==='pip')return;let n=(this.art.roles.objective||{})[obj.kind];if(n){this.sprite(ctx,n,x,y+12,{element:'discoveries',alpha:.97});this.glow(ctx,x,y,'discoveries',225,obj.kind==='dawn'?50:26,.26)}if(roomDone)this.glow(ctx,x,y,'discoveries',245,23,.14)}
   build(room,state,renderW=W,renderH=H){return this.buildSurface(room,state,renderW,renderH,null)}
-  buildPatch(room,state,renderW,renderH,region){return this.buildSurface(room,state,renderW,renderH,region)}
+  buildPatch(room,state,renderW,renderH,region){
+    const raster={...region,x:region.rasterX??region.x,y:region.rasterY??region.y,width:region.rasterWidth??region.width,height:region.rasterHeight??region.height};
+    return this.buildSurface(room,state,renderW,renderH,raster);
+  }
   buildSurface(room,state,renderW,renderH,region){
     // One composition path for the full reference and bounded scratch. Translation
     // is in integer native pixels, preserving the full canvas's fractional phase.
@@ -543,14 +546,21 @@ class GLRenderer{
   patchBackground(region,canvas,maps){
     const g=this.gl,{x,y,width,height}=region;
     if(!this.backgroundReady||this.backgroundSize?.[0]!==this.nativeW||this.backgroundSize?.[1]!==this.nativeH||![x,y,width,height].every(Number.isInteger)||x<0||y<0||width<=0||height<=0||x+width>this.nativeW||y+height>this.nativeH)throw new Error('Stale or invalid static background patch');
-    if(![canvas,maps?.normal,maps?.spec].every(c=>c&&c.width===width&&c.height===height))throw new Error('Incomplete static material patch');
-    const upload=(tex,src,label)=>perfMeasure(label,()=>{g.bindTexture(g.TEXTURE_2D,tex);this.backgroundUploadCalls=(this.backgroundUploadCalls||0)+1;this.backgroundUploadBytes=(this.backgroundUploadBytes||0)+width*height*4;g.texSubImage2D(g.TEXTURE_2D,0,x,this.nativeH-y-height,g.RGBA,g.UNSIGNED_BYTE,src)});
-    this.backgroundReady=false;g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);
+    const rasterX=region.rasterX??x,rasterY=region.rasterY??y,rasterWidth=region.rasterWidth??width,rasterHeight=region.rasterHeight??height;
+    if(![rasterX,rasterY,rasterWidth,rasterHeight].every(Number.isInteger)||rasterX<0||rasterY<0||rasterWidth<=0||rasterHeight<=0||rasterX+rasterWidth>this.nativeW||rasterY+rasterHeight>this.nativeH||rasterX>x||rasterY>y||rasterX+rasterWidth<x+width||rasterY+rasterHeight<y+height)throw new Error('Stale or invalid static background patch crop');
+    if(![canvas,maps?.normal,maps?.spec].every(c=>c&&c.width===rasterWidth&&c.height===rasterHeight))throw new Error('Incomplete static material patch');
+    const flip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL),skipPixels=g.getParameter(g.UNPACK_SKIP_PIXELS),skipRows=g.getParameter(g.UNPACK_SKIP_ROWS);
+    const upload=(tex,src,label)=>perfMeasure(label,()=>{g.bindTexture(g.TEXTURE_2D,tex);this.backgroundUploadCalls=(this.backgroundUploadCalls||0)+1;this.backgroundUploadBytes=(this.backgroundUploadBytes||0)+width*height*4;g.texSubImage2D(g.TEXTURE_2D,0,x,this.nativeH-y-height,width,height,g.RGBA,g.UNSIGNED_BYTE,src)});
+    this.backgroundReady=false;
     try{
+      // Draw filtering away from the uploaded interior. WebGL2 selects the crop
+      // directly from the guarded canvas; with flip enabled, skipped rows count
+      // from its bottom. No intermediate crop canvas or readback is required.
+      g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);g.pixelStorei(g.UNPACK_SKIP_PIXELS,x-rasterX);g.pixelStorei(g.UNPACK_SKIP_ROWS,rasterHeight-(y-rasterY)-height);
       upload(this.bgTex,canvas,'static.patch.upload.color');upload(this.bgNormalTex,maps.normal,'static.patch.upload.normal');upload(this.bgSpecTex,maps.spec,'static.patch.upload.specular');
       if(g.isContextLost?.()||(g.getError&&g.getError()!==g.NO_ERROR))throw new Error('Static background subupload failed');
       this.backgroundReady=true;this.backgroundRevision=(this.backgroundRevision||0)+1;
-    }finally{g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false)}
+    }finally{g.pixelStorei(g.UNPACK_SKIP_PIXELS,skipPixels);g.pixelStorei(g.UNPACK_SKIP_ROWS,skipRows);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,flip)}
   }
   renderBackground(settings=GRAPHICS_DEFAULTS){const g=this.gl;if(!this.materialEnabled){this.quadDraw(this.quadProg,this.bgTex);return}const p=this.bgMaterialProg;g.useProgram(p);this.quadGeometry(p);g.activeTexture(g.TEXTURE0);g.bindTexture(g.TEXTURE_2D,this.bgTex);g.uniform1i(g.getUniformLocation(p,'uTex'),0);g.activeTexture(g.TEXTURE1);g.bindTexture(g.TEXTURE_2D,this.bgNormalTex);g.uniform1i(g.getUniformLocation(p,'uNormalTex'),1);g.activeTexture(g.TEXTURE2);g.bindTexture(g.TEXTURE_2D,this.bgSpecTex);g.uniform1i(g.getUniformLocation(p,'uSpecularTex'),2);g.uniform2f(g.getUniformLocation(p,'uMainLightPos'),this.mainLightPos[0],this.mainLightPos[1]);g.uniform2f(g.getUniformLocation(p,'uLogicalSize'),W,H);g.uniform1f(g.getUniformLocation(p,'uBumpStrength'),this.bumpStrength);g.uniform1f(g.getUniformLocation(p,'uSpecularStrength'),this.specularStrength);g.uniform1f(g.getUniformLocation(p,'uMaterialOn'),this.materialEnabled?1:0);g.drawArrays(g.TRIANGLES,0,6)}
   setWaterMask(canvas,signature='water',settings=GRAPHICS_DEFAULTS,delta=null){
@@ -874,10 +884,10 @@ class Game{
     if(previous?.valid&&snapshot?.valid&&previous.references[2]===this.art&&(previous.resourceSignature!==snapshot.resourceSignature||previous.references.slice(3).some((ref,i)=>ref!==snapshot.references[i+3]))){
       for(const cache of [this.art.tintCache,this.art.normalTransformCache]){if(cache){for(const canvas of cache.values())releaseCanvasBacking(canvas);cache.clear()}}
     }
-    const stats={mode:plan.kind,reason:plan.reason,changedCells:plan.changedCellCount||0,rasterCells:0,pixels:0,uploadCalls:0,uploadBytes:0,scratchPixels:0,scratchBytes:0,readbackPixels:0,regions:[],retainedScratchPixels:0};
+    const stats={mode:plan.kind,reason:plan.reason,changedCells:plan.changedCellCount||0,rasterCells:0,rasterPixels:0,pixels:0,uploadCalls:0,uploadBytes:0,scratchPixels:0,scratchBytes:0,readbackPixels:0,regions:[],retainedScratchPixels:0};
     this.staticRefreshStats=stats;
     const full=()=>{
-      stats.mode='full';stats.rasterCells+=GRID_W*GRID_H;stats.pixels+=renderer.nativeW*renderer.nativeH;stats.scratchPixels=Math.max(stats.scratchPixels,renderer.nativeW*renderer.nativeH);
+      stats.mode='full';stats.rasterCells+=GRID_W*GRID_H;stats.pixels+=renderer.nativeW*renderer.nativeH;stats.rasterPixels+=renderer.nativeW*renderer.nativeH;stats.scratchPixels=Math.max(stats.scratchPixels,renderer.nativeW*renderer.nativeH);
       const staticCanvas=perfMeasure('static.build',()=>this.painter.build(this.room,this.state,renderer.nativeW,renderer.nativeH)),materialMaps=this.painter.lastMaterialMaps;
       try{renderer.setBackground(staticCanvas,materialMaps)}finally{releaseCanvasBacking(staticCanvas);releaseCanvasBacking(materialMaps?.normal);releaseCanvasBacking(materialMaps?.spec);this.painter.lastMaterialMaps=null}
     };
@@ -888,7 +898,8 @@ class Game{
       if(plan.kind==='patch'){
         try{
           for(const region of plan.regions){
-            stats.rasterCells+=(region.tx1-region.tx0)*(region.ty1-region.ty0);stats.pixels+=region.width*region.height;stats.scratchPixels=Math.max(stats.scratchPixels,region.width*region.height);stats.regions.push({...region});
+            const rasterPixels=(region.rasterWidth??region.width)*(region.rasterHeight??region.height);
+            stats.rasterCells+=(region.tx1-region.tx0)*(region.ty1-region.ty0);stats.pixels+=region.width*region.height;stats.rasterPixels+=rasterPixels;stats.scratchPixels=Math.max(stats.scratchPixels,rasterPixels);stats.regions.push({...region});
             const staticCanvas=perfMeasure('static.patch.build',()=>this.painter.buildPatch(this.room,this.state,renderer.nativeW,renderer.nativeH,region)),materialMaps=this.painter.lastMaterialMaps;
             try{
               // An authored room can exceed the bounded sprite cache. A newly

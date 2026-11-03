@@ -15,7 +15,7 @@
   const GEOMETRY_KEYS=['renderWidth','renderHeight','logicalWidth','logicalHeight','tileSize','columns','rows'];
   const REFERENCE_KEYS=['sourceRef','rendererRef','artRef','atlasRef','normalRef','specularRef'];
   const MAX_CELLS=65536,MAX_VALUE_NODES=65536,MAX_VALUE_DEPTH=32;
-  const LOGICAL_HALO=4,NATIVE_HALO=2,NATIVE_ALIGNMENT=16;
+  const LOGICAL_HALO=4,NATIVE_HALO=2,NATIVE_ALIGNMENT=16,NATIVE_RASTER_GUARD=32;
   const snapshots=new WeakSet();
   const own=(object,key)=>Object.prototype.hasOwnProperty.call(object,key);
 
@@ -127,9 +127,10 @@
     const geometry=next?.valid&&next.geometry;
     const full=kind==='full';
     const pixelCount=full?(geometry?geometry.renderWidth*geometry.renderHeight:0):regions.reduce((n,r)=>n+r.width*r.height,0);
+    const rasterPixels=full?pixelCount:regions.reduce((n,r)=>n+r.rasterWidth*r.rasterHeight,0);
     const rasterCellCount=full?(geometry?geometry.columns*geometry.rows:0):regions.reduce((n,r)=>n+(r.tx1-r.tx0)*(r.ty1-r.ty0),0);
-    const scratchPixels=full?pixelCount:regions.reduce((n,r)=>Math.max(n,r.width*r.height),0);
-    return Object.freeze({kind,reason,changedCells:freezeArray(changedCells),changedCellCount:changedCells.length,regions:freezeArray(regions.map(Object.freeze)),pixelCount,rasterCellCount,scratchPixels,scratchBytes:scratchPixels*12,uploadCalls:full?3:regions.length*3,uploadBytes:pixelCount*12,logicalHalo:LOGICAL_HALO,nativeHalo:NATIVE_HALO,nativeAlignment:NATIVE_ALIGNMENT});
+    const scratchPixels=full?pixelCount:regions.reduce((n,r)=>Math.max(n,r.rasterWidth*r.rasterHeight),0);
+    return Object.freeze({kind,reason,changedCells:freezeArray(changedCells),changedCellCount:changedCells.length,regions:freezeArray(regions.map(Object.freeze)),pixelCount,rasterPixels,rasterCellCount,scratchPixels,scratchBytes:scratchPixels*12,uploadCalls:full?3:regions.length*3,uploadBytes:pixelCount*12,logicalHalo:LOGICAL_HALO,nativeHalo:NATIVE_HALO,nativeAlignment:NATIVE_ALIGNMENT,rasterGuard:NATIVE_RASTER_GUARD});
   }
 
   function limits(options){
@@ -197,17 +198,27 @@
     });
     const merged=merge(raw);
     if(merged.length>budget.maxRegions)return full('fragmentation',changes);
-    const regions=merged.map(rect=>({x:rect.x0,y:rect.y0,width:rect.x1-rect.x0,height:rect.y1-rect.y0,
-      // Replay predecessors whose overdraw intersects the native clip. The
-      // extra guard is deliberately separate from the output halo; relying on
-      // just dirty-cell bounds loses neighboring strokes at patch edges.
-      tx0:Math.max(0,Math.floor((rect.x0/sx-LOGICAL_HALO-NATIVE_HALO/sx)/g.tileSize)),
-      ty0:Math.max(0,Math.floor((rect.y0/sy-LOGICAL_HALO-NATIVE_HALO/sy)/g.tileSize)),
-      tx1:Math.min(g.columns,Math.ceil((rect.x1/sx+LOGICAL_HALO+NATIVE_HALO/sx)/g.tileSize)),
-      ty1:Math.min(g.rows,Math.ceil((rect.y1/sy+LOGICAL_HALO+NATIVE_HALO/sy)/g.tileSize))
-    }));
+    const regions=merged.map(rect=>{
+      // Keep the upload away from the scratch clip, where large atlas sprite
+      // sampling can differ from a full composition. Guard overlaps remain
+      // separate raster work; they must not enlarge or merge upload regions.
+      const rasterX=Math.max(0,Math.floor((rect.x0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      const rasterY=Math.max(0,Math.floor((rect.y0-NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      const rasterX1=Math.min(g.renderWidth,Math.ceil((rect.x1+NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      const rasterY1=Math.min(g.renderHeight,Math.ceil((rect.y1+NATIVE_RASTER_GUARD)/NATIVE_ALIGNMENT)*NATIVE_ALIGNMENT);
+      return{x:rect.x0,y:rect.y0,width:rect.x1-rect.x0,height:rect.y1-rect.y0,
+        rasterX,rasterY,rasterWidth:rasterX1-rasterX,rasterHeight:rasterY1-rasterY,
+        // Replay every floor predecessor contributing to the entire scratch,
+        // including its guard. The original logical/native input halo remains.
+        tx0:Math.max(0,Math.floor((rasterX/sx-LOGICAL_HALO-NATIVE_HALO/sx)/g.tileSize)),
+        ty0:Math.max(0,Math.floor((rasterY/sy-LOGICAL_HALO-NATIVE_HALO/sy)/g.tileSize)),
+        tx1:Math.min(g.columns,Math.ceil((rasterX1/sx+LOGICAL_HALO+NATIVE_HALO/sx)/g.tileSize)),
+        ty1:Math.min(g.rows,Math.ceil((rasterY1/sy+LOGICAL_HALO+NATIVE_HALO/sy)/g.tileSize))
+      };
+    });
     const patch=result('patch','terrain',next,changes,regions);
     if(patch.pixelCount>g.renderWidth*g.renderHeight*budget.maxPixelRatio)return full('pixel-budget',changes);
+    if(patch.rasterPixels>g.renderWidth*g.renderHeight*budget.maxPixelRatio)return full('raster-pixel-budget',changes);
     if(patch.rasterCellCount>g.columns*g.rows*budget.maxRasterRatio)return full('raster-budget',changes);
     if(patch.scratchPixels>budget.maxScratchPixels)return full('scratch-budget',changes);
     return patch;

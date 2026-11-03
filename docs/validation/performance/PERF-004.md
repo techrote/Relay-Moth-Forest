@@ -53,6 +53,8 @@ the exact tile seeds, row-major floor order, sky, sorted blocker sprites,
 vegetation interstitials, room patterns, mounted lamps and footer.
 
 Each region creates one small color canvas and two transparent material canvases.
+The raster surface includes a 32-native-pixel guard around the output rectangle,
+aligned outward and clipped to the native canvas. Only its interior is uploaded.
 Its transform uses the full native scale and an integer native-pixel translation,
 so a fractional display scale keeps the same raster phase. Nearby floor cells
 are replayed in their original order. Every unchanged static overlay is replayed
@@ -80,19 +82,31 @@ at `(312,264,32,32)`, two specular-alpha bytes differed by one level, while the
 ([native comparison](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41564327204)).
 The original lower clip cut through a flipped sprite sampled from the large
 specular atlas; extending only its horizontal bounds did not resolve the error.
+Alignment alone was insufficient for a coalesced move: two pixels on the outermost
+scratch column had three differing normal bytes
+([boundary diagnostic](https://github.com/techrote/Relay-Moth-Forest/actions/runs/41565413874)).
+The separate guard moves scratch clipping away from the uploaded interior.
 The raster input range and all memory, pixel and work limits account for the
-expanded bounds. The complete native acceptance matrix, not the alignment
-constant alone, qualifies the resulting image sampling.
+guarded bounds. The complete native acceptance matrix, not the alignment or
+guard constants alone, qualifies the resulting image sampling.
 
 Default planning limits are 16 changed cells, eight merged regions, at most 20%
-of native pixels, 35% of logical floor raster work, and 262,144 pixels in the
-largest scratch map. Thus the three-map scratch capacity is at most 3 MiB on
+of native output pixels and guarded raster pixels, 35% of logical floor raster
+work, and 262,144 pixels in the largest scratch map. Overlapping guards are counted
+separately, including duplicate raster work. Thus three-map scratch capacity is at most 3 MiB on
 the bounded path. Regions are processed sequentially and released immediately;
 no three-map native CPU backing or multiroom canvas cache is retained.
 
 `GLRenderer.patchBackground` subuploads color, normal and specular maps with the
-same native output rectangle and vertical orientation. It validates texture
-storage, dimensions and material completeness before the first write. A rendered
+same native output rectangle and vertical orientation. WebGL2's explicit-size
+`TexImageSource` overload crops directly from each guarded canvas using unpack
+skips; no application-side crop canvas or readback is introduced. This follows the
+[WebGL2 DOM-source pixel-store contract](https://registry.khronos.org/webgl/specs/latest/2.0/#PIXEL_STORE_PARAM_UPLOAD_DOM).
+With vertical flipping enabled, skipped rows count from the source bottom, as
+implemented by Chromium's `TexImageParams::GetSourceRect`. All three unpack
+settings are restored on success and failure. The renderer validates texture
+storage, output/raster containment, dimensions and material completeness before
+the first write. A rendered
 revision and snapshot advance only after the entire update succeeds. Any patch
 failure triggers a synchronous full rebuild; a failed repair invalidates the
 baseline and background key for retry. Scratch and failed full-build canvases are
@@ -102,7 +116,7 @@ discards derived tint/normal tile caches.
 ## Diagnostics and timing
 
 F10 runtime diagnostics include `renderer.staticRefresh`: mode/reason, changed
-cells, floor cells rastered, native pixels, upload calls/bytes, scratch capacity,
+cells, floor cells rastered, output pixels, guarded raster pixels, upload calls/bytes, scratch capacity,
 regions and retained scratch pixels. No-op refreshes report zero work. Upload
 counters include attempted calls when a failure requires repair.
 

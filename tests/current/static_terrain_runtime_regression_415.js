@@ -42,17 +42,23 @@ const production=vm.runInNewContext(`
 `,sandbox);
 
 function fakeGL(){
-  const gl={TEXTURE_2D:3553,RGBA:6408,UNSIGNED_BYTE:5121,UNPACK_FLIP_Y_WEBGL:37440,NO_ERROR:0,uploads:[],fullCount:0,subCount:0,flip:false,bound:null,lost:false,error:0,failFullAt:0,failSubAt:0,errorSubAt:0,hook:null};
+  const gl={TEXTURE_2D:3553,RGBA:6408,UNSIGNED_BYTE:5121,UNPACK_FLIP_Y_WEBGL:37440,UNPACK_SKIP_PIXELS:3316,UNPACK_SKIP_ROWS:3315,NO_ERROR:0,uploads:[],pixelStores:[],parameterQueries:[],fullCount:0,subCount:0,flip:false,skipPixels:0,skipRows:0,bound:null,lost:false,error:0,failFullAt:0,failSubAt:0,errorSubAt:0,hook:null};
   gl.bindTexture=(_target,texture)=>{gl.bound=texture};
-  gl.pixelStorei=(name,value)=>{assert.strictEqual(name,gl.UNPACK_FLIP_Y_WEBGL);gl.flip=value};
+  const storeKey=name=>{const key=new Map([[gl.UNPACK_FLIP_Y_WEBGL,'flip'],[gl.UNPACK_SKIP_PIXELS,'skipPixels'],[gl.UNPACK_SKIP_ROWS,'skipRows']]).get(name);assert(key,'unexpected pixel store');return key};
+  gl.pixelStorei=(name,value)=>{gl[storeKey(name)]=value;gl.pixelStores.push([name,value])};
+  gl.getParameter=name=>{gl.parameterQueries.push(name);return gl[storeKey(name)]};
   gl.texImage2D=(...args)=>{
     gl.fullCount++;const canvas=args[5];assert(canvas instanceof FakeCanvas,'full path uploads the production painter canvas');
     gl.uploads.push({mode:'full',texture:gl.bound,width:canvas.width,height:canvas.height,flip:gl.flip});gl.hook?.('full',canvas);
     if(gl.fullCount===gl.failFullAt)throw new Error('injected full upload failure');
   };
   gl.texSubImage2D=(...args)=>{
-    gl.subCount++;const canvas=args[6];assert(canvas instanceof FakeCanvas,'patch path uploads bounded canvas directly');
-    gl.uploads.push({mode:'patch',texture:gl.bound,x:args[2],y:args[3],width:canvas.width,height:canvas.height,flip:gl.flip});gl.hook?.('patch',canvas);
+    assert.strictEqual(args.length,9,'guarded source uses the explicit-size TexImageSource overload');
+    gl.subCount++;const canvas=args[8],width=args[4],height=args[5];assert(canvas instanceof FakeCanvas,'patch path uploads guarded canvas directly');
+    assert.strictEqual(args[6],gl.RGBA);assert.strictEqual(args[7],gl.UNSIGNED_BYTE);
+    assert([width,height,gl.skipPixels,gl.skipRows].every(Number.isInteger)&&width>0&&height>0&&gl.skipPixels>=0&&gl.skipRows>=0,'invalid source crop geometry');
+    assert(gl.skipPixels+width<=canvas.width&&gl.skipRows+height<=canvas.height,'source crop must fit all three guarded maps');
+    gl.uploads.push({mode:'patch',texture:gl.bound,x:args[2],y:args[3],width,height,sourceWidth:canvas.width,sourceHeight:canvas.height,skipPixels:gl.skipPixels,skipRows:gl.skipRows,flip:gl.flip});gl.hook?.('patch',canvas);
     if(gl.subCount===gl.errorSubAt)gl.error=1282;
     if(gl.subCount===gl.failSubAt)throw new Error('injected subupload failure');
   };
@@ -74,8 +80,24 @@ function released(g,from=0){
   assert.strictEqual(g.painter.lastMaterialMaps,null);assert.strictEqual(g.painter.materialNormalCtx,null);assert.strictEqual(g.painter.materialSpecCtx,null);
   assert(!g.currentStatic,'full-size CPU color backing must not be retained');
   assert.strictEqual(g.renderer.gl.flip,false,'pixel unpack state must be restored');
+  assert.strictEqual(g.renderer.gl.skipPixels,0,'pixel unpack column crop must be restored');assert.strictEqual(g.renderer.gl.skipRows,0,'pixel unpack row crop must be restored');
 }
-function refresh(g){const first=allocations.length,result=g.refreshEditorStatic();released(g,first);assert.strictEqual(result.retainedScratchPixels,0);assert.strictEqual(g.staticBackgroundRevision,g.renderer.backgroundRevision);return result}
+function refresh(g){
+  const first=allocations.length,result=g.refreshEditorStatic();released(g,first);assert.strictEqual(result.retainedScratchPixels,0);assert.strictEqual(g.staticBackgroundRevision,g.renderer.backgroundRevision);
+  const fullPixels=result.mode==='full'?g.renderer.nativeW*g.renderer.nativeH:0,regions=result.regions;
+  const rasterAreas=regions.map(r=>r.rasterWidth*r.rasterHeight);
+  assert.strictEqual(result.pixels,fullPixels+regions.reduce((n,r)=>n+r.width*r.height,0),'upload work uses output bounds');
+  assert.strictEqual(result.rasterPixels,fullPixels+rasterAreas.reduce((n,area)=>n+area,0),'raster work includes every guarded surface and any full repair');
+  assert.strictEqual(result.scratchPixels,Math.max(fullPixels,...rasterAreas,0),'scratch budget uses the largest guarded surface');assert.strictEqual(result.scratchBytes,result.scratchPixels*12);
+  if(result.mode==='patch'){
+    const created=allocations.slice(first);assert.strictEqual(created.length,regions.length*3,'no intermediate crop canvases are allocated');
+    regions.forEach((region,i)=>{for(const canvas of created.slice(i*3,i*3+3)){
+      assert.strictEqual(canvas.originalWidth,region.rasterWidth);assert.strictEqual(canvas.originalHeight,region.rasterHeight);
+      assert.deepStrictEqual(canvas.context.transforms[0],[g.renderer.nativeW/640,0,0,g.renderer.nativeH/360,region.rasterX?-region.rasterX:0,region.rasterY?-region.rasterY:0],'guarded raster translates from source origin, not output origin');
+    }});
+  }
+  return result;
+}
 function observeCommit(g,previous){let calls=0;g.renderer.gl.hook=()=>{assert.strictEqual(g.staticTerrainSnapshot,previous,'snapshot must commit only after every material upload succeeds');assert.strictEqual(g.renderer.backgroundReady,false,'partial material upload is never marked ready');calls++};return()=>{g.renderer.gl.hook=null;return calls}}
 let scenarios=0;
 
@@ -84,10 +106,12 @@ function fullPatchNoopAndHistory(){
   let finish=observeCommit(g,undefined),stats=refresh(g);assert.strictEqual(finish(),3);
   assert.strictEqual(stats.mode,'full');assert.strictEqual(stats.reason,'missing-baseline');assert.strictEqual(stats.rasterCells,760);assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(stats.uploadBytes,640*360*12);assert.strictEqual(r.backgroundRevision,1);assert(g.staticTerrainSnapshot.valid&&g.bgKey);
   let previous=g.staticTerrainSnapshot;g.room.water.add('6,7');finish=observeCommit(g,previous);stats=refresh(g);assert.strictEqual(finish(),3);
-  assert.strictEqual(stats.mode,'patch');assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(gl.fullCount,3,'eligible patch must not use texImage2D');assert(stats.rasterCells<=25&&stats.pixels<640*360);assert.strictEqual(stats.uploadBytes,stats.pixels*12);assert.strictEqual(stats.scratchBytes,stats.scratchPixels*12);assert.strictEqual(g.staticTerrainSnapshot.cellTypes[7*40+6],terrain.CELL_TYPES.water);assert.strictEqual(r.backgroundRevision,2);
+  assert.strictEqual(stats.mode,'patch');assert.strictEqual(stats.uploadCalls,3);assert.strictEqual(gl.fullCount,3,'eligible patch must not use texImage2D');assert(stats.rasterCells<=81&&stats.pixels<640*360);assert.strictEqual(stats.uploadBytes,stats.pixels*12);assert.strictEqual(stats.scratchBytes,stats.scratchPixels*12);assert.strictEqual(g.staticTerrainSnapshot.cellTypes[7*40+6],terrain.CELL_TYPES.water);assert.strictEqual(r.backgroundRevision,2);
   const firstRegion=stats.regions[0],upload=gl.uploads.find(x=>x.mode==='patch');assert.strictEqual(upload.x,firstRegion.x);assert.strictEqual(upload.y,360-firstRegion.y-firstRegion.height,'native y offset must account for flipped texture storage');assert(gl.uploads.every(u=>u.flip===true));
+  assert.strictEqual(upload.width,firstRegion.width);assert.strictEqual(upload.height,firstRegion.height);assert.strictEqual(upload.sourceWidth,firstRegion.rasterWidth);assert.strictEqual(upload.sourceHeight,firstRegion.rasterHeight);
+  assert.strictEqual(upload.skipPixels,firstRegion.x-firstRegion.rasterX);assert.strictEqual(upload.skipRows,firstRegion.rasterHeight-(firstRegion.y-firstRegion.rasterY)-firstRegion.height);assert(stats.rasterPixels>stats.pixels,'filtering guard must be rastered without being uploaded');
   const count=allocations.length;stats=refresh(g);assert.strictEqual(stats.mode,'noop');assert.strictEqual(stats.uploadCalls,0);assert.strictEqual(stats.rasterCells,0);assert.strictEqual(stats.pixels,0);assert.strictEqual(stats.scratchPixels,0);assert.strictEqual(allocations.length,count,'unchanged static state creates no canvases');assert.strictEqual(r.backgroundRevision,2);
-  g.room.water.delete('6,7');g.room.water.add('30,14');stats=refresh(g);assert.strictEqual(stats.mode,'patch');assert.strictEqual(stats.changedCells,2);assert.strictEqual(stats.regions.length,2);assert.strictEqual(stats.uploadCalls,6);assert(stats.rasterCells<=50&&stats.pixels<10000);assert.strictEqual(r.backgroundRevision,4);
+  g.room.water.delete('6,7');g.room.water.add('30,14');stats=refresh(g);assert.strictEqual(stats.mode,'patch');assert.strictEqual(stats.changedCells,2);assert.strictEqual(stats.regions.length,2);assert.strictEqual(stats.uploadCalls,6);assert(stats.rasterCells<=162&&stats.pixels<10000);assert.strictEqual(r.backgroundRevision,4);
   // Production editor history replaces one raw room and rebinds Room while
   // retaining the source map. The runtime must accept this as a bounded delta.
   g.maps.rooms.fixture={walls:[],water:[[6,7]],path_cells:[],floor_microtile:4};g.room=new production.Room(0,g.room.spec,g.maps);g.room.border.clear();stats=refresh(g);assert.strictEqual(stats.mode,'patch');assert.strictEqual(stats.changedCells,2);
@@ -243,19 +267,66 @@ function rasterAndAllocationFailures(){
   assert.throws(()=>g.refreshEditorStatic(),/injected floor raster failure/);released(g,first);assert.strictEqual(g.staticTerrainSnapshot,null);assert.strictEqual(g.bgKey,'');assert.strictEqual(g.renderer.backgroundUploadCalls,0);faults.rasterAt=0;assert.strictEqual(refresh(g).mode,'full');scenarios++;
 }
 
+function guardedEdgeRasterMetrics(){
+  for(const [width,height,cell] of [[640,360,'0,0'],[640,360,'39,18'],[997,563,'0,18'],[997,563,'39,0']]){
+    const g=fixture();g.renderer.nativeW=width;g.renderer.nativeH=height;refresh(g);g.room.water.add(cell);
+    const stats=refresh(g),region=stats.regions[0],uploads=g.renderer.gl.uploads.filter(u=>u.mode==='patch');
+    assert.strictEqual(stats.mode,'patch');assert.strictEqual(stats.regions.length,1);assert.strictEqual(uploads.length,3);
+    assert(region.rasterX>=0&&region.rasterY>=0&&region.rasterX+region.rasterWidth<=width&&region.rasterY+region.rasterHeight<=height,'native-edge guards remain within the full source');
+    assert(region.rasterWidth>region.width&&region.rasterHeight>region.height,'edge clipping preserves the filtering guard on the interior sides');
+    assert.strictEqual(stats.rasterCells,(region.tx1-region.tx0)*(region.ty1-region.ty0));assert(stats.rasterCells<=760*.35,'guarded floor work retains the existing raster budget');
+    for(const u of uploads){
+      assert.strictEqual(u.width,region.width);assert.strictEqual(u.height,region.height);assert.strictEqual(u.sourceWidth,region.rasterWidth);assert.strictEqual(u.sourceHeight,region.rasterHeight);
+      assert.strictEqual(u.skipPixels,region.x-region.rasterX);assert.strictEqual(u.skipRows,region.rasterY+region.rasterHeight-region.y-region.height);
+    }
+    assert.strictEqual(stats.uploadBytes,region.width*region.height*12);assert.strictEqual(stats.scratchBytes,region.rasterWidth*region.rasterHeight*12);scenarios++;
+  }
+}
+
+function croppedUploadRestoresUnpackState(){
+  // Unequal top/bottom margins distinguish flipped source-row cropping from a
+  // top-origin skip. Test both normal completion and material upload failures.
+  const cases=[
+    {x:37,y:11,width:19,height:17,rasterX:16,rasterY:0,rasterWidth:80,rasterHeight:80,skipPixels:21,skipRows:52},
+    {x:613,y:327,width:27,height:21,rasterX:576,rasterY:288,rasterWidth:64,rasterHeight:72,skipPixels:37,skipRows:12}
+  ];
+  for(const region of cases)for(const fault of ['none','throw','gl-error']){
+    const g=fixture();refresh(g);const r=g.renderer,gl=r.gl,first=allocations.length,revision=r.backgroundRevision,bytes=r.backgroundUploadBytes,before=gl.uploads.length;
+    const canvases=[new FakeCanvas(region.rasterWidth,region.rasterHeight),new FakeCanvas(region.rasterWidth,region.rasterHeight),new FakeCanvas(region.rasterWidth,region.rasterHeight)],maps={normal:canvases[1],spec:canvases[2]};
+    const seed={flip:region.y>300,skipPixels:5,skipRows:7};gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,seed.flip);gl.pixelStorei(gl.UNPACK_SKIP_PIXELS,seed.skipPixels);gl.pixelStorei(gl.UNPACK_SKIP_ROWS,seed.skipRows);
+    if(fault==='throw')gl.failSubAt=2;else if(fault==='gl-error')gl.errorSubAt=3;
+    if(fault==='none')r.patchBackground(region,canvases[0],maps);else assert.throws(()=>r.patchBackground(region,canvases[0],maps),/injected subupload|Static background subupload failed/);
+    const uploads=gl.uploads.slice(before),attempts=fault==='throw'?2:3;
+    assert.strictEqual(uploads.length,attempts);assert.deepStrictEqual(uploads.map(u=>u.texture),['color','normal','specular'].slice(0,attempts));
+    for(const u of uploads){
+      assert.strictEqual(u.x,region.x);assert.strictEqual(u.y,360-region.y-region.height);assert.strictEqual(u.width,region.width);assert.strictEqual(u.height,region.height);
+      assert.strictEqual(u.sourceWidth,region.rasterWidth);assert.strictEqual(u.sourceHeight,region.rasterHeight);assert.strictEqual(u.flip,true);
+      assert.strictEqual(u.skipPixels,region.skipPixels);assert.strictEqual(u.skipRows,region.skipRows,'flipped source skip uses the bottom guard, not the top guard');
+    }
+    assert.deepStrictEqual({flip:gl.flip,skipPixels:gl.skipPixels,skipRows:gl.skipRows},seed,'all previous unpack values must be restored on success or failure');
+    assert.strictEqual(r.backgroundUploadBytes-bytes,attempts*region.width*region.height*4,'guard pixels never count as uploaded bytes');
+    assert.strictEqual(r.backgroundReady,fault==='none');assert.strictEqual(r.backgroundRevision,revision+(fault==='none'?1:0));
+    for(const canvas of canvases)canvas.width=canvas.height=1;
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.pixelStorei(gl.UNPACK_SKIP_PIXELS,0);gl.pixelStorei(gl.UNPACK_SKIP_ROWS,0);released(g,first);scenarios++;
+  }
+}
+
 function rejectInvalidPatches(){
-  const g=fixture();refresh(g);const r=g.renderer,gl=r.gl,region={x:7,y:11,width:13,height:17},c=new FakeCanvas(13,17),normal=new FakeCanvas(13,17),spec=new FakeCanvas(13,17),maps={normal,spec},before=gl.uploads.length;
+  const g=fixture();refresh(g);const r=g.renderer,gl=r.gl,region={x:7,y:11,width:13,height:17},c=new FakeCanvas(13,17),normal=new FakeCanvas(13,17),spec=new FakeCanvas(13,17),maps={normal,spec},before=gl.uploads.length,stores=gl.pixelStores.length,queries=gl.parameterQueries.length;
   for(const change of [{x:-1},{y:-1},{width:0},{height:0},{x:.5},{x:639},{y:359}])assert.throws(()=>r.patchBackground({...region,...change},c,maps),/Stale or invalid/);
+  for(const change of [{rasterX:-1},{rasterY:-1},{rasterX:7.5},{rasterY:Infinity},{rasterWidth:0},{rasterHeight:NaN},{rasterWidth:12},{rasterHeight:16},{rasterX:8},{rasterY:12},{rasterWidth:640},{rasterHeight:360}])assert.throws(()=>r.patchBackground({...region,...change},c,maps),/Stale or invalid static background patch crop/);
+  assert.throws(()=>r.patchBackground({...region,rasterX:0,rasterY:0,rasterWidth:20,rasterHeight:28},c,maps),/Incomplete static material patch/,'all material maps must match the larger raster bounds');
   assert.throws(()=>r.patchBackground(region,c,{normal}),/Incomplete static material patch/);
   normal.width=12;assert.throws(()=>r.patchBackground(region,c,maps),/Incomplete static material patch/);normal.width=13;
   assert.strictEqual(gl.uploads.length,before,'validation precedes every upload');assert.strictEqual(r.backgroundReady,true);
+  assert.strictEqual(gl.pixelStores.length,stores,'validation precedes any unpack mutation');assert.strictEqual(gl.parameterQueries.length,queries,'invalid crop requires no driver state query');
   const revision=r.backgroundRevision;r.backgroundReady=false;assert.throws(()=>r.patchBackground(region,c,maps),/Stale or invalid/);r.backgroundReady=true;r.backgroundSize=[639,360];assert.throws(()=>r.patchBackground(region,c,maps),/Stale or invalid/);r.backgroundSize=[640,360];
   gl.failSubAt=gl.subCount+2;assert.throws(()=>r.patchBackground(region,c,maps),/injected subupload/);assert.strictEqual(r.backgroundReady,false);assert.strictEqual(r.backgroundRevision,revision);assert.strictEqual(gl.flip,false);
   c.width=c.height=normal.width=normal.height=spec.width=spec.height=1;scenarios++;
 }
 
-fullPatchNoopAndHistory();staticIdentityAndStaleness();normalSourceGeneration();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();rejectInvalidPatches();
+fullPatchNoopAndHistory();staticIdentityAndStaleness();normalSourceGeneration();repairedUploadFailures();contextLossSkipsWork();laterRasterFailureInvalidatesReadiness();rasterAndAllocationFailures();guardedEdgeRasterMetrics();croppedUploadRestoresUnpackState();rejectInvalidPatches();
 console.log('STATIC TERRAIN RUNTIME REGRESSION PERF-004 PASS');
 console.log('  production Game / StaticPainter / GLRenderer scenarios:',scenarios);
-console.log('  bounded uploads, coherent snapshot/revision commits, native Y offsets, exact resource/source invalidation and editor history');
+console.log('  bounded guarded-raster uploads, asymmetric flipped source crops, unpack restoration, exact scratch/raster accounting and coherent snapshot/revision commits');
 console.log('  normal-source generation/no-op authority, partial upload / GL error / context-loss repair, failed repair invalidation, canvas allocation/raster cleanup, zero retained scratch');

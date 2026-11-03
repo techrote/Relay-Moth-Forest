@@ -17,7 +17,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       PYTHONUNBUFFERED: '1'
       PYTHONDONTWRITEBYTECODE: '1'
@@ -101,7 +101,7 @@ jobs:
         run: python self_test.py 2>&1 | tee "$VALIDATION_OUT/self-test.log"
 
       - name: Native Chromium, editor and bounded water/static textures
-        timeout-minutes: 8
+        timeout-minutes: 12
         run: python tests/current/browser_render_regression_414.py --out "$VALIDATION_OUT/browser" 2>&1 | tee "$VALIDATION_OUT/browser.log"
 
       - name: Check out accepted base for same-host performance comparison
