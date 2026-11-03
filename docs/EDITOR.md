@@ -81,11 +81,13 @@ The toolbar shows **CLEAN**, **DIRTY PROJECT**, or **DIRTY PROJECT/ROOM**, plus 
 
 ## Save and export
 
-**SAVE TO PROJECT** sends the complete maps object to `POST /__editor/save_maps`. The localhost server bounds the payload, checks the map schema/room shape, backs up the old file to `editor_backups/relay_moth_maps-<timestamp>.json`, writes a temporary file and atomically replaces `relay_moth_maps.json`. The Python endpoint performs structural checks; semantic diagnostics are the editor/shared-JavaScript validator's responsibility.
+**SAVE TO PROJECT** sends the complete maps object to `POST /__editor/save_maps`. The localhost server bounds the payload, checks the map schema/room shape, backs up the old file to `editor_backups/relay_moth_maps-<timestamp>-<unique>.json`, writes a temporary file and atomically replaces `relay_moth_maps.json`. Concurrent save requests to the same server commit in sequence, each preserving the exact preceding file; rapid saves cannot overwrite an older backup. A failed replacement leaves the old map intact and removes its temporary file. The Python endpoint performs structural checks; semantic diagnostics are the editor/shared-JavaScript validator's responsibility.
 
 Errors stop the first Save/Download attempt and expose **SAVE ANYWAY** or **DOWNLOAD ANYWAY** for explicit recovery. That acknowledgement belongs to the unchanged map fingerprint and action; editing again invalidates it. Warnings are shown without blocking. Prefer fixing errors to overriding them. A failed save leaves the dirty baseline unchanged and offers Download JSON; it does not silently export or claim success.
 
 **DOWNLOAD JSON** is the explicit fallback for a hosted/static build. The editor marks an issued download as its clean exported baseline, but cannot verify the browser's eventual download destination or completion. Downloading does **not** write the project file: keep the file and replace the local map deliberately. Successful project saves establish the saved baseline. Active pointer gestures are cancelled and field edits are committed before validation/persistence.
+
+While a project save is pending, its button shows **SAVING…** and prevents a second overlapping request. Editing and Download JSON remain available. Success acknowledges the exact map snapshot sent: edits made while waiting remain dirty and retain the navigation warning. A newer explicit export baseline is preserved if its download was issued before the older project-save response arrived. Failed saves restore the button and leave the previous baseline unchanged.
 
 ## Optional metadata and compatibility
 
