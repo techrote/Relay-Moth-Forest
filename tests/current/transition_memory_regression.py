@@ -12,7 +12,11 @@ assert 'relayMothContextRecovery39951' in js
 assert 'automatic reload suppressed after repeated loss' in js
 assert "game.painter.build(game.room,game.state,W,H)" in js
 assert 'this.trimTintCache(96)' in js
-assert 'this.sourceCanvas.width=1;this.sourceCanvas.height=1' in (ROOT/'surfacefx.js').read_text(encoding='utf-8')
+surface=(ROOT/'surfacefx.js').read_text(encoding='utf-8')
+# PERF-003 retains the active logical mask canvas for bounded redraws; ownership is in Game.
+assert 'this.sourceCanvas.width=1;this.sourceCanvas.height=1' not in surface
+assert 'this.fieldCanvas=null;this.fieldContext=null;this.mask=null;this.rgba=null' in surface
+assert 'if(oldCanvas&&oldCanvas!==waterMask)releaseCanvasBacking(oldCanvas)' in js
 assert 'class BoundedThreadingHTTPServer' in server
 assert '_COPY_CHUNK = 32 * 1024' in server
 assert 'max_workers=4' in server

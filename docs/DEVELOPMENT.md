@@ -119,7 +119,7 @@ Before a release:
 3. run full self-test;
 4. run renderer/pixel/browser tests where relevant;
 5. remove caches/temp files;
-6. regenerate `SHA256SUMS.txt`;
+6. stage intended additions/removals, then run `python tools/source_manifest.py --write` and `python tools/source_manifest.py --check`;
 7. make a versioned package;
 8. extract it into a clean directory;
 9. verify internal checksums;
@@ -148,22 +148,26 @@ The `docs/4.14 milestone archive/` directory is historical evidence. Do not upda
 
 Release identity is in `VERSION.txt`, the HTML title/help heading, launcher/self-test banners and game diagnostics (including the F10 download filename). The editor file header follows the product milestone. Preserve the map/LUT/effect/story/atlas schema IDs, graphics/progression localStorage keys, internal SurfaceFX/FoliageFX material versions, descriptor compatibility signatures, historical test filenames and archived evidence.
 
-The root `SHA256SUMS.txt` is the current source-package manifest, not the frozen v4.14 archive. Regenerate it from tracked final files (including new documents/tests), excluding itself and temporary candidate-validation workflows. This repairs obsolete root paths without rewriting any historical archive contents:
+The root `SHA256SUMS.txt` is the current source-package manifest, not the frozen v4.14 archive. [The source-manifest tool](../tools/source_manifest.py) enumerates Git's tracked index and hashes the current working-tree bytes. It includes new documents, tests, tools and durable workflows once they are staged. It never discovers untracked backups, bytecode or test output by walking the checkout.
 
-```python
-from pathlib import Path
-import hashlib, subprocess
-root = Path('.')
-paths = sorted(p for p in subprocess.check_output(
-    ['git', 'ls-files', '-z']).decode().split('\0') if p)
-with open('SHA256SUMS.txt', 'w', encoding='utf-8') as out:
-    for name in paths:
-        if name == 'SHA256SUMS.txt' or name.startswith('.github/workflows/e415-11-'):
-            continue
-        digest = hashlib.sha256((root / name).read_bytes()).hexdigest()
-        out.write(f'{digest}  ./{name}\n')
+Stage only the intended source additions and removals first. Then regenerate and verify the manifest:
+
+```text
+python tools/source_manifest.py --write
+python tools/source_manifest.py --check
+git add -- SHA256SUMS.txt
 ```
 
-Stage intended new files before enumerating them. Do not include local backups, bytecode, evidence outputs, `.git`, or a package inside its own checksum set. Create the versioned source package from the final tracked tree outside the checkout, extract into a clean directory and run `sha256sum -c SHA256SUMS.txt`, `python self_test.py`, the explicit v4.15 behavior/reservation/docs suites, then verify checksums again. Generated caches are not shipped content.
+`--check` is read-only and reports changed hashes, missing or extra inventory entries, duplicate/malformed entries and noncanonical ordering. A missing tracked file is an error; restore it or stage its deliberate removal with `git rm`. Review the resulting diff before committing. The tool requires a Git checkout, Python 3.9 or later and regular tracked files; unsupported symbolic links, submodules and unresolved conflicts fail explicitly.
 
-The E415 release-consolidation issue does not itself require a GitHub Release/tag. Keep the Wiki publisher unchanged: it mirrors version-controlled `wiki/` after merge. Preserve `docs/rag/editor-v415/` as implementation provenance and record concise validation under `docs/validation/v4.15/`. Temporary validation workflows are removed before merge; accepted run IDs and tested source commits remain in the issue/PR evidence.
+The manifest excludes itself and historical temporary `e415-<number>-{validation,evidence,prepare}.yml` / `perf-<number>[letter]-{validation,evidence,prepare}.yml` transports (also `.yaml`). Durable `validate.yml` and `publish-wiki.yml` are included. Preserve the frozen archive contents and their own historical manifests.
+
+Create the versioned source package from the final tracked tree outside the checkout. A clean extraction need not contain `.git`: use `sha256sum -c SHA256SUMS.txt` there to verify the shipped bytes, run `python self_test.py` and the explicit v4.15 behavior/reservation/docs suites, then verify checksums again. Do not add local backups, caches or a package inside its own checksum set.
+
+## Continuous validation
+
+[The durable validation workflow](../.github/workflows/validate.yml) runs one Ubuntu 24.04 job for pull requests targeting `main`, pushes to `main` and manual dispatch. Feature-branch pushes do not start a second copy of a PR run; a newer run cancels the older run for the same PR/ref. PR validation checks out the exact submitted head, so reconcile with current `main` before accepting its result.
+
+The job checks the source inventory, requires a genuine GLES3 context, runs the full deterministic/shader/pixel suite, exercises the native Chromium renderer/editor and captures bounded water performance evidence. It verifies the source manifest again after testing. Every run attempts to upload logs, source commit/tree identity, installed Python package versions, browser results/screenshots and raw timing JSON; artifacts are retained for 30 days. Archive evidence needed for long-term acceptance before that retention window expires.
+
+See [Testing](TESTING.md) for the equivalent local commands and the limits of software-rendered evidence. The E415 release-consolidation issue does not itself require a GitHub Release/tag. The Wiki publisher continues to mirror version-controlled `wiki/` after merge. Preserve `docs/rag/editor-v415/` as implementation provenance and record concise validation under `docs/validation/v4.15/` or `docs/validation/performance/`. Historical branch-only validation workflows have been replaced by durable CI; retain their accepted run IDs and tested source commits in the evidence.

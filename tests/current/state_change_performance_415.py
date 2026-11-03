@@ -36,6 +36,20 @@ SCENARIOS = [
 SCENARIO_JS = r"""
 async (name) => {
   const twoFrames=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  const waterCounters=()=>({
+    fullRebuilds:game.renderer.surfaceFX?.water?.rebuilds||0,
+    boundedUpdates:game.renderer.surfaceFX?.water?.boundedUpdates||0,
+    fullLegacyUploads:game.renderer.waterMaskFullUploads||0,
+    boundedLegacyUploads:game.renderer.waterMaskBoundedUploads||0,
+  });
+  let waterBefore=null;
+  const decorate=r=>{
+    const after=waterCounters();
+    return {...r,waterDiagnostics:game.renderer.surfaceFX?.diagnostics?.().water||null,
+      legacyWater:game.renderer.lastWaterMaskUpdate||null,
+      waterSourceReadFrequently:game.waterMaskCanvas?.getContext('2d').getContextAttributes?.().willReadFrequently??null,
+      waterWorkDelta:Object.fromEntries(Object.keys(after).map(k=>[k,after[k]-(waterBefore?.[k]??after[k])]))};
+  };
   const reset=async(roomKey,completed=[],editor=false)=>{
     relayMothPerf.enable(false);relayMothPerf.clear();
     if(globalThis.rmfEditor?.active)rmfEditor.toggle(false);
@@ -54,19 +68,21 @@ async (name) => {
     game.paused=true;
     if(editor)rmfEditor.toggle(true);
     await twoFrames();
+    waterBefore=waterCounters();
     relayMothPerf.enable(true);relayMothPerf.clear();
   };
   const finish=async()=>{
     for(let i=0;i<8;i++){
       await new Promise(resolve=>requestAnimationFrame(resolve));
       const records=relayMothPerf.snapshot().records;
-      if(records.length&&!records[records.length-1].pendingFrame)return records[records.length-1];
+      if(records.length&&!records[records.length-1].pendingFrame)return decorate(records[records.length-1]);
     }
     const snap=relayMothPerf.snapshot();
     if(!snap.records.length)throw Error('Scenario '+name+' produced no timing record');
     throw Error('Scenario '+name+' did not reach a post-event frame: '+JSON.stringify(snap.records[snap.records.length-1]));
   };
   const manual=async(label,meta,fn)=>{
+    waterBefore=waterCounters();
     const token=relayMothPerf.begin(label,meta);
     try{fn()}finally{relayMothPerf.end(token)}
     return finish();
@@ -215,7 +231,7 @@ def summarize(records):
         summary["phases"][name] = stats([r.get("phases", {}).get(name, 0.0) for r in records])
     leaf = {
         k: v for k, v in summary["phases"].items()
-        if v and not k.endswith(".total") and k not in {"foliage.descriptor.build"}
+        if v and not k.endswith(".total") and k not in {"foliage.descriptor.build", "water.upload"}
     }
     if leaf:
         dominant = max(leaf.items(), key=lambda kv: kv[1]["median"])
@@ -303,6 +319,21 @@ def main():
                 for _ in range(args.samples):
                     record = page.evaluate(SCENARIO_JS, scenario)
                     records.append(record)
+                if scenario in {"objective-rivet", "editor-water"}:
+                    for record in records:
+                        water = (record.get("waterDiagnostics") or {}).get("lastUpdate") or {}
+                        legacy = record.get("legacyWater") or {}
+                        assert water.get("mode") == "bounded", (scenario, "SurfaceFX did not use bounded update", water)
+                        assert legacy.get("mode") == "bounded", (scenario, "legacy mask did not use bounded update", legacy)
+                        field = water.get("field") or [0, 0]
+                        assert water.get("uploadBytes", 10**12) < field[0] * field[1] * 4, (scenario, "bounded field uploaded full texture", water)
+                        work = record.get("waterWorkDelta") or {}
+                        assert work.get("fullRebuilds") == 0 and work.get("fullLegacyUploads") == 0, (scenario, "bounded event also ran a full refresh", work)
+                        assert work.get("boundedUpdates") == 1 and work.get("boundedLegacyUploads") == 1, (scenario, "unexpected water refresh count", work)
+                        assert 0 < water.get("distanceCells", 10**12) < field[0] * field[1], (scenario, "unbounded shore work", water)
+                        assert 0 < water.get("acquirePixels", 10**12) < field[0] * field[1], (scenario, "unbounded mask acquisition", water)
+                        assert 0 < legacy.get("uploadBytes", 10**12) < 640 * 360 * 4, (scenario, "unbounded legacy upload", legacy)
+                        assert record.get("waterSourceReadFrequently") is True, (scenario, "CPU mask backing was not selected at context creation")
                 run["scenarios"][scenario] = {
                     "summary": summarize(records),
                     "records": records,
