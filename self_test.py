@@ -238,6 +238,7 @@ def main():
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_invalidation_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'mutable_presentation_regression_415.js')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'raster_export_regression_415.js')],check=True)
+    subprocess.run(['python',str(ROOT/'tests'/'current'/'native_gate_orchestration_415.py')],check=True)
     subprocess.run(['node',str(ROOT/'tests'/'current'/'editor_behavior_regression_415.js')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'wysiwyg_editor_input_regression_411.py')],check=True)
     subprocess.run(['python',str(ROOT/'tests'/'current'/'object_editor_regression_412.py')],check=True)
